@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod init:*)",
+      "Bash(go get:*)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "WebFetch(domain:docs.polymarket.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:nautilustrader.io)",
+      "WebFetch(domain:apidog.com)",
+      "WebFetch(domain:www.polytrackhq.app)",
+      "Bash(cd \"/home/atlasdev/Рабочий стол/Scripts/Golang/polytrade-bot\" && go mod tidy 2>&1)",
+      "Bash(cat:*)",
+      "Bash(cd \"/home/atlasdev/Рабочий стол/Scripts/Golang/polytrade-bot\" && go get github.com/fsnotify/fsnotify && go get github.com/google/uuid && go mod tidy 2>&1)",
+      "Bash(cd \"/home/atlasdev/Рабочий стол/Scripts/Golang/polytrade-bot\" && go test ./internal/storage/sqlite/... -v 2>&1)",
+      "Bash(cd \"/home/atlasdev/Рабочий стол/Scripts/Golang/polytrade-bot\" && go test ./internal/auth/... -v 2>&1)"
+    ]
+  }
+}
