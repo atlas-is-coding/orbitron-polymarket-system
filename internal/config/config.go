@@ -17,6 +17,7 @@ type Config struct {
 	Database    DatabaseConfig    `toml:"database"`
 	Log         LogConfig         `toml:"log"`
 	Copytrading CopytradingConfig `toml:"copytrading"`
+	UI          UIConfig          `toml:"ui"`
 }
 
 type APIConfig struct {
@@ -81,6 +82,10 @@ type DatabaseConfig struct {
 type LogConfig struct {
 	Level  string `toml:"level"`
 	Format string `toml:"format"`
+}
+
+type UIConfig struct {
+	Language string `toml:"language"`
 }
 
 // CopytradingConfig — конфигурация подсистемы копитрейдинга.
@@ -168,6 +173,9 @@ func (c *Config) validate() error {
 		if c.Copytrading.Traders[i].AllocationPct <= 0 {
 			c.Copytrading.Traders[i].AllocationPct = 5.0
 		}
+	}
+	if c.UI.Language == "" {
+		c.UI.Language = "en"
 	}
 	return nil
 }

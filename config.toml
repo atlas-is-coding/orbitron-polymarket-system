@@ -1,79 +1,54 @@
-# ============================================================
-# Polymarket Bot — Configuration
-# ============================================================
-
 [api]
-  clob_url    = "https://clob.polymarket.com"
-  gamma_url   = "https://gamma-api.polymarket.com"
-  data_url    = "https://data-api.polymarket.com"
-  ws_url      = "wss://ws-subscriptions-clob.polymarket.com/ws/"
+  clob_url = "https://clob.polymarket.com"
+  gamma_url = "https://gamma-api.polymarket.com"
+  data_url = "https://data-api.polymarket.com"
+  ws_url = "wss://ws-subscriptions-clob.polymarket.com/ws/"
   timeout_sec = 10
   max_retries = 3
 
 [auth]
-  # L1: Ethereum private key (hex, без 0x)
   private_key = ""
-  # L2: API credentials (получить через Polymarket UI)
-  api_key     = ""
-  api_secret  = ""
-  passphrase  = ""
-  # Chain ID: 137 = Polygon Mainnet, 80002 = Amoy Testnet
-  chain_id    = 137
+  api_key = ""
+  api_secret = ""
+  passphrase = ""
+  chain_id = 137
 
 [trading]
-  enabled          = false
+  enabled = false
   max_position_usd = 100.0
-  slippage_pct     = 0.5
-  # Типы ордеров: GTC, FOK, GTD
+  slippage_pct = 0.5
   default_order_type = "GTC"
-  # neg_risk — для рынков с двойными токенами (YES/NO)
   neg_risk = false
 
 [monitor]
-  enabled          = true
+  enabled = true
   poll_interval_ms = 1000
-  # Список condition_id рынков для отслеживания (пусто = все)
   markets = []
-
   [monitor.trades]
-    # Включить мониторинг ордеров, сделок и позиций пользователя
-    # Требует L2 авторизации (api_key, api_secret, passphrase)
-    enabled          = false
+    enabled = false
     poll_interval_ms = 5000
-    # Отслеживать позиции через CLOB /positions
-    track_positions  = true
-    # Алерты при исполнении и отмене ордеров
-    alert_on_fill    = true
-    alert_on_cancel  = true
-    # Количество последних сделок для загрузки в каждом цикле
-    trades_limit     = 50
+    track_positions = true
+    alert_on_fill = true
+    alert_on_cancel = true
+    trades_limit = 50
 
 [telegram]
-  enabled   = false
+  enabled = false
   bot_token = ""
-  chat_id   = ""
+  chat_id = ""
 
 [database]
   enabled = false
-  path    = "./data/polytrade.db"
+  path = "./data/polytrade.db"
 
 [log]
-  # Уровни: trace, debug, info, warn, error
-  level  = "info"
-  # Форматы: pretty (цветной для разработки), json (для продакшена)
+  level = "trace"
   format = "pretty"
 
 [copytrading]
-  enabled          = false
+  enabled = false
   poll_interval_ms = 10000
-  # Метод расчёта размера: "proportional" или "fixed_pct"
-  size_mode        = "proportional"
+  size_mode = "proportional"
 
-  # Пример трейдера — укажи реальный адрес proxy-wallet
-  # [[copytrading.traders]]
-  #   address          = "0xABC..."
-  #   label            = "whale1"
-  #   enabled          = true
-  #   allocation_pct   = 10.0
-  #   max_position_usd = 50.0
-  #   # size_mode = "fixed_pct"   # переопределяет глобальный
+[ui]
+language = "en"
