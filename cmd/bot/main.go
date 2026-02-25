@@ -49,7 +49,7 @@ func run() error {
 			return fmt.Errorf("wizard: %w", err)
 		}
 		if _, err := os.Stat(*cfgPath); os.IsNotExist(err) {
-			return fmt.Errorf("wizard завершён без создания конфига")
+			return fmt.Errorf("wizard completed without creating config")
 		}
 	}
 
@@ -72,7 +72,7 @@ func run() error {
 	} else {
 		log = logger.New(cfg.Log.Level, cfg.Log.Format)
 	}
-	log.Info().Str("config", *cfgPath).Msg("polytrade-bot starting")
+	log.Info().Str("config", *cfgPath).Msg(i18n.T().LogBotStarting)
 
 	// --- HTTP клиенты ---
 	clobHTTP := api.NewClient(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
@@ -95,7 +95,7 @@ func run() error {
 			}
 			l2Creds.Address = l1.Address()
 			walletAddr = l1.Address()
-			log.Info().Str("address", l2Creds.Address).Msg("L1 signer initialized")
+			log.Info().Str("address", l2Creds.Address).Msg(i18n.T().LogL1Initialized)
 		}
 	}
 
@@ -108,7 +108,7 @@ func run() error {
 	wsClient := ws.NewClient(cfg.API.WSURL, log)
 	if l2Creds != nil {
 		wsClient.Subscribe(ws.UserSubscription(l2Creds), func(msg *ws.Message) {
-			log.Debug().Str("event", msg.EventType).Msg("ws user event")
+			log.Debug().Str("event", msg.EventType).Msg(i18n.T().LogWSUserEvent)
 		})
 	}
 
@@ -116,7 +116,7 @@ func run() error {
 	var notifier notify.Notifier = &notify.NoopNotifier{}
 	if cfg.Telegram.Enabled {
 		notifier = telegramNotify.New(cfg.Telegram.BotToken, cfg.Telegram.ChatID)
-		log.Info().Msg("telegram notifier enabled")
+		log.Info().Msg(i18n.T().LogTelegramEnabled)
 	}
 
 	// --- Storage (SQLite) ---
@@ -127,7 +127,7 @@ func run() error {
 			return fmt.Errorf("open database: %w", err)
 		}
 		defer db.Close()
-		log.Info().Str("path", cfg.Database.Path).Msg("database opened")
+		log.Info().Str("path", cfg.Database.Path).Msg(i18n.T().LogDatabaseOpened)
 	}
 
 	// --- Trading Engine ---
@@ -148,7 +148,7 @@ func run() error {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		sig := <-sigCh
-		log.Info().Str("signal", sig.String()).Msg("shutdown signal received")
+		log.Info().Str("signal", sig.String()).Msg(i18n.T().LogShutdownSignal)
 		cancel()
 	}()
 
@@ -174,9 +174,9 @@ func run() error {
 
 	if cfg.Monitor.Trades.Enabled {
 		if l2Creds == nil {
-			log.Warn().Msg("trades monitor requires L2 credentials, skipping")
+			log.Warn().Msg(i18n.T().LogTradesMonitorSkip)
 		} else {
-			log.Info().Msg("trades monitor enabled")
+			log.Info().Msg(i18n.T().LogTradesMonitorEnabled)
 			startSubsystem("Trades Monitor", func() error { return tradesMon.Run(ctx) })
 		}
 	}
@@ -187,9 +187,9 @@ func run() error {
 
 	if cfg.Copytrading.Enabled {
 		if l2Creds == nil || cfg.Auth.PrivateKey == "" {
-			log.Warn().Msg("copytrading requires L2 credentials and private_key, skipping")
+			log.Warn().Msg(i18n.T().LogCopytradingSkipL2)
 		} else if db == nil {
-			log.Warn().Msg("copytrading requires database.enabled = true, skipping")
+			log.Warn().Msg(i18n.T().LogCopytradingSkipDB)
 		} else {
 			l1, err := auth.NewL1Signer(cfg.Auth.PrivateKey)
 			if err != nil {
@@ -207,7 +207,7 @@ func run() error {
 				clobClient,
 				log,
 			)
-			log.Info().Int("traders", len(cfg.Copytrading.Traders)).Msg("copytrading enabled")
+			log.Info().Int("traders", len(cfg.Copytrading.Traders)).Msg(i18n.T().LogCopytradingEnabled)
 			startSubsystem("Copytrading", func() error { return copyTrader.Run(ctx) })
 		}
 	}
@@ -238,18 +238,18 @@ func run() error {
 	}
 
 	// --- Headless режим ---
-	log.Info().Msg("bot running. Press Ctrl+C to stop.")
+	log.Info().Msg(i18n.T().LogBotRunning)
 	select {
 	case <-ctx.Done():
-		log.Info().Msg("shutting down...")
+		log.Info().Msg(i18n.T().LogShuttingDown)
 	case err := <-errCh:
-		log.Error().Err(err).Msg("fatal error")
+		log.Error().Err(err).Msg(i18n.T().LogFatalError)
 		cancel()
 		return err
 	}
 
 	wsClient.Close()
 	engine.Stop()
-	log.Info().Msg("bye!")
+	log.Info().Msg(i18n.T().LogBye)
 	return nil
 }
