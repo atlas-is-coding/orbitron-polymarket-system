@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/atlasdev/polytrade-bot/internal/i18n"
 )
 
 // wizardStep describes one wizard input step.
@@ -18,27 +20,15 @@ type wizardStep struct {
 	IsPass bool
 }
 
-var wizardSteps = []wizardStep{
-	{
-		Label:  "Private Key",
-		Hint:   "Hex-ключ вашего Ethereum кошелька (без 0x).\nИспользуется для подписи ордеров EIP-712 и деривации адреса.",
-		IsPass: true,
-	},
-	{
-		Label:  "API Key",
-		Hint:   "API-ключ Polymarket CLOB.\nПолучите через POST /auth/api-key или в личном кабинете.",
-		IsPass: false,
-	},
-	{
-		Label:  "API Secret",
-		Hint:   "Секрет для HMAC-SHA256 подписи запросов.",
-		IsPass: true,
-	},
-	{
-		Label:  "Passphrase",
-		Hint:   "Passphrase для L2 аутентификации.",
-		IsPass: true,
-	},
+// buildWizardSteps returns wizard steps using the current locale.
+func buildWizardSteps() []wizardStep {
+	t := i18n.T()
+	return []wizardStep{
+		{Label: t.WizardStep1Label, Hint: t.WizardStep1Hint, IsPass: true},
+		{Label: t.WizardStep2Label, Hint: t.WizardStep2Hint, IsPass: false},
+		{Label: t.WizardStep3Label, Hint: t.WizardStep3Hint, IsPass: true},
+		{Label: t.WizardStep4Label, Hint: t.WizardStep4Hint, IsPass: true},
+	}
 }
 
 // WizardDoneMsg is emitted when the wizard completes and config.toml is written.
@@ -49,6 +39,7 @@ type WizardDoneMsg struct {
 // WizardModel is the Bubble Tea model for the first-run wizard.
 type WizardModel struct {
 	step    int
+	steps   []wizardStep
 	inputs  []textinput.Model
 	errMsg  string
 	width   int
@@ -58,8 +49,9 @@ type WizardModel struct {
 
 // NewWizardModel creates a new WizardModel.
 func NewWizardModel(width, height int, outPath string) WizardModel {
-	inputs := make([]textinput.Model, len(wizardSteps))
-	for i, s := range wizardSteps {
+	steps := buildWizardSteps()
+	inputs := make([]textinput.Model, len(steps))
+	for i, s := range steps {
 		ti := textinput.New()
 		ti.Placeholder = s.Label
 		ti.CharLimit = 256
@@ -69,7 +61,7 @@ func NewWizardModel(width, height int, outPath string) WizardModel {
 		inputs[i] = ti
 	}
 	inputs[0].Focus()
-	return WizardModel{inputs: inputs, width: width, height: height, outPath: outPath}
+	return WizardModel{steps: steps, inputs: inputs, width: width, height: height, outPath: outPath}
 }
 
 func (m WizardModel) Init() tea.Cmd { return textinput.Blink }
@@ -87,20 +79,20 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			val := strings.TrimSpace(m.inputs[m.step].Value())
 			if val == "" {
-				m.errMsg = "Поле не может быть пустым"
+				m.errMsg = i18n.T().WizardEmptyField
 				return m, nil
 			}
 			m.errMsg = ""
 			m.inputs[m.step].Blur()
 
-			if m.step < len(wizardSteps)-1 {
+			if m.step < len(m.steps)-1 {
 				m.step++
 				m.inputs[m.step].Focus()
 				return m, textinput.Blink
 			}
 
 			if err := m.writeConfig(); err != nil {
-				m.errMsg = fmt.Sprintf("Ошибка записи конфига: %v", err)
+				m.errMsg = fmt.Sprintf(i18n.T().WizardWriteError, err)
 				return m, nil
 			}
 			return m, func() tea.Msg { return WizardDoneMsg{ConfigPath: m.outPath} }
@@ -171,8 +163,8 @@ func (m WizardModel) writeConfig() error {
 }
 
 func (m WizardModel) View() string {
-	s := wizardSteps[m.step]
-	progress := fmt.Sprintf("Шаг %d/%d: %s", m.step+1, len(wizardSteps), s.Label)
+	s := m.steps[m.step]
+	progress := fmt.Sprintf(i18n.T().WizardProgress, m.step+1, len(m.steps), s.Label)
 
 	errLine := ""
 	if m.errMsg != "" {
@@ -187,7 +179,7 @@ func (m WizardModel) View() string {
 		StyleTooltip.Render(s.Hint),
 		errLine,
 		"",
-		StyleMuted.Render("[Enter] продолжить  [Ctrl+C] выход"),
+		StyleMuted.Render(i18n.T().WizardContinue),
 	)
 
 	w := m.width - 6
@@ -195,6 +187,6 @@ func (m WizardModel) View() string {
 		w = 40
 	}
 	box := StyleBorder.Width(w).Padding(1, 2).Render(body)
-	title := StyleHeader.Render("  polytrade-bot — Первичная настройка  ")
+	title := StyleHeader.Render(i18n.T().WizardTitle)
 	return lipgloss.JoinVertical(lipgloss.Left, title, "", box)
 }

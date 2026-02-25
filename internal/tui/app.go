@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/i18n"
 )
 
 // AppModel is the root Bubble Tea model for the TUI dashboard.
@@ -174,10 +175,10 @@ func (m AppModel) View() string {
 	dot := StyleHeaderDot.Render("●")
 	walletPart := ""
 	if walletShort != "" {
-		walletPart = "  │  Wallet: " + walletShort
+		walletPart = "  │  " + i18n.T().AppWallet + ": " + walletShort
 	}
 	header := StyleHeader.Width(m.width).Render(
-		fmt.Sprintf(" polytrade-bot  %s Running%s ", dot, walletPart),
+		fmt.Sprintf(" polytrade-bot  %s %s%s ", dot, i18n.T().AppRunning, walletPart),
 	)
 	tabBar := RenderTabBar(m.activeTab, m.width)
 
@@ -198,7 +199,7 @@ func (m AppModel) View() string {
 	}
 
 	helpBar := StyleHelpBar.Width(m.width).Render(
-		"  Tab/Shift+Tab: вкладка  1-6: быстрый переход  Ctrl+C: выход  ",
+		"  " + i18n.T().HelpGlobal + "  ",
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, helpBar)
