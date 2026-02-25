@@ -9,6 +9,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/api/clob"
 	"github.com/atlasdev/polytrade-bot/internal/api/data"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/notify"
 	"github.com/rs/zerolog"
 )
@@ -59,7 +60,7 @@ func (tm *TradesMonitor) Run(ctx context.Context) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	tm.logger.Info().Dur("interval", interval).Msg("trades monitor started")
+	tm.logger.Info().Dur("interval", interval).Msg(i18n.T().LogTradesMonitorStarted)
 
 	// Первый цикл сразу при запуске
 	tm.poll(ctx)
@@ -87,7 +88,7 @@ func (tm *TradesMonitor) poll(ctx context.Context) {
 func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	resp, err := tm.clobClient.GetOrders()
 	if err != nil {
-		tm.logger.Warn().Err(err).Msg("failed to fetch orders")
+		tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedFetchOrders)
 		return
 	}
 
@@ -100,11 +101,11 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	// Детект отменённых/исполненных ордеров (были в prevOrderIDs, нет в новых)
 	for id := range tm.prevOrderIDs {
 		if _, ok := newOrderIDs[id]; !ok {
-			tm.logger.Info().Str("order_id", id).Msg("order closed or canceled")
+			tm.logger.Info().Str("order_id", id).Msg(i18n.T().LogOrderClosed)
 			go func(orderID string) {
-				msg := fmt.Sprintf("🔔 Ордер закрыт/исполнен: %s", orderID)
+				msg := fmt.Sprintf(i18n.T().TgOrderClosed, orderID)
 				if err := tm.notifier.Send(ctx, msg); err != nil {
-					tm.logger.Warn().Err(err).Msg("failed to send order alert")
+					tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 				}
 			}(id)
 		}
@@ -114,11 +115,11 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	if len(tm.prevOrderIDs) > 0 {
 		for _, o := range resp.Data {
 			if _, ok := tm.prevOrderIDs[o.ID]; !ok {
-				tm.logger.Info().Str("order_id", o.ID).Str("side", string(o.Side)).Str("price", o.Price).Msg("new order detected")
+				tm.logger.Info().Str("order_id", o.ID).Str("side", string(o.Side)).Str("price", o.Price).Msg(i18n.T().LogNewOrderDetected)
 				go func(order clob.Order) {
-					msg := fmt.Sprintf("📋 Новый ордер: %s %s @ %s (размер: %s)", order.Side, order.AssetID[:8]+"...", order.Price, order.OriginalSize)
+					msg := fmt.Sprintf(i18n.T().TgNewOrder, order.Side, order.AssetID[:8]+"...", order.Price, order.OriginalSize)
 					if err := tm.notifier.Send(ctx, msg); err != nil {
-						tm.logger.Warn().Err(err).Msg("failed to send new order alert")
+						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(o)
 			}
@@ -129,7 +130,7 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	tm.prevOrderIDs = newOrderIDs
 	tm.mu.Unlock()
 
-	tm.logger.Debug().Int("count", len(resp.Data)).Msg("orders updated")
+	tm.logger.Debug().Int("count", len(resp.Data)).Msg(i18n.T().LogOrdersUpdated)
 }
 
 // pollTrades обновляет список сделок и генерирует алерты о новых исполнениях.
@@ -137,7 +138,7 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 	filter := clob.TradesFilter{Limit: tm.cfg.TradesLimit}
 	resp, err := tm.clobClient.GetTrades(filter)
 	if err != nil {
-		tm.logger.Warn().Err(err).Msg("failed to fetch trades")
+		tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedFetchTrades)
 		return
 	}
 
@@ -156,12 +157,12 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 					Str("side", string(t.Side)).
 					Str("price", t.Price).
 					Str("size", t.Size).
-					Msg("new trade executed")
+					Msg(i18n.T().LogTradeExecuted)
 				go func(trade clob.Trade) {
-					msg := fmt.Sprintf("✅ Сделка исполнена: %s %s @ %s (объём: %s)",
+					msg := fmt.Sprintf(i18n.T().TgTradeExecuted,
 						trade.Side, trade.AssetID[:8]+"...", trade.Price, trade.Size)
 					if err := tm.notifier.Send(ctx, msg); err != nil {
-						tm.logger.Warn().Err(err).Msg("failed to send trade alert")
+						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(t)
 			}

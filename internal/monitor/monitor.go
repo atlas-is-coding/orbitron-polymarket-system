@@ -8,6 +8,7 @@ import (
 
 	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/notify"
 	"github.com/rs/zerolog"
 )
@@ -47,7 +48,7 @@ func (m *Monitor) Run(ctx context.Context) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	m.logger.Info().Dur("interval", interval).Msg("monitor started")
+	m.logger.Info().Dur("interval", interval).Msg(i18n.T().LogMonitorStarted)
 
 	for {
 		select {
