@@ -25,7 +25,7 @@ func TestGetMarkets_WithLimit(t *testing.T) {
 	client := testutil.NewGammaClient()
 	markets, err := client.GetMarkets(gamma.MarketsParams{Limit: 3})
 	require.NoError(t, err)
-	assert.True(t, len(markets) <= 3, "expected at most 3 markets, got %d", len(markets))
+	assert.LessOrEqual(t, len(markets), 3)
 }
 
 func TestGetMarket_ByConditionID(t *testing.T) {
