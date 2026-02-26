@@ -312,11 +312,11 @@ var allFields = []FieldDef{
 	},
 	{
 		Section: func() string { return i18n.T().SectionTelegram },
-		Label:   func() string { return i18n.T().FieldChatID },
-		Tooltip: func() string { return i18n.T().TooltipChatID },
+		Label:   func() string { return i18n.T().FieldAdminChatID },
+		Tooltip: func() string { return i18n.T().TooltipAdminChatID },
 		Kind:    KindString,
-		Get:     func(c *config.Config) string { return c.Telegram.ChatID },
-		Set:     func(c *config.Config, v string) error { c.Telegram.ChatID = v; return nil },
+		Get:     func(c *config.Config) string { return c.Telegram.AdminChatID },
+		Set:     func(c *config.Config, v string) error { c.Telegram.AdminChatID = v; return nil },
 	},
 	// ── Database ─────────────────────────────────────────────────────────────
 	{
