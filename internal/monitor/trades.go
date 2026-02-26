@@ -11,6 +11,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/notify"
+	"github.com/atlasdev/polytrade-bot/internal/tui"
 	"github.com/rs/zerolog"
 )
 
@@ -33,6 +34,9 @@ type TradesMonitor struct {
 	prevOrderIDs map[string]struct{}
 	// Множество ID сделок из предыдущего цикла (для детекта новых исполнений)
 	prevTradeIDs map[string]struct{}
+
+	// bus — опциональный EventBus для push-снимков данных подписчикам (TUI, Telegram Bot)
+	bus *tui.EventBus
 }
 
 // NewTradesMonitor создаёт TradesMonitor.
@@ -52,6 +56,12 @@ func NewTradesMonitor(
 		prevOrderIDs: make(map[string]struct{}),
 		prevTradeIDs: make(map[string]struct{}),
 	}
+}
+
+// SetBus подключает EventBus для рассылки снимков данных после каждого poll.
+// Вызывать до Run(). Передача nil отключает рассылку.
+func (tm *TradesMonitor) SetBus(bus *tui.EventBus) {
+	tm.bus = bus
 }
 
 // Run запускает мониторинг. Блокирует до отмены ctx.
@@ -131,6 +141,22 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	tm.mu.Unlock()
 
 	tm.logger.Debug().Int("count", len(resp.Data)).Msg(i18n.T().LogOrdersUpdated)
+
+	if tm.bus != nil {
+		rows := make([]tui.OrderRow, 0, len(resp.Data))
+		for _, o := range resp.Data {
+			rows = append(rows, tui.OrderRow{
+				Market: o.AssetID,
+				Side:   string(o.Side),
+				Price:  o.Price,
+				Size:   o.OriginalSize,
+				Filled: o.SizeFilled,
+				Status: string(o.Status),
+				ID:     o.ID,
+			})
+		}
+		tm.bus.Send(tui.OrdersUpdateMsg{Rows: rows})
+	}
 }
 
 // pollTrades обновляет список сделок и генерирует алерты о новых исполнениях.
@@ -189,6 +215,22 @@ func (tm *TradesMonitor) pollPositions(ctx context.Context) {
 	tm.mu.Unlock()
 
 	tm.logger.Debug().Int("count", len(positions)).Msg("positions updated")
+
+	if tm.bus != nil {
+		rows := make([]tui.PositionRow, 0, len(positions))
+		for _, p := range positions {
+			rows = append(rows, tui.PositionRow{
+				Market:  p.AssetID,
+				Side:    p.Outcome,
+				Size:    fmt.Sprintf("%.4f", p.Size),
+				Entry:   fmt.Sprintf("%.4f", p.AveragePrice),
+				Current: fmt.Sprintf("%.4f", p.CurrentValue),
+				PnL:     fmt.Sprintf("%+.2f", p.PnL),
+				PnLPct:  "",
+			})
+		}
+		tm.bus.Send(tui.PositionsUpdateMsg{Rows: rows})
+	}
 }
 
 // --- Методы для чтения кэша ---
