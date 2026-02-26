@@ -33,6 +33,16 @@ type BalanceMsg struct {
 // LanguageChangedMsg is sent when the user switches the UI language.
 type LanguageChangedMsg struct{}
 
+// OrdersUpdateMsg carries a fresh snapshot of open orders from TradesMonitor.
+type OrdersUpdateMsg struct {
+	Rows []OrderRow
+}
+
+// PositionsUpdateMsg carries a fresh snapshot of positions from TradesMonitor.
+type PositionsUpdateMsg struct {
+	Rows []PositionRow
+}
+
 // EventBus bridges bot goroutines to the Bubble Tea loop.
 // Supports multiple subscribers via Tap(); the primary channel is
 // used by the TUI via WaitForEvent().
