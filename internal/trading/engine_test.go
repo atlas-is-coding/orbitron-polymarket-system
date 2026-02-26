@@ -75,7 +75,7 @@ func TestEngine_StrategyError_Propagates(t *testing.T) {
 	engine.Register(&immediateErrStrategy{err: expectedErr})
 	err := engine.Start(context.Background())
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, expectedErr), "expected error to wrap %v, got: %v", expectedErr, err)
+	assert.ErrorIs(t, err, expectedErr)
 }
 
 func TestEngine_Stop_CallsStopOnStrategies(t *testing.T) {

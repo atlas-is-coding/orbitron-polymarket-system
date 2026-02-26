@@ -2,6 +2,7 @@
 package assert
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -166,6 +167,36 @@ func GreaterOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...in
 func Less(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
 	helper(t)
 	return compareTwoValues(t, e1, e2, []CompareType{compareLess}, "\"%v\" is not less than \"%v\"", msgAndArgs...)
+}
+
+// LessOrEqual asserts that the first element is less than or equal to the second.
+func LessOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
+	helper(t)
+	return compareTwoValues(t, e1, e2, []CompareType{compareLess, compareEqual}, "\"%v\" is not less than or equal to \"%v\"", msgAndArgs...)
+}
+
+// ErrorIs asserts that errors.Is(err, target) is true.
+func ErrorIs(t TestingT, err, target error, msgAndArgs ...interface{}) bool {
+	helper(t)
+	if errors.Is(err, target) {
+		return true
+	}
+	t.Errorf("Target error should be in err chain:\n"+
+		"expected : %q\n"+
+		"in chain : %s\n%s",
+		target, buildErrorChainString(err), formatMsgAndArgs(msgAndArgs...))
+	return false
+}
+
+func buildErrorChainString(err error) string {
+	if err == nil {
+		return ""
+	}
+	var chain []string
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		chain = append(chain, fmt.Sprintf("%q", e))
+	}
+	return strings.Join(chain, "\n\t")
 }
 
 // NotEmpty asserts that the specified object is NOT empty.
@@ -516,6 +547,12 @@ func (a *Assertions) Fail(failureMessage string, msgAndArgs ...interface{}) bool
 }
 func (a *Assertions) FailNow(failureMessage string, msgAndArgs ...interface{}) bool {
 	return FailNow(a.t, failureMessage, msgAndArgs...)
+}
+func (a *Assertions) LessOrEqual(e1, e2 interface{}, msgAndArgs ...interface{}) bool {
+	return LessOrEqual(a.t, e1, e2, msgAndArgs...)
+}
+func (a *Assertions) ErrorIs(err, target error, msgAndArgs ...interface{}) bool {
+	return ErrorIs(a.t, err, target, msgAndArgs...)
 }
 
 // --- testing.T wrappers ---

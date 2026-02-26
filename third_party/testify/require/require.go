@@ -110,6 +110,22 @@ func Greater(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface
 	}
 }
 
+// LessOrEqual asserts that the first element is less than or equal to the second.
+func LessOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) {
+	helper(t)
+	if !assert.LessOrEqual(t, e1, e2, msgAndArgs...) {
+		t.FailNow()
+	}
+}
+
+// ErrorIs asserts that errors.Is(err, target) is true.
+func ErrorIs(t TestingT, err, target error, msgAndArgs ...interface{}) {
+	helper(t)
+	if !assert.ErrorIs(t, err, target, msgAndArgs...) {
+		t.FailNow()
+	}
+}
+
 // NotEmpty asserts that the specified object is NOT empty.
 func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) {
 	helper(t)
@@ -206,4 +222,10 @@ func (a *Assertions) ErrorContains(theError error, contains string, msgAndArgs .
 }
 func (a *Assertions) Fail(failureMessage string, msgAndArgs ...interface{}) {
 	Fail(a.t, failureMessage, msgAndArgs...)
+}
+func (a *Assertions) LessOrEqual(e1, e2 interface{}, msgAndArgs ...interface{}) {
+	LessOrEqual(a.t, e1, e2, msgAndArgs...)
+}
+func (a *Assertions) ErrorIs(err, target error, msgAndArgs ...interface{}) {
+	ErrorIs(a.t, err, target, msgAndArgs...)
 }
