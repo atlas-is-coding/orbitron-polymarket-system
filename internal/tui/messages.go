@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"sync"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/atlasdev/polytrade-bot/internal/config"
@@ -32,8 +34,12 @@ type BalanceMsg struct {
 type LanguageChangedMsg struct{}
 
 // EventBus bridges bot goroutines to the Bubble Tea loop.
+// Supports multiple subscribers via Tap(); the primary channel is
+// used by the TUI via WaitForEvent().
 type EventBus struct {
-	ch chan tea.Msg
+	ch   chan tea.Msg
+	mu   sync.Mutex
+	taps []chan tea.Msg
 }
 
 // NewEventBus creates an EventBus with a buffered channel.
@@ -41,12 +47,30 @@ func NewEventBus() *EventBus {
 	return &EventBus{ch: make(chan tea.Msg, 512)}
 }
 
-// Send enqueues a message (non-blocking; drops if full).
+// Send enqueues a message to the TUI channel and all tap subscribers (non-blocking; drops if full).
 func (b *EventBus) Send(msg tea.Msg) {
 	select {
 	case b.ch <- msg:
 	default:
 	}
+	b.mu.Lock()
+	for _, tap := range b.taps {
+		select {
+		case tap <- msg:
+		default:
+		}
+	}
+	b.mu.Unlock()
+}
+
+// Tap creates a new subscriber channel that receives a copy of every future Send() call.
+// The caller is responsible for draining the channel to prevent blocking.
+func (b *EventBus) Tap() <-chan tea.Msg {
+	ch := make(chan tea.Msg, 512)
+	b.mu.Lock()
+	b.taps = append(b.taps, ch)
+	b.mu.Unlock()
+	return ch
 }
 
 // WaitForEvent returns a tea.Cmd that blocks until the next EventBus message.
