@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 )
 
@@ -82,4 +84,60 @@ func (m CopytradingModel) View() string {
 		sb.WriteString("  " + t + "\n")
 	}
 	return lipgloss.NewStyle().Padding(0, 1).Render(sb.String())
+}
+
+// addTrader appends a new trader to cfg. Returns error if address is empty or already exists.
+func addTrader(cfg *config.Config, address, label string, allocPct, maxPositionUSD float64) error {
+	if address == "" {
+		return fmt.Errorf("address is required")
+	}
+	for _, t := range cfg.Copytrading.Traders {
+		if t.Address == address {
+			return fmt.Errorf("trader %q already exists", address)
+		}
+	}
+	cfg.Copytrading.Traders = append(cfg.Copytrading.Traders, config.TraderConfig{
+		Address:        address,
+		Label:          label,
+		Enabled:        true,
+		AllocationPct:  allocPct,
+		MaxPositionUSD: maxPositionUSD,
+		SizeMode:       cfg.Copytrading.SizeMode,
+	})
+	return nil
+}
+
+// removeTrader removes the trader with the given address. Returns error if not found.
+func removeTrader(cfg *config.Config, address string) error {
+	for i, t := range cfg.Copytrading.Traders {
+		if t.Address == address {
+			cfg.Copytrading.Traders = append(cfg.Copytrading.Traders[:i], cfg.Copytrading.Traders[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("trader %q not found", address)
+}
+
+// toggleTrader flips the Enabled flag on the trader with the given address.
+func toggleTrader(cfg *config.Config, address string) error {
+	for i, t := range cfg.Copytrading.Traders {
+		if t.Address == address {
+			cfg.Copytrading.Traders[i].Enabled = !t.Enabled
+			return nil
+		}
+	}
+	return fmt.Errorf("trader %q not found", address)
+}
+
+// editTrader updates label, allocPct, and maxPositionUSD for the trader with the given address.
+func editTrader(cfg *config.Config, address, label string, allocPct, maxPositionUSD float64) error {
+	for i, t := range cfg.Copytrading.Traders {
+		if t.Address == address {
+			cfg.Copytrading.Traders[i].Label = label
+			cfg.Copytrading.Traders[i].AllocationPct = allocPct
+			cfg.Copytrading.Traders[i].MaxPositionUSD = maxPositionUSD
+			return nil
+		}
+	}
+	return fmt.Errorf("trader %q not found", address)
 }

@@ -4,6 +4,7 @@ package assert
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -489,6 +490,37 @@ type Assertions struct {
 	t TestingT
 }
 
+// InDelta asserts that two floats are within delta of each other.
+func InDelta(t TestingT, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+	helper(t)
+	toFloat := func(v interface{}) (float64, bool) {
+		switch x := v.(type) {
+		case float64:
+			return x, true
+		case float32:
+			return float64(x), true
+		case int:
+			return float64(x), true
+		case int64:
+			return float64(x), true
+		default:
+			return 0, false
+		}
+	}
+	e, ok1 := toFloat(expected)
+	a2, ok2 := toFloat(actual)
+	if !ok1 || !ok2 {
+		t.Errorf("InDelta: non-numeric values %v, %v\n%s", expected, actual, formatMsgAndArgs(msgAndArgs...))
+		return false
+	}
+	diff := math.Abs(e - a2)
+	if diff > delta {
+		t.Errorf("InDelta: |%v - %v| = %v > %v\n%s", expected, actual, diff, delta, formatMsgAndArgs(msgAndArgs...))
+		return false
+	}
+	return true
+}
+
 // New makes a new Assertions object for the specified TestingT.
 func New(t TestingT) *Assertions {
 	return &Assertions{t: t}
@@ -553,6 +585,9 @@ func (a *Assertions) LessOrEqual(e1, e2 interface{}, msgAndArgs ...interface{}) 
 }
 func (a *Assertions) ErrorIs(err, target error, msgAndArgs ...interface{}) bool {
 	return ErrorIs(a.t, err, target, msgAndArgs...)
+}
+func (a *Assertions) InDelta(expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+	return InDelta(a.t, expected, actual, delta, msgAndArgs...)
 }
 
 // --- testing.T wrappers ---
