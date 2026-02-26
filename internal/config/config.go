@@ -69,9 +69,9 @@ type TradesMonitorConfig struct {
 }
 
 type TelegramConfig struct {
-	Enabled  bool   `toml:"enabled"`
-	BotToken string `toml:"bot_token"`
-	ChatID   string `toml:"chat_id"`
+	Enabled     bool   `toml:"enabled"`
+	BotToken    string `toml:"bot_token"`
+	AdminChatID string `toml:"admin_chat_id"` // admin: receives notifications and can control the bot
 }
 
 type DatabaseConfig struct {
@@ -114,6 +114,16 @@ type TraderConfig struct {
 	MaxPositionUSD float64 `toml:"max_position_usd"`
 	// SizeMode — переопределяет глобальный (если не пустая строка)
 	SizeMode string `toml:"size_mode"`
+}
+
+// Save сериализует cfg в TOML и записывает в файл path (создаёт или перезаписывает).
+func Save(path string, cfg *Config) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("config: save %q: %w", path, err)
+	}
+	defer f.Close()
+	return toml.NewEncoder(f).Encode(cfg)
 }
 
 // Load читает и парсит TOML-конфиг из указанного файла.

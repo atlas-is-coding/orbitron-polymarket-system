@@ -92,6 +92,7 @@ type Locale struct {
 	FieldSizeMode       string `json:"field_size_mode"`
 	FieldBotToken       string `json:"field_bot_token"`
 	FieldChatID         string `json:"field_chat_id"`
+	FieldAdminChatID    string `json:"field_admin_chat_id"`
 	FieldDBPath         string `json:"field_db_path"`
 	FieldLogLevel       string `json:"field_log_level"`
 	FieldLogFormat      string `json:"field_log_format"`
@@ -124,6 +125,7 @@ type Locale struct {
 	TooltipTelegramEnabled string `json:"tooltip_telegram_enabled"`
 	TooltipBotToken        string `json:"tooltip_bot_token"`
 	TooltipChatID          string `json:"tooltip_chat_id"`
+	TooltipAdminChatID     string `json:"tooltip_admin_chat_id"`
 	TooltipDBEnabled       string `json:"tooltip_db_enabled"`
 	TooltipDBPath          string `json:"tooltip_db_path"`
 	TooltipLogLevel        string `json:"tooltip_log_level"`

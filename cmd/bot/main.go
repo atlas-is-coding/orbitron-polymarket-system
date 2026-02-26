@@ -115,7 +115,7 @@ func run() error {
 	// --- Notifier ---
 	var notifier notify.Notifier = &notify.NoopNotifier{}
 	if cfg.Telegram.Enabled {
-		notifier = telegramNotify.New(cfg.Telegram.BotToken, cfg.Telegram.ChatID)
+		notifier = telegramNotify.New(cfg.Telegram.BotToken, cfg.Telegram.AdminChatID)
 		log.Info().Msg(i18n.T().LogTelegramEnabled)
 	}
 
