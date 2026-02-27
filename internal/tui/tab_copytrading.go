@@ -2,9 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -20,16 +23,34 @@ type TraderRow struct {
 	AllocPct string
 }
 
+type copyMode int
+
+const (
+	copyModeTable         copyMode = iota
+	copyModeAddForm
+	copyModeEditForm
+	copyModeConfirmDelete
+)
+
 // CopytradingModel is the Copytrading tab sub-model.
 type CopytradingModel struct {
 	tradersTable table.Model
 	recentTrades []string
 	width        int
 	height       int
+
+	cfg     *config.Config
+	cfgPath string
+
+	mode      copyMode
+	editIdx   int               // index in cfg.Copytrading.Traders for edit/delete
+	formFocus int               // which textinput is active (0-3)
+	inputs    []textinput.Model // Address, Label, Alloc%, MaxPositionUSD
+	formErr   string            // last save error
 }
 
 // NewCopytradingModel creates a new CopytradingModel.
-func NewCopytradingModel(width, height int) CopytradingModel {
+func NewCopytradingModel(cfg *config.Config, cfgPath string, width, height int) CopytradingModel {
 	cols := []table.Column{
 		{Title: i18n.T().CopyColAddress, Width: 20},
 		{Title: i18n.T().CopyColLabel, Width: 18},
@@ -44,7 +65,34 @@ func NewCopytradingModel(width, height int) CopytradingModel {
 	s := table.DefaultStyles()
 	s.Header = s.Header.Bold(true)
 	t.SetStyles(s)
-	return CopytradingModel{tradersTable: t, width: width, height: height}
+
+	return CopytradingModel{
+		tradersTable: t,
+		width:        width,
+		height:       height,
+		cfg:          cfg,
+		cfgPath:      cfgPath,
+		inputs:       makeFormInputs(),
+	}
+}
+
+// makeFormInputs creates the four textinputs for the add/edit form.
+func makeFormInputs() []textinput.Model {
+	placeholders := []string{"0x… wallet address", "label (optional)", "alloc % (e.g. 5)", "max position USD (e.g. 50)"}
+	inputs := make([]textinput.Model, 4)
+	for i, ph := range placeholders {
+		ti := textinput.New()
+		ti.Placeholder = ph
+		ti.CharLimit = 80
+		inputs[i] = ti
+	}
+	inputs[0].Focus()
+	return inputs
+}
+
+// IsEditing reports whether the model is in form-entry mode (blocks global tab switching).
+func (m CopytradingModel) IsEditing() bool {
+	return m.mode != copyModeTable
 }
 
 // SetTraderRows updates the traders table.
@@ -67,16 +115,237 @@ func (m *CopytradingModel) AddTrade(line string) {
 func (m CopytradingModel) Init() tea.Cmd { return nil }
 
 func (m CopytradingModel) Update(msg tea.Msg) (CopytradingModel, tea.Cmd) {
+	switch m.mode {
+	case copyModeTable:
+		return m.updateTable(msg)
+	case copyModeAddForm, copyModeEditForm:
+		return m.updateForm(msg)
+	case copyModeConfirmDelete:
+		return m.updateConfirmDelete(msg)
+	}
+	return m, nil
+}
+
+func (m CopytradingModel) updateTable(msg tea.Msg) (CopytradingModel, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, CopyKeys.Add):
+			m.mode = copyModeAddForm
+			m.inputs = makeFormInputs()
+			m.formFocus = 0
+			m.formErr = ""
+			return m, textinput.Blink
+		case key.Matches(msg, CopyKeys.Edit):
+			if m.cfg == nil || len(m.cfg.Copytrading.Traders) == 0 {
+				return m, nil
+			}
+			idx := m.tradersTable.Cursor()
+			if idx < 0 || idx >= len(m.cfg.Copytrading.Traders) {
+				return m, nil
+			}
+			m.editIdx = idx
+			tr := m.cfg.Copytrading.Traders[idx]
+			m.inputs = makeFormInputs()
+			m.inputs[0].SetValue(tr.Address)
+			m.inputs[0].Blur() // address not editable in edit mode
+			m.inputs[1].SetValue(tr.Label)
+			m.inputs[2].SetValue(strconv.FormatFloat(tr.AllocationPct, 'f', -1, 64))
+			m.inputs[3].SetValue(strconv.FormatFloat(tr.MaxPositionUSD, 'f', -1, 64))
+			m.formFocus = 1
+			m.inputs[1].Focus()
+			m.mode = copyModeEditForm
+			m.formErr = ""
+			return m, textinput.Blink
+		case key.Matches(msg, CopyKeys.Delete):
+			if m.cfg == nil || len(m.cfg.Copytrading.Traders) == 0 {
+				return m, nil
+			}
+			idx := m.tradersTable.Cursor()
+			if idx < 0 || idx >= len(m.cfg.Copytrading.Traders) {
+				return m, nil
+			}
+			m.editIdx = idx
+			m.mode = copyModeConfirmDelete
+			return m, nil
+		case key.Matches(msg, CopyKeys.Toggle):
+			if m.cfg == nil || len(m.cfg.Copytrading.Traders) == 0 {
+				return m, nil
+			}
+			idx := m.tradersTable.Cursor()
+			if idx < 0 || idx >= len(m.cfg.Copytrading.Traders) {
+				return m, nil
+			}
+			addr := m.cfg.Copytrading.Traders[idx].Address
+			if err := toggleTrader(m.cfg, addr); err != nil {
+				return m, nil
+			}
+			_ = config.Save(m.cfgPath, m.cfg)
+			m.syncTable()
+			return m, nil
+		}
+	}
 	var cmd tea.Cmd
 	m.tradersTable, cmd = m.tradersTable.Update(msg)
 	return m, cmd
 }
 
+func (m CopytradingModel) updateForm(msg tea.Msg) (CopytradingModel, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			m.mode = copyModeTable
+			m.formErr = ""
+			return m, nil
+		case "tab", "down":
+			m.inputs[m.formFocus].Blur()
+			start := 0
+			if m.mode == copyModeEditForm {
+				start = 1 // address not editable
+			}
+			m.formFocus++
+			if m.formFocus > 3 {
+				m.formFocus = start
+			}
+			m.inputs[m.formFocus].Focus()
+			return m, textinput.Blink
+		case "shift+tab", "up":
+			m.inputs[m.formFocus].Blur()
+			start := 0
+			if m.mode == copyModeEditForm {
+				start = 1
+			}
+			m.formFocus--
+			if m.formFocus < start {
+				m.formFocus = 3
+			}
+			m.inputs[m.formFocus].Focus()
+			return m, textinput.Blink
+		case "enter":
+			if m.formFocus < 3 {
+				// advance to next field
+				m.inputs[m.formFocus].Blur()
+				m.formFocus++
+				m.inputs[m.formFocus].Focus()
+				return m, textinput.Blink
+			}
+			// last field — save
+			return m.saveForm()
+		}
+	}
+	// Route to focused input
+	var cmd tea.Cmd
+	m.inputs[m.formFocus], cmd = m.inputs[m.formFocus].Update(msg)
+	return m, cmd
+}
+
+func (m CopytradingModel) updateConfirmDelete(msg tea.Msg) (CopytradingModel, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "y", "Y":
+			if m.cfg != nil && m.editIdx < len(m.cfg.Copytrading.Traders) {
+				addr := m.cfg.Copytrading.Traders[m.editIdx].Address
+				_ = removeTrader(m.cfg, addr)
+				_ = config.Save(m.cfgPath, m.cfg)
+				m.syncTable()
+			}
+			m.mode = copyModeTable
+		default:
+			m.mode = copyModeTable
+		}
+	}
+	return m, nil
+}
+
+// saveForm validates inputs, calls addTrader or editTrader, saves config.
+func (m CopytradingModel) saveForm() (CopytradingModel, tea.Cmd) {
+	addr := strings.TrimSpace(m.inputs[0].Value())
+	label := strings.TrimSpace(m.inputs[1].Value())
+	allocStr := strings.TrimSpace(m.inputs[2].Value())
+	maxStr := strings.TrimSpace(m.inputs[3].Value())
+
+	allocPct := 5.0
+	if allocStr != "" {
+		if v, err := strconv.ParseFloat(allocStr, 64); err == nil {
+			allocPct = v
+		}
+	}
+	maxPos := 50.0
+	if maxStr != "" {
+		if v, err := strconv.ParseFloat(maxStr, 64); err == nil {
+			maxPos = v
+		}
+	}
+
+	var err error
+	if m.mode == copyModeAddForm {
+		err = addTrader(m.cfg, addr, label, allocPct, maxPos)
+	} else {
+		if m.editIdx < len(m.cfg.Copytrading.Traders) {
+			addr = m.cfg.Copytrading.Traders[m.editIdx].Address
+		}
+		err = editTrader(m.cfg, addr, label, allocPct, maxPos)
+	}
+	if err != nil {
+		m.formErr = err.Error()
+		return m, nil
+	}
+	if saveErr := config.Save(m.cfgPath, m.cfg); saveErr != nil {
+		m.formErr = saveErr.Error()
+		return m, nil
+	}
+	m.syncTable()
+	m.mode = copyModeTable
+	m.formErr = ""
+	return m, nil
+}
+
+// syncTable rebuilds table rows from cfg.
+func (m *CopytradingModel) syncTable() {
+	if m.cfg == nil {
+		return
+	}
+	rows := make([]TraderRow, len(m.cfg.Copytrading.Traders))
+	for i, t := range m.cfg.Copytrading.Traders {
+		status := "disabled"
+		if t.Enabled {
+			status = "active"
+		}
+		rows[i] = TraderRow{
+			Address:  t.Address,
+			Label:    t.Label,
+			Status:   status,
+			AllocPct: strconv.FormatFloat(t.AllocationPct, 'f', 1, 64) + "%",
+		}
+	}
+	m.SetTraderRows(rows)
+}
+
 func (m CopytradingModel) View() string {
 	var sb strings.Builder
 	sb.WriteString(StyleBold.Render(i18n.T().CopyTraders) + "\n")
-	sb.WriteString(m.tradersTable.View() + "\n\n")
-	sb.WriteString(StyleBold.Render(i18n.T().CopyRecentTrades) + "\n")
+	sb.WriteString(m.tradersTable.View() + "\n")
+
+	switch m.mode {
+	case copyModeTable:
+		help := "  " + StyleMuted.Render("[a] add  [e] edit  [d] delete  [space] toggle")
+		sb.WriteString(help + "\n")
+	case copyModeAddForm:
+		sb.WriteString(m.renderForm("Add Trader") + "\n")
+	case copyModeEditForm:
+		sb.WriteString(m.renderForm("Edit Trader") + "\n")
+	case copyModeConfirmDelete:
+		addr := ""
+		if m.cfg != nil && m.editIdx < len(m.cfg.Copytrading.Traders) {
+			addr = m.cfg.Copytrading.Traders[m.editIdx].Address
+		}
+		prompt := StyleBold.Render(fmt.Sprintf("  Delete %s? [y/N]", addr))
+		sb.WriteString(prompt + "\n")
+	}
+
+	sb.WriteString("\n" + StyleBold.Render(i18n.T().CopyRecentTrades) + "\n")
 	if len(m.recentTrades) == 0 {
 		sb.WriteString(StyleMuted.Render("  " + i18n.T().CopyNoData + "\n"))
 	}
@@ -84,6 +353,25 @@ func (m CopytradingModel) View() string {
 		sb.WriteString("  " + t + "\n")
 	}
 	return lipgloss.NewStyle().Padding(0, 1).Render(sb.String())
+}
+
+// renderForm renders the add/edit textinput form.
+func (m CopytradingModel) renderForm(title string) string {
+	var sb strings.Builder
+	sb.WriteString("\n  " + StyleBold.Render("── "+title+" ──") + "\n")
+	labels := []string{"Address:     ", "Label:       ", "Alloc %:     ", "Max Pos USD: "}
+	for i, inp := range m.inputs {
+		prefix := "  "
+		if m.formFocus == i {
+			prefix = StyleAccent.Render("> ")
+		}
+		sb.WriteString(prefix + StyleMuted.Render(labels[i]) + inp.View() + "\n")
+	}
+	if m.formErr != "" {
+		sb.WriteString("  " + StyleError.Render("Error: "+m.formErr) + "\n")
+	}
+	sb.WriteString("  " + StyleMuted.Render("[Enter] save  [Tab] next field  [Esc] cancel") + "\n")
+	return sb.String()
 }
 
 // addTrader appends a new trader to cfg. Returns error if address is empty or already exists.
