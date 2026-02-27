@@ -26,7 +26,7 @@ func TestStateOrders(t *testing.T) {
 
 func TestStateLogsBuffer(t *testing.T) {
 	s := newWebState()
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		s.AddLog("info", "msg")
 	}
 	if len(s.Logs()) > 200 {
