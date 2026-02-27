@@ -276,6 +276,39 @@ func backKeyboard() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
+func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, t := range traders {
+		addr := t.Address
+		short := addr
+		if len(short) > 12 {
+			short = short[:6] + "…" + short[len(short)-4:]
+		}
+		label := t.Label
+		if label == "" {
+			label = short
+		}
+		toggleIcon := "▶ Enable"
+		if t.Enabled {
+			toggleIcon = "⏸ Disable"
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("%s  %s", label, toggleIcon),
+				"trader:toggle:"+addr,
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				"🗑 Remove",
+				"trader:remove:"+addr,
+			),
+		))
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Back", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 // --- Command dispatch ---
 
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
@@ -299,6 +332,27 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		b.sendPositions(msg.Chat.ID)
 	case "copy":
 		b.sendCopytrading(msg.Chat.ID)
+	case "addtrader":
+		args := strings.Fields(msg.CommandArguments())
+		if len(args) < 1 {
+			b.sendText(msg.Chat.ID, RenderError("Usage: /addtrader &lt;address&gt; [label] [alloc_pct]"))
+			return
+		}
+		b.doAddTrader(ctx, msg.Chat.ID, args)
+	case "removetrader":
+		addr := strings.TrimSpace(msg.CommandArguments())
+		if addr == "" {
+			b.sendText(msg.Chat.ID, RenderError("Usage: /removetrader &lt;address&gt;"))
+			return
+		}
+		b.doRemoveTrader(ctx, msg.Chat.ID, addr)
+	case "toggletrader":
+		addr := strings.TrimSpace(msg.CommandArguments())
+		if addr == "" {
+			b.sendText(msg.Chat.ID, RenderError("Usage: /toggletrader &lt;address&gt;"))
+			return
+		}
+		b.doToggleTrader(ctx, msg.Chat.ID, addr)
 	case "logs":
 		b.sendLogs(msg.Chat.ID)
 	case "settings":
@@ -346,6 +400,14 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(data, "cancel:"):
 		orderID := strings.TrimPrefix(data, "cancel:")
 		b.doCancelOrder(ctx, chatID, orderID)
+	case strings.HasPrefix(data, "trader:toggle:"):
+		addr := strings.TrimPrefix(data, "trader:toggle:")
+		b.doToggleTrader(ctx, chatID, addr)
+		b.sendCopytrading(chatID)
+	case strings.HasPrefix(data, "trader:remove:"):
+		addr := strings.TrimPrefix(data, "trader:remove:")
+		b.doRemoveTrader(ctx, chatID, addr)
+		b.sendCopytrading(chatID)
 	}
 }
 
@@ -370,7 +432,13 @@ func (b *Bot) sendPositions(chatID int64) {
 }
 
 func (b *Bot) sendCopytrading(chatID int64) {
-	b.sendWithKeyboard(chatID, RenderCopytrading(b.state.Traders()), backKeyboard())
+	b.cfgMu.RLock()
+	traders := make([]config.TraderConfig, len(b.cfg.Copytrading.Traders))
+	copy(traders, b.cfg.Copytrading.Traders)
+	b.cfgMu.RUnlock()
+
+	text := RenderCopytrading(b.state.Traders())
+	b.sendWithKeyboard(chatID, text, copytradingKeyboard(traders))
 }
 
 func (b *Bot) sendLogs(chatID int64) {
@@ -481,4 +549,124 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
 
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf("<code>%s</code> = <code>%s</code>\nConfig saved. TUI updated.", key, value)))
+}
+
+func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
+	addr := args[0]
+	label := ""
+	if len(args) > 1 {
+		label = args[1]
+	}
+	allocPct := 5.0
+	if len(args) > 2 {
+		if v, err := strconv.ParseFloat(args[2], 64); err == nil {
+			allocPct = v
+		}
+	}
+
+	b.cfgMu.Lock()
+	cfgCopy := *b.cfg
+	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
+	copy(traders, cfgCopy.Copytrading.Traders)
+	cfgCopy.Copytrading.Traders = traders
+
+	for _, t := range cfgCopy.Copytrading.Traders {
+		if t.Address == addr {
+			b.cfgMu.Unlock()
+			b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q already exists.", addr)))
+			return
+		}
+	}
+
+	cfgCopy.Copytrading.Traders = append(cfgCopy.Copytrading.Traders, config.TraderConfig{
+		Address:        addr,
+		Label:          label,
+		Enabled:        true,
+		AllocationPct:  allocPct,
+		MaxPositionUSD: 50.0,
+		SizeMode:       cfgCopy.Copytrading.SizeMode,
+	})
+
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+
+	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> added (label: %s, alloc: %.1f%%).", addr, label, allocPct)))
+}
+
+func (b *Bot) doRemoveTrader(_ context.Context, chatID int64, addr string) {
+	b.cfgMu.Lock()
+	cfgCopy := *b.cfg
+	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
+	copy(traders, cfgCopy.Copytrading.Traders)
+	cfgCopy.Copytrading.Traders = traders
+
+	found := false
+	for i, t := range cfgCopy.Copytrading.Traders {
+		if t.Address == addr {
+			cfgCopy.Copytrading.Traders = append(cfgCopy.Copytrading.Traders[:i], cfgCopy.Copytrading.Traders[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		return
+	}
+
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+
+	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> removed.", addr)))
+}
+
+func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
+	b.cfgMu.Lock()
+	cfgCopy := *b.cfg
+	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
+	copy(traders, cfgCopy.Copytrading.Traders)
+	cfgCopy.Copytrading.Traders = traders
+
+	found := false
+	newState := false
+	for i, t := range cfgCopy.Copytrading.Traders {
+		if t.Address == addr {
+			cfgCopy.Copytrading.Traders[i].Enabled = !t.Enabled
+			newState = cfgCopy.Copytrading.Traders[i].Enabled
+			found = true
+			break
+		}
+	}
+	if !found {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		return
+	}
+
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+
+	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
+	state := "disabled"
+	if newState {
+		state = "enabled"
+	}
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> %s.", addr, state)))
 }
