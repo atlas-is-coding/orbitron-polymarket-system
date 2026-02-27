@@ -55,7 +55,7 @@ func NewAppModel(
 		overview:   NewOverviewModel(width, cw),
 		orders:     NewOrdersModel(width, cw),
 		positions:  NewPositionsModel(width, cw),
-		copytrader: NewCopytradingModel(width, cw),
+		copytrader: NewCopytradingModel(cfg, cfgPath, width, cw),
 		logs:       NewLogsModel(width, cw),
 		settings:   NewSettingsModel(cfg, cfgPath, width, cw, onSave),
 	}
@@ -88,10 +88,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
+			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
+				break
+			}
 			m.activeTab = (m.activeTab + 1) % tabCount
 			return m, m.bus.WaitForEvent()
 		case "shift+tab":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
+				break
+			}
+			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
 				break
 			}
 			if m.activeTab == 0 {
@@ -102,6 +108,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.bus.WaitForEvent()
 		case "1", "2", "3", "4", "5", "6":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
+				break
+			}
+			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
 				break
 			}
 			switch msg.String() {
@@ -122,6 +131,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ConfigReloadedMsg:
 		m.cfg = msg.Config
+		m.copytrader.cfg = msg.Config
 		var cmd tea.Cmd
 		m.settings, cmd = m.settings.Update(msg)
 		return m, tea.Batch(cmd, m.bus.WaitForEvent())
@@ -142,8 +152,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cw := max(m.height-6, 10)
 		m.orders = NewOrdersModel(m.width, cw)
 		m.positions = NewPositionsModel(m.width, cw)
-		m.copytrader = NewCopytradingModel(m.width, cw)
-		m.settings = NewSettingsModel(m.cfg, m.cfgPath, m.width, cw, m.onSave)
+		m.copytrader = NewCopytradingModel(m.cfg, m.cfgPath, m.width, cw)
+		// settings NOT rebuilt — FieldDef labels/tooltips use func() string closures,
+		// sectionNames() is computed dynamically, and optionIdx is already updated.
+		// Rebuilding from m.cfg would reset the Language field to the unsaved (old) value.
 		return m, m.bus.WaitForEvent()
 	}
 
