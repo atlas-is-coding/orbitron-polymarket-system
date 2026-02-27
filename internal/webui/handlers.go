@@ -77,7 +77,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
-func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"balance":    s.state.Balance(),
 		"subsystems": s.state.Subsystems(),
@@ -100,11 +100,12 @@ func (s *Server) handleLogs(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleCopytrading(w http.ResponseWriter, _ *http.Request) {
 	s.cfgMu.RLock()
+	enabled := s.cfg.Copytrading.Enabled
 	traders := make([]config.TraderConfig, len(s.cfg.Copytrading.Traders))
 	copy(traders, s.cfg.Copytrading.Traders)
 	s.cfgMu.RUnlock()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled": s.cfg.Copytrading.Enabled,
+		"enabled": enabled,
 		"traders": traders,
 	})
 }
