@@ -39,32 +39,33 @@ func signJWT(subject string, ttl time.Duration, secret string) (string, error) {
 	return body + "." + b64enc(mac.Sum(nil)), nil
 }
 
-func verifyJWT(token, secret string) error {
+func verifyJWT(token, secret string) (string, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return errTokenInvalid
+		return "", errTokenInvalid
 	}
 	body := parts[0] + "." + parts[1]
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(body))
 	expected := b64enc(mac.Sum(nil))
 	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
-		return errTokenInvalid
+		return "", errTokenInvalid
 	}
 	raw, err := b64dec(parts[1])
 	if err != nil {
-		return fmt.Errorf("%w: payload decode", errTokenInvalid)
+		return "", fmt.Errorf("%w: payload decode", errTokenInvalid)
 	}
 	var claims map[string]any
 	if err := json.Unmarshal(raw, &claims); err != nil {
-		return fmt.Errorf("%w: payload json", errTokenInvalid)
+		return "", fmt.Errorf("%w: payload json", errTokenInvalid)
 	}
 	exp, ok := claims["exp"].(float64)
 	if !ok {
-		return fmt.Errorf("%w: missing exp", errTokenInvalid)
+		return "", fmt.Errorf("%w: missing exp", errTokenInvalid)
 	}
 	if time.Now().Unix() > int64(exp) {
-		return errTokenExpired
+		return "", errTokenExpired
 	}
-	return nil
+	subject, _ := claims["sub"].(string)
+	return subject, nil
 }
