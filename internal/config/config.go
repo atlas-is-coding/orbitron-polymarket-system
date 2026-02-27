@@ -18,6 +18,7 @@ type Config struct {
 	Log         LogConfig         `toml:"log"`
 	Copytrading CopytradingConfig `toml:"copytrading"`
 	UI          UIConfig          `toml:"ui"`
+	WebUI       WebUIConfig       `toml:"webui"`
 }
 
 type APIConfig struct {
@@ -86,6 +87,12 @@ type LogConfig struct {
 
 type UIConfig struct {
 	Language string `toml:"language"`
+}
+
+type WebUIConfig struct {
+	Enabled   bool   `toml:"enabled"`
+	Listen    string `toml:"listen"`
+	JWTSecret string `toml:"jwt_secret"`
 }
 
 // CopytradingConfig — конфигурация подсистемы копитрейдинга.
@@ -186,6 +193,12 @@ func (c *Config) validate() error {
 	}
 	if c.UI.Language == "" {
 		c.UI.Language = "en"
+	}
+	if c.WebUI.Listen == "" {
+		c.WebUI.Listen = "127.0.0.1:8080"
+	}
+	if c.WebUI.JWTSecret == "" {
+		c.WebUI.JWTSecret = "change-me-in-production"
 	}
 	return nil
 }
