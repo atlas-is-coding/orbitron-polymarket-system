@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/atlasdev/polytrade-bot/internal/config"
@@ -112,9 +113,7 @@ func (s *WebState) Subsystems() map[string]bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	cp := make(map[string]bool, len(s.subsystems))
-	for k, v := range s.subsystems {
-		cp[k] = v
-	}
+	maps.Copy(cp, s.subsystems)
 	return cp
 }
 
