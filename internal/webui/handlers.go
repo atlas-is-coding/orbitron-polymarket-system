@@ -86,19 +86,19 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleOrders(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOrders(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.state.Orders())
 }
 
-func (s *Server) handlePositions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePositions(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.state.Positions())
 }
 
-func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleLogs(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.state.Logs())
 }
 
-func (s *Server) handleCopytrading(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCopytrading(w http.ResponseWriter, _ *http.Request) {
 	s.cfgMu.RLock()
 	traders := make([]config.TraderConfig, len(s.cfg.Copytrading.Traders))
 	copy(traders, s.cfg.Copytrading.Traders)
@@ -109,7 +109,7 @@ func (s *Server) handleCopytrading(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	s.cfgMu.RLock()
 	cfg := *s.cfg
 	s.cfgMu.RUnlock()
@@ -183,7 +183,7 @@ func (s *Server) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
-func (s *Server) handleCancelAll(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCancelAll(w http.ResponseWriter, _ *http.Request) {
 	if s.canceler == nil {
 		writeError(w, http.StatusServiceUnavailable, "TradesMonitor not enabled")
 		return
