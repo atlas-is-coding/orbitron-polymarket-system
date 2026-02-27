@@ -7,7 +7,7 @@
   max_retries = 3
 
 [auth]
-  private_key = ""
+  private_key = "2e24bafee616a0045fc6b97d2ad7db7a144d760c4508f63b0fe4d84a97b72b2b"
   api_key = ""
   api_secret = ""
   passphrase = ""
@@ -33,12 +33,12 @@
     trades_limit = 50
 
 [telegram]
-  enabled = false
-  bot_token = ""
-  chat_id = ""
+  enabled = true
+  bot_token = "8527011591:AAHNTTUvOc3NkZGVgYv-w4Lz_1QRndCNB_Q"
+  admin_chat_id = "5018443124"
 
 [database]
-  enabled = false
+  enabled = true
   path = "./data/polytrade.db"
 
 [log]
@@ -51,4 +51,9 @@
   size_mode = "proportional"
 
 [ui]
-language = "en"
+  language = "ru"
+
+[webui]
+  enabled = false
+  listen = "127.0.0.1:8080"
+  jwt_secret = "change-me"
