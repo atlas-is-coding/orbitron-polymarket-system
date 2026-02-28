@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "overview": "Обзор",
+    "orders": "Ордера",
+    "positions": "Позиции",
+    "copytrading": "Копитрейдинг",
+    "logs": "Логи",
+    "settings": "Настройки"
+  },
+  "login": {
+    "title": "Polytrade Bot",
+    "subtitle": "Веб-панель управления",
+    "password": "Пароль",
+    "submit": "Войти",
+    "error": "Неверный пароль"
+  },
+  "overview": {
+    "balance": "Баланс",
+    "wallet": "Кошелёк",
+    "subsystems": "Подсистемы",
+    "active": "Активна",
+    "inactive": "Неактивна"
+  },
+  "orders": {
+    "id": "ID",
+    "market": "Рынок",
+    "side": "Сторона",
+    "price": "Цена",
+    "size": "Объём",
+    "status": "Статус",
+    "cancelAll": "Отменить все",
+    "cancel": "Отменить",
+    "noOrders": "Нет ордеров"
+  },
+  "positions": {
+    "market": "Рынок",
+    "side": "Сторона",
+    "size": "Объём",
+    "avgPrice": "Ср. цена",
+    "pnl": "P&L",
+    "noPositions": "Нет позиций"
+  },
+  "copytrading": {
+    "enabled": "Включён",
+    "disabled": "Выключен",
+    "addTrader": "Добавить трейдера",
+    "address": "Адрес",
+    "label": "Метка",
+    "allocation": "Аллокация %",
+    "toggle": "Переключить",
+    "remove": "Удалить",
+    "noTraders": "Нет трейдеров",
+    "enable": "Включить копитрейдинг",
+    "disable": "Выключить копитрейдинг"
+  },
+  "logs": {
+    "level": "Уровень",
+    "message": "Сообщение",
+    "noLogs": "Нет логов",
+    "clear": "Очистить"
+  },
+  "settings": {
+    "title": "Настройки",
+    "save": "Сохранить",
+    "saved": "Сохранено",
+    "language": "Язык",
+    "logLevel": "Уровень логов",
+    "monitorInterval": "Интервал монитора (мс)",
+    "tradesInterval": "Интервал монитора сделок (мс)",
+    "copytradingInterval": "Интервал копитрейдинга (мс)",
+    "tradingEnabled": "Торговля включена",
+    "copytradingEnabled": "Копитрейдинг включён"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "confirm": "Подтвердить",
+    "cancel": "Отмена",
+    "yes": "Да",
+    "no": "Нет",
+    "refresh": "Обновить",
+    "connected": "Подключено",
+    "disconnected": "Отключено"
+  }
+}

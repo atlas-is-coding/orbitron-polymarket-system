@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "overview": "概览",
+    "orders": "订单",
+    "positions": "仓位",
+    "copytrading": "跟单",
+    "logs": "日志",
+    "settings": "设置"
+  },
+  "login": {
+    "title": "Polytrade Bot",
+    "subtitle": "网页控制面板",
+    "password": "密码",
+    "submit": "登录",
+    "error": "密码错误"
+  },
+  "overview": {
+    "balance": "余额",
+    "wallet": "钱包",
+    "subsystems": "子系统",
+    "active": "活跃",
+    "inactive": "不活跃"
+  },
+  "orders": {
+    "id": "ID",
+    "market": "市场",
+    "side": "方向",
+    "price": "价格",
+    "size": "数量",
+    "status": "状态",
+    "cancelAll": "取消全部",
+    "cancel": "取消",
+    "noOrders": "无挂单"
+  },
+  "positions": {
+    "market": "市场",
+    "side": "方向",
+    "size": "数量",
+    "avgPrice": "均价",
+    "pnl": "盈亏",
+    "noPositions": "无仓位"
+  },
+  "copytrading": {
+    "enabled": "已启用",
+    "disabled": "已停用",
+    "addTrader": "添加跟单员",
+    "address": "地址",
+    "label": "标签",
+    "allocation": "分配%",
+    "toggle": "切换",
+    "remove": "删除",
+    "noTraders": "未配置跟单员",
+    "enable": "启用跟单",
+    "disable": "停用跟单"
+  },
+  "logs": {
+    "level": "级别",
+    "message": "消息",
+    "noLogs": "暂无日志",
+    "clear": "清空"
+  },
+  "settings": {
+    "title": "设置",
+    "save": "保存",
+    "saved": "已保存",
+    "language": "语言",
+    "logLevel": "日志级别",
+    "monitorInterval": "监控间隔(毫秒)",
+    "tradesInterval": "交易监控间隔(毫秒)",
+    "copytradingInterval": "跟单间隔(毫秒)",
+    "tradingEnabled": "启用交易",
+    "copytradingEnabled": "启用跟单"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "confirm": "确认",
+    "cancel": "取消",
+    "yes": "是",
+    "no": "否",
+    "refresh": "刷新",
+    "connected": "已连接",
+    "disconnected": "已断开"
+  }
+}
