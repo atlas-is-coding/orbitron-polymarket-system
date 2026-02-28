@@ -25,8 +25,10 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/notify"
 	telegramNotify "github.com/atlasdev/polytrade-bot/internal/notify/telegram"
 	"github.com/atlasdev/polytrade-bot/internal/storage/sqlite"
+	"github.com/atlasdev/polytrade-bot/internal/telegrambot"
 	"github.com/atlasdev/polytrade-bot/internal/trading"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/polytrade-bot/internal/webui"
 )
 
 func main() {
@@ -62,10 +64,10 @@ func run() error {
 	// --- Язык интерфейса ---
 	i18n.SetLanguage(cfg.UI.Language)
 
-	// --- EventBus + LogWriter (TUI режим) ---
+	// --- EventBus + LogWriter (TUI режим или WebUI) ---
 	var bus *tui.EventBus
 	var log zerolog.Logger
-	if !*noTUI {
+	if !*noTUI || cfg.WebUI.Enabled {
 		bus = tui.NewEventBus()
 		lw := tui.NewLogWriter(bus)
 		log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, lw)
@@ -119,6 +121,28 @@ func run() error {
 		log.Info().Msg(i18n.T().LogTelegramEnabled)
 	}
 
+	// --- Trades Monitor ---
+	tradesMon := monitor.NewTradesMonitor(clobClient, dataClient, notifier, &cfg.Monitor.Trades, log)
+	if bus != nil {
+		tradesMon.SetBus(bus)
+	}
+
+	// --- Telegram Bot (interactive) ---
+	// Initialised before subsystems so it can be started alongside them.
+	// tgBot may be nil if bot_token is empty or init fails.
+	var tgBot *telegrambot.Bot
+	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
+		var cancelerForBot telegrambot.OrderCanceler
+		if cfg.Monitor.Trades.Enabled && l2Creds != nil {
+			cancelerForBot = tradesMon
+		}
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, &log)
+		if err != nil {
+			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
+			tgBot = nil
+		}
+	}
+
 	// --- Storage (SQLite) ---
 	var db *sqlite.DB
 	if cfg.Database.Enabled {
@@ -136,9 +160,6 @@ func run() error {
 
 	// --- Market Monitor ---
 	mon := monitor.New(gammaClient, notifier, &cfg.Monitor, log)
-
-	// --- Trades Monitor ---
-	tradesMon := monitor.NewTradesMonitor(clobClient, dataClient, notifier, &cfg.Monitor.Trades, log)
 
 	// --- Context с graceful shutdown ---
 	ctx, cancel := context.WithCancel(context.Background())
@@ -210,6 +231,19 @@ func run() error {
 			log.Info().Int("traders", len(cfg.Copytrading.Traders)).Msg(i18n.T().LogCopytradingEnabled)
 			startSubsystem("Copytrading", func() error { return copyTrader.Run(ctx) })
 		}
+	}
+
+	if tgBot != nil {
+		startSubsystem("Telegram Bot", func() error { return tgBot.Run(ctx) })
+	}
+
+	if cfg.WebUI.Enabled && bus != nil {
+		var cancelerForWeb webui.OrderCanceler
+		if cfg.Monitor.Trades.Enabled && l2Creds != nil {
+			cancelerForWeb = tradesMon
+		}
+		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, &log)
+		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 
 	// --- TUI режим ---
