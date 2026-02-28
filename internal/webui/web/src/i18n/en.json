@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "overview": "Overview",
+    "orders": "Orders",
+    "positions": "Positions",
+    "copytrading": "Copytrading",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "login": {
+    "title": "Polytrade Bot",
+    "subtitle": "Web Control Panel",
+    "password": "Password",
+    "submit": "Sign In",
+    "error": "Invalid password"
+  },
+  "overview": {
+    "balance": "Balance",
+    "wallet": "Wallet",
+    "subsystems": "Subsystems",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "orders": {
+    "id": "ID",
+    "market": "Market",
+    "side": "Side",
+    "price": "Price",
+    "size": "Size",
+    "status": "Status",
+    "cancelAll": "Cancel All",
+    "cancel": "Cancel",
+    "noOrders": "No open orders"
+  },
+  "positions": {
+    "market": "Market",
+    "side": "Side",
+    "size": "Size",
+    "avgPrice": "Avg Price",
+    "pnl": "P&L",
+    "noPositions": "No positions"
+  },
+  "copytrading": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "addTrader": "Add Trader",
+    "address": "Address",
+    "label": "Label",
+    "allocation": "Allocation %",
+    "toggle": "Toggle",
+    "remove": "Remove",
+    "noTraders": "No traders configured",
+    "enable": "Enable copytrading",
+    "disable": "Disable copytrading"
+  },
+  "logs": {
+    "level": "Level",
+    "message": "Message",
+    "noLogs": "No logs yet",
+    "clear": "Clear"
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save",
+    "saved": "Saved",
+    "language": "Language",
+    "logLevel": "Log Level",
+    "monitorInterval": "Monitor Interval (ms)",
+    "tradesInterval": "Trades Monitor Interval (ms)",
+    "copytradingInterval": "Copytrading Interval (ms)",
+    "tradingEnabled": "Trading Enabled",
+    "copytradingEnabled": "Copytrading Enabled"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "yes": "Yes",
+    "no": "No",
+    "refresh": "Refresh",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  }
+}

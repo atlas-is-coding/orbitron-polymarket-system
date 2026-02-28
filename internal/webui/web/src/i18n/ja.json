@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "overview": "概要",
+    "orders": "注文",
+    "positions": "ポジション",
+    "copytrading": "コピートレード",
+    "logs": "ログ",
+    "settings": "設定"
+  },
+  "login": {
+    "title": "Polytrade Bot",
+    "subtitle": "ウェブコントロールパネル",
+    "password": "パスワード",
+    "submit": "サインイン",
+    "error": "パスワードが違います"
+  },
+  "overview": {
+    "balance": "残高",
+    "wallet": "ウォレット",
+    "subsystems": "サブシステム",
+    "active": "アクティブ",
+    "inactive": "非アクティブ"
+  },
+  "orders": {
+    "id": "ID",
+    "market": "マーケット",
+    "side": "サイド",
+    "price": "価格",
+    "size": "数量",
+    "status": "ステータス",
+    "cancelAll": "全キャンセル",
+    "cancel": "キャンセル",
+    "noOrders": "注文なし"
+  },
+  "positions": {
+    "market": "マーケット",
+    "side": "サイド",
+    "size": "数量",
+    "avgPrice": "平均価格",
+    "pnl": "損益",
+    "noPositions": "ポジションなし"
+  },
+  "copytrading": {
+    "enabled": "有効",
+    "disabled": "無効",
+    "addTrader": "トレーダー追加",
+    "address": "アドレス",
+    "label": "ラベル",
+    "allocation": "配分%",
+    "toggle": "切替",
+    "remove": "削除",
+    "noTraders": "トレーダー未設定",
+    "enable": "コピートレード有効化",
+    "disable": "コピートレード無効化"
+  },
+  "logs": {
+    "level": "レベル",
+    "message": "メッセージ",
+    "noLogs": "ログなし",
+    "clear": "クリア"
+  },
+  "settings": {
+    "title": "設定",
+    "save": "保存",
+    "saved": "保存済み",
+    "language": "言語",
+    "logLevel": "ログレベル",
+    "monitorInterval": "監視間隔(ms)",
+    "tradesInterval": "取引監視間隔(ms)",
+    "copytradingInterval": "コピートレード間隔(ms)",
+    "tradingEnabled": "取引有効",
+    "copytradingEnabled": "コピートレード有効"
+  },
+  "common": {
+    "loading": "読込中...",
+    "error": "エラー",
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "yes": "はい",
+    "no": "いいえ",
+    "refresh": "更新",
+    "connected": "接続済み",
+    "disconnected": "切断済み"
+  }
+}

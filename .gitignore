@@ -1,0 +1,8 @@
+__NOTES.md
+POLYMARKET_DOCS.md
+CLAUDE.md
+docs/*
+.claude/
+data/*
+*_test.go
+internal/webui/web/node_modules/
