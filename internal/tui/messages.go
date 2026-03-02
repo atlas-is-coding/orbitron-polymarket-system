@@ -90,7 +90,7 @@ func (b *EventBus) WaitForEvent() tea.Cmd {
 	}
 }
 
-// WalletAddedMsg is sent when a new wallet is added to the manager.
+// WalletAddedMsg is sent when a new active wallet is added (reserved for AddActive, not yet used by AddInactive).
 type WalletAddedMsg struct{ ID string }
 
 // WalletRemovedMsg is sent when a wallet is removed.
