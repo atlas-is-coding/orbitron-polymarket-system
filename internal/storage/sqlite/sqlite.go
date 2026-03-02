@@ -86,7 +86,22 @@ func (d *DB) migrate() error {
 		CREATE INDEX IF NOT EXISTS idx_copy_trades_open
 			ON copy_trades(trader_address, asset_id, status);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	_, err = d.db.Exec(`
+		CREATE TABLE IF NOT EXISTS wallet_stats (
+			wallet_id   TEXT    NOT NULL,
+			fetched_at  INTEGER NOT NULL,
+			balance_usd REAL    NOT NULL DEFAULT 0,
+			pnl_usd     REAL    NOT NULL DEFAULT 0,
+			PRIMARY KEY (wallet_id, fetched_at)
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("sqlite: create wallet_stats: %w", err)
+	}
+	return nil
 }
 
 // --- TradeStore ---
@@ -260,6 +275,45 @@ func scanCopyTrades(rows *sql.Rows) ([]*storage.CopyTradeRecord, error) {
 			r.ClosedAt = &t
 		}
 		r.PnL = pnl
+		result = append(result, &r)
+	}
+	return result, rows.Err()
+}
+
+// --- WalletStatsStore ---
+
+// SaveWalletStats сохраняет снимок статистики кошелька.
+func (d *DB) SaveWalletStats(ctx context.Context, walletID string, balanceUSD, pnlUSD float64) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT OR REPLACE INTO wallet_stats (wallet_id, fetched_at, balance_usd, pnl_usd)
+		 VALUES (?, ?, ?, ?)`,
+		walletID, time.Now().Unix(), balanceUSD, pnlUSD,
+	)
+	return err
+}
+
+// GetWalletStats возвращает последние limit снимков статистики для кошелька walletID.
+func (d *DB) GetWalletStats(ctx context.Context, walletID string, limit int) ([]*storage.WalletStatsRecord, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT wallet_id, fetched_at, balance_usd, pnl_usd
+		 FROM wallet_stats
+		 WHERE wallet_id = ?
+		 ORDER BY fetched_at DESC
+		 LIMIT ?`,
+		walletID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []*storage.WalletStatsRecord
+	for rows.Next() {
+		var r storage.WalletStatsRecord
+		var ts int64
+		if err := rows.Scan(&r.WalletID, &ts, &r.BalanceUSD, &r.PnLUSD); err != nil {
+			return nil, err
+		}
+		r.FetchedAt = time.Unix(ts, 0)
 		result = append(result, &r)
 	}
 	return result, rows.Err()
