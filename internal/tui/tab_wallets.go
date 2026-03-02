@@ -4,13 +4,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// WalletProvider is a minimal interface that the WalletsModel uses to access
-// wallet data. It is implemented by *wallet.Manager but avoids an import cycle
-// (internal/wallet already imports internal/tui).
+// WalletProvider is implemented by *wallet.Manager (see internal/wallet).
+// Using an interface here avoids an import cycle (wallet imports tui).
 type WalletProvider interface {
-	// Wallets returns a slice of wallet summaries suitable for display.
-	// The actual type is returned as interface{} to break the cycle;
-	// the full implementation in Task 6 will use concrete types.
+	// WalletIDs returns the list of wallet identifiers to display.
 	WalletIDs() []string
 }
 
