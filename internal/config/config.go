@@ -7,10 +7,24 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// WalletConfig — настройки одного кошелька.
+type WalletConfig struct {
+	ID         string `toml:"id"`
+	Label      string `toml:"label"`
+	PrivateKey string `toml:"private_key"`
+	APIKey     string `toml:"api_key"`
+	APISecret  string `toml:"api_secret"`
+	Passphrase string `toml:"passphrase"`
+	ChainID    int64  `toml:"chain_id"`
+	Enabled    bool   `toml:"enabled"`
+	NegRisk    bool   `toml:"neg_risk"`
+}
+
 // Config — корневая структура конфигурации.
 type Config struct {
+	Wallets     []WalletConfig    `toml:"wallets"`
+	Auth        AuthConfig        `toml:"auth"` // Deprecated: use [[wallets]]; kept for migration
 	API         APIConfig         `toml:"api"`
-	Auth        AuthConfig        `toml:"auth"`
 	Trading     TradingConfig     `toml:"trading"`
 	Monitor     MonitorConfig     `toml:"monitor"`
 	Telegram    TelegramConfig    `toml:"telegram"`
@@ -144,6 +158,8 @@ func Load(path string) (*Config, error) {
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
 		return nil, fmt.Errorf("config: parse toml: %w", err)
 	}
+
+	cfg.migrateAuth()
 
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("config: validation: %w", err)
