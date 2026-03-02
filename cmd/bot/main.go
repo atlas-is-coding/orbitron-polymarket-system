@@ -28,6 +28,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/telegrambot"
 	"github.com/atlasdev/polytrade-bot/internal/trading"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/polytrade-bot/internal/wallet"
 	"github.com/atlasdev/polytrade-bot/internal/webui"
 )
 
@@ -76,71 +77,26 @@ func run() error {
 	}
 	log.Info().Str("config", *cfgPath).Msg(i18n.T().LogBotStarting)
 
+	// --- Wallet Manager ---
+	wm := wallet.NewManager(bus)
+
 	// --- HTTP клиенты ---
 	clobHTTP := api.NewClient(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
 	gammaHTTP := api.NewClient(cfg.API.GammaURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
 	dataHTTP := api.NewClient(cfg.API.DataURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
 
-	// --- Auth (L2) ---
-	var l2Creds *auth.L2Credentials
-	var walletAddr string
-	if cfg.Auth.APIKey != "" {
-		l2Creds = &auth.L2Credentials{
-			APIKey:     cfg.Auth.APIKey,
-			APISecret:  cfg.Auth.APISecret,
-			Passphrase: cfg.Auth.Passphrase,
-		}
-		if cfg.Auth.PrivateKey != "" {
-			l1, err := auth.NewL1Signer(cfg.Auth.PrivateKey)
-			if err != nil {
-				return fmt.Errorf("l1 signer: %w", err)
-			}
-			l2Creds.Address = l1.Address()
-			walletAddr = l1.Address()
-			log.Info().Str("address", l2Creds.Address).Msg(i18n.T().LogL1Initialized)
-		}
-	}
-
-	// --- API клиенты ---
-	clobClient := clob.NewClient(clobHTTP, l2Creds)
+	// --- API клиенты (shared/public) ---
 	gammaClient := gamma.NewClient(gammaHTTP)
 	dataClient := data.NewClient(dataHTTP)
 
 	// --- WebSocket ---
 	wsClient := ws.NewClient(cfg.API.WSURL, log)
-	if l2Creds != nil {
-		wsClient.Subscribe(ws.UserSubscription(l2Creds), func(msg *ws.Message) {
-			log.Debug().Str("event", msg.EventType).Msg(i18n.T().LogWSUserEvent)
-		})
-	}
 
 	// --- Notifier ---
 	var notifier notify.Notifier = &notify.NoopNotifier{}
 	if cfg.Telegram.Enabled {
 		notifier = telegramNotify.New(cfg.Telegram.BotToken, cfg.Telegram.AdminChatID)
 		log.Info().Msg(i18n.T().LogTelegramEnabled)
-	}
-
-	// --- Trades Monitor ---
-	tradesMon := monitor.NewTradesMonitor(clobClient, dataClient, notifier, &cfg.Monitor.Trades, log)
-	if bus != nil {
-		tradesMon.SetBus(bus)
-	}
-
-	// --- Telegram Bot (interactive) ---
-	// Initialised before subsystems so it can be started alongside them.
-	// tgBot may be nil if bot_token is empty or init fails.
-	var tgBot *telegrambot.Bot
-	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
-		var cancelerForBot telegrambot.OrderCanceler
-		if cfg.Monitor.Trades.Enabled && l2Creds != nil {
-			cancelerForBot = tradesMon
-		}
-		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, &log)
-		if err != nil {
-			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
-			tgBot = nil
-		}
 	}
 
 	// --- Storage (SQLite) ---
@@ -154,9 +110,78 @@ func run() error {
 		log.Info().Str("path", cfg.Database.Path).Msg(i18n.T().LogDatabaseOpened)
 	}
 
+	// --- Build wallet instances ---
+	for _, wCfg := range cfg.Wallets {
+		if !wCfg.Enabled {
+			wm.AddInactive(wCfg)
+			continue
+		}
+		if wCfg.APIKey == "" {
+			log.Warn().Str("wallet", wCfg.Label).Msg("wallet has no api_key, skipping")
+			wm.AddInactive(wCfg)
+			continue
+		}
+		l2 := &auth.L2Credentials{
+			APIKey:     wCfg.APIKey,
+			APISecret:  wCfg.APISecret,
+			Passphrase: wCfg.Passphrase,
+		}
+		var addr string
+		if wCfg.PrivateKey != "" {
+			l1, err := auth.NewL1Signer(wCfg.PrivateKey)
+			if err != nil {
+				log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("l1 signer failed, skipping wallet")
+				wm.AddInactive(wCfg)
+				continue
+			}
+			l2.Address = l1.Address()
+			addr = l1.Address()
+			log.Info().Str("wallet", wCfg.Label).Str("address", addr).Msg("wallet initialized")
+		}
+		wClobClient := clob.NewClient(clobHTTP, l2)
+
+		// Subscribe WebSocket user events for this wallet
+		wsClient.Subscribe(ws.UserSubscription(l2), func(msg *ws.Message) {
+			log.Debug().Str("event", msg.EventType).Msg(i18n.T().LogWSUserEvent)
+		})
+
+		inst := &wallet.WalletInstance{
+			Cfg:        wCfg,
+			Address:    addr,
+			L2:         l2,
+			ClobClient: wClobClient,
+			Stats:      &wallet.WalletStats{},
+		}
+		if cfg.Monitor.Trades.Enabled {
+			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log)
+			if bus != nil {
+				tm.SetBus(bus)
+			}
+			inst.TradesMon = tm
+		}
+		if cfg.Copytrading.Enabled && db != nil && wCfg.PrivateKey != "" {
+			l1, err := auth.NewL1Signer(wCfg.PrivateKey)
+			if err == nil {
+				orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
+				executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, wCfg.APIKey, addr, log)
+				ct := copytrading.NewCopyTrader(
+					*cfgPath,
+					func() *config.CopytradingConfig { return &cfg.Copytrading },
+					dataClient,
+					executor,
+					db,
+					notifier,
+					wClobClient,
+					log,
+				)
+				inst.CopyTrader = ct
+			}
+		}
+		wm.AddActive(inst)
+	}
+
 	// --- Trading Engine ---
 	engine := trading.NewEngine(log)
-	_ = clobClient
 
 	// --- Market Monitor ---
 	mon := monitor.New(gammaClient, notifier, &cfg.Monitor, log)
@@ -193,43 +218,42 @@ func run() error {
 		startSubsystem("Monitor", func() error { return mon.Run(ctx) })
 	}
 
-	if cfg.Monitor.Trades.Enabled {
-		if l2Creds == nil {
-			log.Warn().Msg(i18n.T().LogTradesMonitorSkip)
-		} else {
-			log.Info().Msg(i18n.T().LogTradesMonitorEnabled)
-			startSubsystem("Trades Monitor", func() error { return tradesMon.Run(ctx) })
-		}
-	}
-
 	if cfg.Trading.Enabled {
 		startSubsystem("Trading Engine", func() error { return engine.Start(ctx) })
 	}
 
-	if cfg.Copytrading.Enabled {
-		if l2Creds == nil || cfg.Auth.PrivateKey == "" {
-			log.Warn().Msg(i18n.T().LogCopytradingSkipL2)
-		} else if db == nil {
-			log.Warn().Msg(i18n.T().LogCopytradingSkipDB)
-		} else {
-			l1, err := auth.NewL1Signer(cfg.Auth.PrivateKey)
-			if err != nil {
-				return fmt.Errorf("copytrading l1 signer: %w", err)
+	// --- Start per-wallet subsystems ---
+	for _, inst := range wm.Wallets() {
+		if !inst.Cfg.Enabled {
+			continue
+		}
+		label := inst.Cfg.Label
+		if inst.TradesMon != nil {
+			tm := inst.TradesMon
+			startSubsystem("Trades Monitor ["+label+"]", func() error { return tm.Run(ctx) })
+		}
+		if inst.CopyTrader != nil {
+			ct := inst.CopyTrader
+			startSubsystem("Copytrading ["+label+"]", func() error { return ct.Run(ctx) })
+		}
+	}
+
+	// --- Telegram Bot (interactive) ---
+	// Initialised before subsystems so it can be started alongside them.
+	// tgBot may be nil if bot_token is empty or init fails.
+	var tgBot *telegrambot.Bot
+	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" {
+		var cancelerForBot telegrambot.OrderCanceler
+		for _, inst := range wm.Wallets() {
+			if inst.TradesMon != nil && inst.Cfg.Enabled {
+				cancelerForBot = inst.TradesMon
+				break
 			}
-			orderSigner := auth.NewOrderSigner(l1, cfg.Auth.ChainID, cfg.Trading.NegRisk)
-			executor := copytrading.NewOrderExecutor(clobClient, orderSigner, cfg.Auth.APIKey, l2Creds.Address, log)
-			copyTrader := copytrading.NewCopyTrader(
-				*cfgPath,
-				func() *config.CopytradingConfig { return &cfg.Copytrading },
-				dataClient,
-				executor,
-				db,
-				notifier,
-				clobClient,
-				log,
-			)
-			log.Info().Int("traders", len(cfg.Copytrading.Traders)).Msg(i18n.T().LogCopytradingEnabled)
-			startSubsystem("Copytrading", func() error { return copyTrader.Run(ctx) })
+		}
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, &log)
+		if err != nil {
+			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
+			tgBot = nil
 		}
 	}
 
@@ -239,8 +263,11 @@ func run() error {
 
 	if cfg.WebUI.Enabled && bus != nil {
 		var cancelerForWeb webui.OrderCanceler
-		if cfg.Monitor.Trades.Enabled && l2Creds != nil {
-			cancelerForWeb = tradesMon
+		for _, inst := range wm.Wallets() {
+			if inst.TradesMon != nil && inst.Cfg.Enabled {
+				cancelerForWeb = inst.TradesMon
+				break
+			}
 		}
 		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
@@ -254,14 +281,16 @@ func run() error {
 		})
 		go watcher.Run(ctx)
 
-		// Отправляем адрес кошелька
-		if walletAddr != "" {
-			bus.Send(tui.SubsystemStatusMsg{Name: "WebSocket", Active: true}) // повторно чтобы не потерялось
-		}
-
 		// Запускаем TUI
 		appModel := tui.NewAppModel(cfg, *cfgPath, bus, 0, 0, nil)
-		appModel.SetWallet(walletAddr)
+
+		// Show first active wallet address
+		for _, inst := range wm.Wallets() {
+			if inst.Address != "" && inst.Cfg.Enabled {
+				appModel.SetWallet(inst.Address)
+				break
+			}
+		}
 
 		p := tea.NewProgram(appModel, tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {

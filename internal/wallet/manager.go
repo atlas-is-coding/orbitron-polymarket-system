@@ -32,6 +32,16 @@ func (m *Manager) AddInactive(cfg config.WalletConfig) {
 	})
 }
 
+// AddActive adds a fully initialised wallet instance and broadcasts WalletAddedMsg.
+func (m *Manager) AddActive(inst *WalletInstance) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.instances = append(m.instances, inst)
+	if m.bus != nil {
+		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID})
+	}
+}
+
 // Wallets returns a snapshot slice of all wallet instances (both active and inactive).
 func (m *Manager) Wallets() []*WalletInstance {
 	m.mu.RLock()
