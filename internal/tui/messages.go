@@ -89,3 +89,24 @@ func (b *EventBus) WaitForEvent() tea.Cmd {
 		return <-b.ch
 	}
 }
+
+// WalletAddedMsg is sent when a new wallet is added to the manager.
+type WalletAddedMsg struct{ ID string }
+
+// WalletRemovedMsg is sent when a wallet is removed.
+type WalletRemovedMsg struct{ ID string }
+
+// WalletChangedMsg is sent when a wallet's enabled state changes.
+type WalletChangedMsg struct {
+	ID      string
+	Enabled bool
+}
+
+// WalletStatsMsg carries a statistics snapshot for one wallet.
+type WalletStatsMsg struct {
+	ID          string
+	BalanceUSD  float64
+	PnLUSD      float64
+	OpenOrders  int
+	TotalTrades int
+}
