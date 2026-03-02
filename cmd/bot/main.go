@@ -127,8 +127,9 @@ func run() error {
 			Passphrase: wCfg.Passphrase,
 		}
 		var addr string
+		var l1 *auth.L1Signer
 		if wCfg.PrivateKey != "" {
-			l1, err := auth.NewL1Signer(wCfg.PrivateKey)
+			l1, err = auth.NewL1Signer(wCfg.PrivateKey)
 			if err != nil {
 				log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("l1 signer failed, skipping wallet")
 				wm.AddInactive(wCfg)
@@ -159,23 +160,20 @@ func run() error {
 			}
 			inst.TradesMon = tm
 		}
-		if cfg.Copytrading.Enabled && db != nil && wCfg.PrivateKey != "" {
-			l1, err := auth.NewL1Signer(wCfg.PrivateKey)
-			if err == nil {
-				orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
-				executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, wCfg.APIKey, addr, log)
-				ct := copytrading.NewCopyTrader(
-					*cfgPath,
-					func() *config.CopytradingConfig { return &cfg.Copytrading },
-					dataClient,
-					executor,
-					db,
-					notifier,
-					wClobClient,
-					log,
-				)
-				inst.CopyTrader = ct
-			}
+		if cfg.Copytrading.Enabled && db != nil && l1 != nil {
+			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
+			executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, wCfg.APIKey, addr, log)
+			ct := copytrading.NewCopyTrader(
+				*cfgPath,
+				func() *config.CopytradingConfig { return &cfg.Copytrading },
+				dataClient,
+				executor,
+				db,
+				notifier,
+				wClobClient,
+				log,
+			)
+			inst.CopyTrader = ct
 		}
 		wm.AddActive(inst)
 	}
