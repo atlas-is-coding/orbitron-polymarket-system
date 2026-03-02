@@ -14,18 +14,27 @@ const (
 	TabOverview    TabID = iota
 	TabOrders
 	TabPositions
-	TabCopytrading
-	TabLogs
-	TabSettings
-	tabCount // sentinel
+	TabWallets     // NEW — index 3
+	TabCopytrading // was 3, now 4
+	TabLogs        // was 4, now 5
+	TabSettings    // was 5, now 6
+	tabCount       // sentinel
 )
 
-var tabKeys = []string{"1", "2", "3", "4", "5", "6"}
+var tabKeys = []string{"1", "2", "3", "4", "5", "6", "7"}
 
 // tabNames returns tab display names in the current locale.
 func tabNames() []string {
 	t := i18n.T()
-	return []string{t.TabOverview, t.TabOrders, t.TabPositions, t.TabCopytrading, t.TabLogs, t.TabSettings}
+	return []string{
+		t.TabOverview,
+		t.TabOrders,
+		t.TabPositions,
+		t.TabWallets,
+		t.TabCopytrading,
+		t.TabLogs,
+		t.TabSettings,
+	}
 }
 
 // RenderTabBar renders the tab bar with the active tab highlighted.

@@ -6,6 +6,7 @@ type Locale struct {
 	TabOverview    string `json:"tab_overview"`
 	TabOrders      string `json:"tab_orders"`
 	TabPositions   string `json:"tab_positions"`
+	TabWallets     string `json:"tab_wallets"`
 	TabCopytrading string `json:"tab_copytrading"`
 	TabLogs        string `json:"tab_logs"`
 	TabSettings    string `json:"tab_settings"`

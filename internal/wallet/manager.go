@@ -42,6 +42,18 @@ func (m *Manager) AddActive(inst *WalletInstance) {
 	}
 }
 
+// WalletIDs returns a snapshot of all wallet IDs (both active and inactive).
+// Implements tui.WalletProvider.
+func (m *Manager) WalletIDs() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	ids := make([]string, len(m.instances))
+	for i, w := range m.instances {
+		ids[i] = w.Cfg.ID
+	}
+	return ids
+}
+
 // Wallets returns a snapshot slice of all wallet instances (both active and inactive).
 func (m *Manager) Wallets() []*WalletInstance {
 	m.mu.RLock()

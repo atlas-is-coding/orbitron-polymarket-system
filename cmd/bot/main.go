@@ -280,7 +280,7 @@ func run() error {
 		go watcher.Run(ctx)
 
 		// Запускаем TUI
-		appModel := tui.NewAppModel(cfg, *cfgPath, bus, 0, 0, nil)
+		appModel := tui.NewAppModel(cfg, *cfgPath, bus, 0, 0, nil, wm)
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {

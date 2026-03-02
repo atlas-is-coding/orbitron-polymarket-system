@@ -16,6 +16,7 @@ type AppModel struct {
 	overview   OverviewModel
 	orders     OrdersModel
 	positions  PositionsModel
+	wallets    WalletsModel
 	copytrader CopytradingModel
 	logs       LogsModel
 	settings   SettingsModel
@@ -36,6 +37,7 @@ func NewAppModel(
 	bus *EventBus,
 	width, height int,
 	onSave func(string),
+	wm WalletProvider,
 ) AppModel {
 	if width == 0 {
 		width = 120
@@ -55,6 +57,7 @@ func NewAppModel(
 		overview:   NewOverviewModel(width, cw),
 		orders:     NewOrdersModel(width, cw),
 		positions:  NewPositionsModel(width, cw),
+		wallets:    NewWalletsModel(wm, cfgPath, width, cw),
 		copytrader: NewCopytradingModel(cfg, cfgPath, width, cw),
 		logs:       NewLogsModel(width, cw),
 		settings:   NewSettingsModel(cfg, cfgPath, width, cw, onSave),
@@ -91,6 +94,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
 				break
 			}
+			if m.activeTab == TabWallets && m.wallets.IsEditing() {
+				break
+			}
 			m.activeTab = (m.activeTab + 1) % tabCount
 			return m, m.bus.WaitForEvent()
 		case "shift+tab":
@@ -100,17 +106,23 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
 				break
 			}
+			if m.activeTab == TabWallets && m.wallets.IsEditing() {
+				break
+			}
 			if m.activeTab == 0 {
 				m.activeTab = tabCount - 1
 			} else {
 				m.activeTab--
 			}
 			return m, m.bus.WaitForEvent()
-		case "1", "2", "3", "4", "5", "6":
+		case "1", "2", "3", "4", "5", "6", "7":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
 			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
+				break
+			}
+			if m.activeTab == TabWallets && m.wallets.IsEditing() {
 				break
 			}
 			switch msg.String() {
@@ -121,10 +133,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "3":
 				m.activeTab = TabPositions
 			case "4":
-				m.activeTab = TabCopytrading
+				m.activeTab = TabWallets
 			case "5":
-				m.activeTab = TabLogs
+				m.activeTab = TabCopytrading
 			case "6":
+				m.activeTab = TabLogs
+			case "7":
 				m.activeTab = TabSettings
 			}
 		}
@@ -148,6 +162,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs, _ = m.logs.Update(msg)
 		return m, m.bus.WaitForEvent()
 
+	case WalletAddedMsg, WalletRemovedMsg, WalletChangedMsg, WalletStatsMsg:
+		m.wallets, _ = m.wallets.Update(msg)
+		return m, m.bus.WaitForEvent()
+
 	case LanguageChangedMsg:
 		cw := max(m.height-6, 10)
 		m.orders = NewOrdersModel(m.width, cw)
@@ -168,6 +186,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.orders, cmd = m.orders.Update(msg)
 	case TabPositions:
 		m.positions, cmd = m.positions.Update(msg)
+	case TabWallets:
+		m.wallets, cmd = m.wallets.Update(msg)
 	case TabCopytrading:
 		m.copytrader, cmd = m.copytrader.Update(msg)
 	case TabLogs:
@@ -202,6 +222,8 @@ func (m AppModel) View() string {
 		content = m.orders.View()
 	case TabPositions:
 		content = m.positions.View()
+	case TabWallets:
+		content = m.wallets.View()
 	case TabCopytrading:
 		content = m.copytrader.View()
 	case TabLogs:
