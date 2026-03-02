@@ -87,10 +87,25 @@ type CopyTradeStore interface {
 	GetAllOpenCopyTrades(ctx context.Context) ([]*CopyTradeRecord, error)
 }
 
+// WalletStatsRecord — снимок баланса и P&L кошелька.
+type WalletStatsRecord struct {
+	WalletID   string
+	FetchedAt  time.Time
+	BalanceUSD float64
+	PnLUSD     float64
+}
+
+// WalletStatsStore — хранилище снимков статистики кошельков.
+type WalletStatsStore interface {
+	SaveWalletStats(ctx context.Context, walletID string, balanceUSD, pnlUSD float64) error
+	GetWalletStats(ctx context.Context, walletID string, limit int) ([]*WalletStatsRecord, error)
+}
+
 // Store — объединённый интерфейс хранилища.
 type Store interface {
 	TradeStore
 	OrderStore
 	CopyTradeStore
+	WalletStatsStore
 	Close() error
 }

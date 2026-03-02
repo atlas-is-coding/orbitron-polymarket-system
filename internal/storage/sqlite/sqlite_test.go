@@ -127,3 +127,49 @@ func TestCopyTradeUpdateStatus(t *testing.T) {
 		t.Errorf("expected 0 open trades after close, got %d", len(trades))
 	}
 }
+
+func TestWalletStats(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Save a stats record
+	err = db.SaveWalletStats(ctx, "wallet-1", 1234.56, 88.0)
+	if err != nil {
+		t.Fatalf("SaveWalletStats: %v", err)
+	}
+
+	// Retrieve it
+	rows, err := db.GetWalletStats(ctx, "wallet-1", 10)
+	if err != nil {
+		t.Fatalf("GetWalletStats: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	if rows[0].BalanceUSD != 1234.56 {
+		t.Errorf("BalanceUSD = %f, want 1234.56", rows[0].BalanceUSD)
+	}
+	if rows[0].PnLUSD != 88.0 {
+		t.Errorf("PnLUSD = %f, want 88.0", rows[0].PnLUSD)
+	}
+	if rows[0].WalletID != "wallet-1" {
+		t.Errorf("WalletID = %q, want wallet-1", rows[0].WalletID)
+	}
+	if rows[0].FetchedAt.IsZero() {
+		t.Error("FetchedAt must not be zero")
+	}
+
+	// Different wallet should not appear
+	rows2, err := db.GetWalletStats(ctx, "wallet-2", 10)
+	if err != nil {
+		t.Fatalf("GetWalletStats wallet-2: %v", err)
+	}
+	if len(rows2) != 0 {
+		t.Errorf("expected 0 rows for wallet-2, got %d", len(rows2))
+	}
+}
