@@ -96,6 +96,40 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 			state.SetConfig(m.Config)
 		}
 		h.broadcast(WsEvent{Type: "config_reloaded", Data: nil})
+
+	case tui.WalletAddedMsg:
+		e := WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled}
+		state.UpsertWallet(e)
+		h.broadcast(WsEvent{Type: "wallet_added", Data: e})
+
+	case tui.WalletRemovedMsg:
+		state.RemoveWallet(m.ID)
+		h.broadcast(WsEvent{Type: "wallet_removed", Data: map[string]string{"id": m.ID}})
+
+	case tui.WalletChangedMsg:
+		// Partial update: toggle enabled flag in existing entry
+		wallets := state.Wallets()
+		for _, w := range wallets {
+			if w.ID == m.ID {
+				w.Enabled = m.Enabled
+				state.UpsertWallet(w)
+				h.broadcast(WsEvent{Type: "wallet_changed", Data: map[string]any{"id": m.ID, "enabled": m.Enabled}})
+				break
+			}
+		}
+
+	case tui.WalletStatsMsg:
+		e := WalletEntry{
+			ID:          m.ID,
+			Label:       m.Label,
+			Enabled:     m.Enabled,
+			BalanceUSD:  m.BalanceUSD,
+			PnLUSD:      m.PnLUSD,
+			OpenOrders:  m.OpenOrders,
+			TotalTrades: m.TotalTrades,
+		}
+		state.UpsertWallet(e)
+		h.broadcast(WsEvent{Type: "wallet_stats", Data: e})
 	}
 }
 

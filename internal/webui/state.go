@@ -16,6 +16,17 @@ type LogEntry struct {
 	Message string `json:"message"`
 }
 
+// WalletEntry holds the latest stats snapshot for one wallet.
+type WalletEntry struct {
+	ID          string  `json:"id"`
+	Label       string  `json:"label"`
+	Enabled     bool    `json:"enabled"`
+	BalanceUSD  float64 `json:"balance_usd"`
+	PnLUSD      float64 `json:"pnl_usd"`
+	OpenOrders  int     `json:"open_orders"`
+	TotalTrades int     `json:"total_trades"`
+}
+
 // WebState is a thread-safe snapshot of bot data for the web panel.
 type WebState struct {
 	mu         sync.RWMutex
@@ -25,11 +36,15 @@ type WebState struct {
 	traders    []tui.TraderRow
 	logs       []LogEntry
 	subsystems map[string]bool
+	wallets    map[string]*WalletEntry
 	cfg        *config.Config
 }
 
 func newWebState() *WebState {
-	return &WebState{subsystems: make(map[string]bool)}
+	return &WebState{
+		subsystems: make(map[string]bool),
+		wallets:    make(map[string]*WalletEntry),
+	}
 }
 
 func (s *WebState) SetBalance(v float64) {
@@ -115,6 +130,28 @@ func (s *WebState) Subsystems() map[string]bool {
 	cp := make(map[string]bool, len(s.subsystems))
 	maps.Copy(cp, s.subsystems)
 	return cp
+}
+
+func (s *WebState) UpsertWallet(e WalletEntry) {
+	s.mu.Lock()
+	s.wallets[e.ID] = &e
+	s.mu.Unlock()
+}
+
+func (s *WebState) RemoveWallet(id string) {
+	s.mu.Lock()
+	delete(s.wallets, id)
+	s.mu.Unlock()
+}
+
+func (s *WebState) Wallets() []WalletEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]WalletEntry, 0, len(s.wallets))
+	for _, w := range s.wallets {
+		out = append(out, *w)
+	}
+	return out
 }
 
 func (s *WebState) SetConfig(cfg *config.Config) {

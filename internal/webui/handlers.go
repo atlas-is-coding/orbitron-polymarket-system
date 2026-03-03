@@ -18,6 +18,14 @@ type OrderCanceler interface {
 	CancelAllOrders() error
 }
 
+// WalletMutator allows the Web UI to mutate wallet runtime state.
+// Implemented by *wallet.Manager.
+type WalletMutator interface {
+	UpdateLabel(id, label string) error
+	Toggle(id string, enabled bool) error
+	Remove(id string) error
+}
+
 // Server is the Web UI HTTP server.
 // NOTE: Additional fields (log, embed fs wiring) added in server.go (Task 6).
 type Server struct {
@@ -27,6 +35,7 @@ type Server struct {
 	password string
 	bus      *tui.EventBus
 	canceler OrderCanceler
+	wallets  WalletMutator // may be nil
 	state    *WebState
 	hub      *hub
 }
@@ -308,4 +317,73 @@ func (s *Server) handleToggleTrader(w http.ResponseWriter, r *http.Request) {
 		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
+}
+
+// ── Wallet handlers ───────────────────────────────────────────────────────────
+
+// handleGetWallets returns the cached wallet list from WebState.
+func (s *Server) handleGetWallets(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.state.Wallets())
+}
+
+// handleUpdateWallet handles PATCH /api/v1/wallets/:id
+// Accepts JSON body {"label": "new name"}.
+func (s *Server) handleUpdateWallet(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/wallets/")
+	id = strings.TrimSuffix(id, "/toggle")
+	var req struct {
+		Label string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Label == "" {
+		writeError(w, http.StatusBadRequest, "label required")
+		return
+	}
+	if s.wallets == nil {
+		writeError(w, http.StatusServiceUnavailable, "wallet manager unavailable")
+		return
+	}
+	if err := s.wallets.UpdateLabel(id, req.Label); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// handleToggleWallet handles POST /api/v1/wallets/:id/toggle
+// Accepts JSON body {"enabled": true/false}.
+func (s *Server) handleToggleWallet(w http.ResponseWriter, r *http.Request) {
+	// path: /api/v1/wallets/{id}/toggle
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/wallets/")
+	id := strings.TrimSuffix(path, "/toggle")
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	if s.wallets == nil {
+		writeError(w, http.StatusServiceUnavailable, "wallet manager unavailable")
+		return
+	}
+	if err := s.wallets.Toggle(id, req.Enabled); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
+}
+
+// handleDeleteWallet handles DELETE /api/v1/wallets/:id
+func (s *Server) handleDeleteWallet(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/wallets/")
+	id = strings.TrimSuffix(id, "/toggle")
+	if s.wallets == nil {
+		writeError(w, http.StatusServiceUnavailable, "wallet manager unavailable")
+		return
+	}
+	if err := s.wallets.Remove(id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
