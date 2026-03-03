@@ -21,12 +21,20 @@ type OrderCanceler interface {
 	CancelAllOrders() error
 }
 
+// WalletMutator allows the Telegram Bot to toggle wallet state.
+// Implemented by *wallet.Manager.
+type WalletMutator interface {
+	Toggle(id string, enabled bool) error
+	WalletEnabled(id string) bool
+}
+
 // Bot is the interactive Telegram Bot.
 type Bot struct {
 	api      *tgbotapi.BotAPI
 	bus      *tui.EventBus
 	state    *BotState
 	canceler OrderCanceler // optional; nil if TradesMonitor not running
+	wallets  WalletMutator // optional; nil if wallet manager unavailable
 	log      zerolog.Logger
 
 	cfgMu   sync.RWMutex
@@ -37,10 +45,10 @@ type Bot struct {
 }
 
 // New creates a new Bot.
-// canceler may be nil if order management is not needed.
+// canceler and wallets may be nil.
 // log may be nil (uses nop logger).
 // Returns (nil, nil) if bot_token is empty — caller must check.
-func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, log *zerolog.Logger) (*Bot, error) {
+func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, log *zerolog.Logger) (*Bot, error) {
 	var adminID int64
 	if cfg.Telegram.AdminChatID != "" {
 		if id, err := strconv.ParseInt(cfg.Telegram.AdminChatID, 10, 64); err == nil {
@@ -57,6 +65,7 @@ func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCa
 		bus:      bus,
 		state:    NewBotState(),
 		canceler: canceler,
+		wallets:  wallets,
 		log:      l,
 		cfg:      cfg,
 		cfgPath:  cfgPath,
@@ -149,6 +158,31 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 			b.cfg = m.Config
 			b.cfgMu.Unlock()
 		}
+
+	case tui.WalletAddedMsg:
+		b.state.UpsertWallet(WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled})
+
+	case tui.WalletRemovedMsg:
+		b.state.RemoveWallet(m.ID)
+
+	case tui.WalletChangedMsg:
+		wallets := b.state.Wallets()
+		for _, w := range wallets {
+			if w.ID == m.ID {
+				w.Enabled = m.Enabled
+				b.state.UpsertWallet(w)
+				break
+			}
+		}
+
+	case tui.WalletStatsMsg:
+		b.state.UpsertWallet(WalletEntry{
+			ID:      m.ID,
+			Label:   m.Label,
+			Enabled: m.Enabled,
+			Balance: m.BalanceUSD,
+			PnL:     m.PnLUSD,
+		})
 	}
 }
 

@@ -12,6 +12,15 @@ type SubsystemStatus struct {
 	Active bool
 }
 
+// WalletEntry holds the latest stats snapshot for one wallet in the bot state.
+type WalletEntry struct {
+	ID      string
+	Label   string
+	Enabled bool
+	Balance float64
+	PnL     float64
+}
+
 // BotState is a thread-safe cache of the latest bot data,
 // updated by the EventBus consumer goroutine.
 type BotState struct {
@@ -22,11 +31,15 @@ type BotState struct {
 	traders    []tui.TraderRow
 	logs       []string
 	subsystems map[string]bool
+	wallets    map[string]WalletEntry
 }
 
 // NewBotState creates an empty BotState.
 func NewBotState() *BotState {
-	return &BotState{subsystems: make(map[string]bool)}
+	return &BotState{
+		subsystems: make(map[string]bool),
+		wallets:    make(map[string]WalletEntry),
+	}
 }
 
 func (s *BotState) SetBalance(v float64) {
@@ -99,6 +112,28 @@ func (s *BotState) Logs() []string {
 	cp := make([]string, len(s.logs))
 	copy(cp, s.logs)
 	return cp
+}
+
+func (s *BotState) UpsertWallet(e WalletEntry) {
+	s.mu.Lock()
+	s.wallets[e.ID] = e
+	s.mu.Unlock()
+}
+
+func (s *BotState) RemoveWallet(id string) {
+	s.mu.Lock()
+	delete(s.wallets, id)
+	s.mu.Unlock()
+}
+
+func (s *BotState) Wallets() []WalletEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]WalletEntry, 0, len(s.wallets))
+	for _, w := range s.wallets {
+		out = append(out, w)
+	}
+	return out
 }
 
 func (s *BotState) SetSubsystem(name string, active bool) {
