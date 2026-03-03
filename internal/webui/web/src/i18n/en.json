@@ -4,6 +4,7 @@
     "orders": "Orders",
     "positions": "Positions",
     "copytrading": "Copytrading",
+    "wallets": "Wallets",
     "logs": "Logs",
     "settings": "Settings"
   },
@@ -52,6 +53,26 @@
     "noTraders": "No traders configured",
     "enable": "Enable copytrading",
     "disable": "Disable copytrading"
+  },
+  "wallets": {
+    "totalBalance": "Total Balance",
+    "totalPnL": "Total P&L",
+    "active": "Active",
+    "label": "Label",
+    "address": "Address",
+    "balance": "Balance",
+    "pnl": "P&L",
+    "openOrders": "Open Orders",
+    "status": "Status",
+    "on": "ON",
+    "off": "OFF",
+    "enable": "Enable",
+    "disable": "Disable",
+    "rename": "Rename",
+    "remove": "Remove",
+    "noWallets": "No wallets configured",
+    "confirmRemove": "Remove Wallet",
+    "confirmRemoveMsg": "Are you sure you want to remove wallet \"{label}\"?"
   },
   "logs": {
     "level": "Level",

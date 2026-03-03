@@ -4,6 +4,7 @@
     "orders": "Ордера",
     "positions": "Позиции",
     "copytrading": "Копитрейдинг",
+    "wallets": "Кошельки",
     "logs": "Логи",
     "settings": "Настройки"
   },
@@ -52,6 +53,26 @@
     "noTraders": "Нет трейдеров",
     "enable": "Включить копитрейдинг",
     "disable": "Выключить копитрейдинг"
+  },
+  "wallets": {
+    "totalBalance": "Общий баланс",
+    "totalPnL": "Общий P&L",
+    "active": "Активных",
+    "label": "Метка",
+    "address": "Адрес",
+    "balance": "Баланс",
+    "pnl": "P&L",
+    "openOrders": "Открытых ордеров",
+    "status": "Статус",
+    "on": "ВКЛ",
+    "off": "ВЫКЛ",
+    "enable": "Включить",
+    "disable": "Выключить",
+    "rename": "Переименовать",
+    "remove": "Удалить",
+    "noWallets": "Кошельки не настроены",
+    "confirmRemove": "Удалить кошелёк",
+    "confirmRemoveMsg": "Удалить кошелёк \"{label}\"?"
   },
   "logs": {
     "level": "Уровень",

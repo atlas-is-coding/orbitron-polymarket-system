@@ -4,6 +4,7 @@
     "orders": "注文",
     "positions": "ポジション",
     "copytrading": "コピートレード",
+    "wallets": "ウォレット",
     "logs": "ログ",
     "settings": "設定"
   },
@@ -52,6 +53,26 @@
     "noTraders": "トレーダー未設定",
     "enable": "コピートレード有効化",
     "disable": "コピートレード無効化"
+  },
+  "wallets": {
+    "totalBalance": "総残高",
+    "totalPnL": "総損益",
+    "active": "アクティブ",
+    "label": "ラベル",
+    "address": "アドレス",
+    "balance": "残高",
+    "pnl": "損益",
+    "openOrders": "未決注文",
+    "status": "ステータス",
+    "on": "ON",
+    "off": "OFF",
+    "enable": "有効化",
+    "disable": "無効化",
+    "rename": "名前変更",
+    "remove": "削除",
+    "noWallets": "ウォレット未設定",
+    "confirmRemove": "ウォレット削除",
+    "confirmRemoveMsg": "ウォレット \"{label}\" を削除しますか？"
   },
   "logs": {
     "level": "レベル",
