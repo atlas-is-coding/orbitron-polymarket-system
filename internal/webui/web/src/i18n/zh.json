@@ -4,6 +4,7 @@
     "orders": "订单",
     "positions": "仓位",
     "copytrading": "跟单",
+    "wallets": "钱包",
     "logs": "日志",
     "settings": "设置"
   },
@@ -52,6 +53,26 @@
     "noTraders": "未配置跟单员",
     "enable": "启用跟单",
     "disable": "停用跟单"
+  },
+  "wallets": {
+    "totalBalance": "总余额",
+    "totalPnL": "总盈亏",
+    "active": "活跃",
+    "label": "标签",
+    "address": "地址",
+    "balance": "余额",
+    "pnl": "盈亏",
+    "openOrders": "挂单数",
+    "status": "状态",
+    "on": "开",
+    "off": "关",
+    "enable": "启用",
+    "disable": "停用",
+    "rename": "重命名",
+    "remove": "删除",
+    "noWallets": "未配置钱包",
+    "confirmRemove": "删除钱包",
+    "confirmRemoveMsg": "确定要删除钱包 \"{label}\" 吗？"
   },
   "logs": {
     "level": "级别",

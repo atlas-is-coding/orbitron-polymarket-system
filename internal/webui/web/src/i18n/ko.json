@@ -4,6 +4,7 @@
     "orders": "주문",
     "positions": "포지션",
     "copytrading": "카피트레이딩",
+    "wallets": "지갑",
     "logs": "로그",
     "settings": "설정"
   },
@@ -52,6 +53,26 @@
     "noTraders": "설정된 트레이더 없음",
     "enable": "카피트레이딩 활성화",
     "disable": "카피트레이딩 비활성화"
+  },
+  "wallets": {
+    "totalBalance": "총 잔액",
+    "totalPnL": "총 손익",
+    "active": "활성",
+    "label": "라벨",
+    "address": "주소",
+    "balance": "잔액",
+    "pnl": "손익",
+    "openOrders": "미체결 주문",
+    "status": "상태",
+    "on": "ON",
+    "off": "OFF",
+    "enable": "활성화",
+    "disable": "비활성화",
+    "rename": "이름 변경",
+    "remove": "삭제",
+    "noWallets": "지갑 미설정",
+    "confirmRemove": "지갑 삭제",
+    "confirmRemoveMsg": "지갑 \"{label}\"을(를) 삭제하시겠습니까?"
   },
   "logs": {
     "level": "레벨",

@@ -54,6 +54,7 @@ const navItems = [
   { to: '/orders',       label: 'nav.orders' },
   { to: '/positions',    label: 'nav.positions' },
   { to: '/copytrading',  label: 'nav.copytrading' },
+  { to: '/wallets',      label: 'nav.wallets' },
   { to: '/logs',         label: 'nav.logs' },
   { to: '/settings',     label: 'nav.settings' },
 ]
