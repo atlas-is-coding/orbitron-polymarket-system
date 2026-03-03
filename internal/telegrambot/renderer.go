@@ -157,3 +157,46 @@ func RenderError(msg string) string {
 func RenderSuccess(msg string) string {
 	return fmt.Sprintf("✅ %s", msg)
 }
+
+// RenderWallets formats the wallet list as an HTML Telegram message.
+func RenderWallets(wallets []WalletEntry) string {
+	if len(wallets) == 0 {
+		return "<b>👛 Wallets</b>\n\nNo wallets configured."
+	}
+	var sb strings.Builder
+	sb.WriteString("<b>👛 Wallets</b>\n\n")
+
+	var totalBal, totalPnL float64
+	activeCount := 0
+	for _, w := range wallets {
+		totalBal += w.Balance
+		totalPnL += w.PnL
+		if w.Enabled {
+			activeCount++
+		}
+	}
+	pnlSign := "+"
+	if totalPnL < 0 {
+		pnlSign = ""
+	}
+	sb.WriteString(fmt.Sprintf("Total: <b>$%.2f</b>  P&L: <b>%s%.2f</b>  Active: <b>%d/%d</b>\n\n",
+		totalBal, pnlSign, totalPnL, activeCount, len(wallets)))
+
+	for _, w := range wallets {
+		status := "🔴 OFF"
+		if w.Enabled {
+			status = "🟢 ON"
+		}
+		label := w.Label
+		if label == "" {
+			label = w.ID
+		}
+		pSign := "+"
+		if w.PnL < 0 {
+			pSign = ""
+		}
+		sb.WriteString(fmt.Sprintf("• <b>%s</b>  %s\n  Balance: $%.2f  P&L: %s%.2f\n  ID: <code>%s</code>\n\n",
+			label, status, w.Balance, pSign, w.PnL, w.ID))
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}

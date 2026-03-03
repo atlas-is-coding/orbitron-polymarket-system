@@ -238,10 +238,37 @@ func mainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🔄 Copytrading", "cmd:copytrading"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👛 Wallets", "cmd:wallets"),
 			tgbotapi.NewInlineKeyboardButtonData("📝 Logs", "cmd:logs"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "cmd:settings"),
 		),
 	)
+}
+
+func walletsKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, w := range wallets {
+		label := w.Label
+		if label == "" {
+			label = w.ID
+		}
+		toggleIcon := "▶ Enable"
+		if w.Enabled {
+			toggleIcon = "⏸ Disable"
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("👛 %s  %s", label, toggleIcon),
+				"wallet:toggle:"+w.ID,
+			),
+		))
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Back", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func ordersKeyboard(orders []tui.OrderRow) tgbotapi.InlineKeyboardMarkup {
@@ -330,6 +357,15 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		b.sendWithKeyboard(msg.Chat.ID, "⚠️ Cancel ALL open orders?", cancelAllConfirmKeyboard())
 	case "positions":
 		b.sendPositions(msg.Chat.ID)
+	case "wallets":
+		b.sendWallets(msg.Chat.ID)
+	case "togglewallet":
+		id := strings.TrimSpace(msg.CommandArguments())
+		if id == "" {
+			b.sendText(msg.Chat.ID, RenderError("Usage: /togglewallet &lt;wallet_id&gt;"))
+			return
+		}
+		b.doToggleWallet(ctx, msg.Chat.ID, id)
 	case "copy":
 		b.sendCopytrading(msg.Chat.ID)
 	case "addtrader":
@@ -393,6 +429,12 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.sendLogs(chatID)
 	case data == "cmd:settings":
 		b.sendSettings(chatID, b.isAdmin(chatID))
+	case data == "cmd:wallets":
+		b.sendWallets(chatID)
+	case strings.HasPrefix(data, "wallet:toggle:"):
+		id := strings.TrimPrefix(data, "wallet:toggle:")
+		b.doToggleWallet(ctx, chatID, id)
+		b.sendWallets(chatID)
 	case data == "cancelall:confirm":
 		b.sendWithKeyboard(chatID, "⚠️ Are you sure you want to cancel ALL orders?", cancelAllConfirmKeyboard())
 	case data == "cancelall:do":
@@ -439,6 +481,29 @@ func (b *Bot) sendCopytrading(chatID int64) {
 
 	text := RenderCopytrading(b.state.Traders())
 	b.sendWithKeyboard(chatID, text, copytradingKeyboard(traders))
+}
+
+func (b *Bot) sendWallets(chatID int64) {
+	wallets := b.state.Wallets()
+	text := RenderWallets(wallets)
+	b.sendWithKeyboard(chatID, text, walletsKeyboard(wallets))
+}
+
+func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
+	if b.wallets == nil {
+		b.sendText(chatID, RenderError("Wallet manager unavailable"))
+		return
+	}
+	enabled := b.wallets.WalletEnabled(id)
+	if err := b.wallets.Toggle(id, !enabled); err != nil {
+		b.sendText(chatID, RenderError(err.Error()))
+		return
+	}
+	status := "disabled"
+	if !enabled {
+		status = "enabled"
+	}
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Wallet <code>%s</code> %s.", id, status)))
 }
 
 func (b *Bot) sendLogs(chatID int64) {
