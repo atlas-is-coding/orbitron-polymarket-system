@@ -112,20 +112,11 @@ func run() error {
 	}
 
 	// --- Build wallet instances ---
+	pubClobClient := clob.NewClient(clobHTTP, nil)
 	for _, wCfg := range cfg.Wallets {
 		if !wCfg.Enabled {
 			wm.AddInactive(wCfg)
 			continue
-		}
-		if wCfg.APIKey == "" {
-			log.Warn().Str("wallet", wCfg.Label).Msg("wallet has no api_key, skipping")
-			wm.AddInactive(wCfg)
-			continue
-		}
-		l2 := &auth.L2Credentials{
-			APIKey:     wCfg.APIKey,
-			APISecret:  wCfg.APISecret,
-			Passphrase: wCfg.Passphrase,
 		}
 		var addr string
 		var l1 *auth.L1Signer
@@ -136,8 +127,33 @@ func run() error {
 				wm.AddInactive(wCfg)
 				continue
 			}
-			l2.Address = l1.Address()
 			addr = l1.Address()
+		}
+		l2 := &auth.L2Credentials{
+			APIKey:     wCfg.APIKey,
+			APISecret:  wCfg.APISecret,
+			Passphrase: wCfg.Passphrase,
+		}
+		if l1 != nil {
+			l2.Address = l1.Address()
+		}
+		if l2.APIKey == "" && l1 != nil {
+			derived, deriveErr := pubClobClient.DeriveAPIKey(l1)
+			if deriveErr != nil {
+				log.Warn().Err(deriveErr).Str("wallet", wCfg.Label).Msg("auto-derive api_key failed")
+			} else {
+				l2.APIKey = derived.APIKey
+				l2.APISecret = derived.APISecret
+				l2.Passphrase = derived.Passphrase
+				log.Info().Str("wallet", wCfg.Label).Str("address", addr).Msg("api_key auto-derived from private_key")
+			}
+		}
+		if l2.APIKey == "" {
+			log.Warn().Str("wallet", wCfg.Label).Msg("wallet has no api_key, skipping")
+			wm.AddInactive(wCfg)
+			continue
+		}
+		if addr != "" {
 			log.Info().Str("wallet", wCfg.Label).Str("address", addr).Msg("wallet initialized")
 		}
 		wClobClient := clob.NewClient(clobHTTP, l2)
@@ -163,7 +179,7 @@ func run() error {
 		}
 		if cfg.Copytrading.Enabled && db != nil && l1 != nil {
 			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
-			executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, wCfg.APIKey, addr, log)
+			executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, log)
 			ct := copytrading.NewCopyTrader(
 				*cfgPath,
 				func() *config.CopytradingConfig { return &cfg.Copytrading },
@@ -252,7 +268,7 @@ func run() error {
 				break
 			}
 		}
-		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, &log)
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, &log)
 		if err != nil {
 			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
 			tgBot = nil
