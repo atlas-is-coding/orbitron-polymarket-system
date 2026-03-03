@@ -15,12 +15,13 @@ import (
 //go:embed web/dist
 var staticFiles embed.FS
 
-// New creates a Server. canceler may be nil if TradesMonitor is disabled.
+// New creates a Server. canceler and wallets may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
 	bus *tui.EventBus,
 	canceler OrderCanceler,
+	wallets WalletMutator,
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -29,6 +30,7 @@ func New(
 		password: cfg.WebUI.JWTSecret,
 		bus:      bus,
 		canceler: canceler,
+		wallets:  wallets,
 		state:    newWebState(),
 		hub:      newHub(),
 	}
@@ -107,6 +109,27 @@ func (s *Server) Run(ctx context.Context) error {
 			s.handleGetSettings(w, r)
 		case http.MethodPost:
 			s.handlePostSettings(w, r)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	}))
+
+	// Wallets
+	mux.HandleFunc("/api/v1/wallets", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			s.handleGetWallets(w, r)
+		} else {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	}))
+	mux.HandleFunc("/api/v1/wallets/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPatch:
+			s.handleUpdateWallet(w, r)
+		case r.Method == http.MethodDelete:
+			s.handleDeleteWallet(w, r)
+		case r.Method == http.MethodPost:
+			s.handleToggleWallet(w, r)
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
