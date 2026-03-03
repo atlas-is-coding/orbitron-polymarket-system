@@ -25,9 +25,6 @@ func buildWizardSteps() []wizardStep {
 	t := i18n.T()
 	return []wizardStep{
 		{Label: t.WizardStep1Label, Hint: t.WizardStep1Hint, IsPass: true},
-		{Label: t.WizardStep2Label, Hint: t.WizardStep2Hint, IsPass: false},
-		{Label: t.WizardStep3Label, Hint: t.WizardStep3Hint, IsPass: true},
-		{Label: t.WizardStep4Label, Hint: t.WizardStep4Hint, IsPass: true},
 	}
 }
 
@@ -107,9 +104,6 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m WizardModel) writeConfig() error {
 	type authSection struct {
 		PrivateKey string `toml:"private_key"`
-		APIKey     string `toml:"api_key"`
-		APISecret  string `toml:"api_secret"`
-		Passphrase string `toml:"passphrase"`
 		ChainID    int    `toml:"chain_id"`
 	}
 	type apiSection struct {
@@ -145,9 +139,6 @@ func (m WizardModel) writeConfig() error {
 		},
 		Auth: authSection{
 			PrivateKey: m.inputs[0].Value(),
-			APIKey:     m.inputs[1].Value(),
-			APISecret:  m.inputs[2].Value(),
-			Passphrase: m.inputs[3].Value(),
 			ChainID:    137,
 		},
 		Log: logSection{Level: "info", Format: "pretty"},
