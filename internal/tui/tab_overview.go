@@ -16,6 +16,15 @@ type SubsystemStatus struct {
 	Active bool
 }
 
+// walletSummaryRow holds per-wallet stats for the Overview display.
+type walletSummaryRow struct {
+	id      string
+	label   string
+	enabled bool
+	balance float64
+	pnl     float64
+}
+
 // OverviewModel is the Overview tab sub-model.
 type OverviewModel struct {
 	subsystems []SubsystemStatus
@@ -24,6 +33,7 @@ type OverviewModel struct {
 	positions  int
 	pnlToday   float64
 	traders    int
+	wallets    []walletSummaryRow
 	width      int
 	height     int
 }
@@ -55,6 +65,57 @@ func (m OverviewModel) Update(msg tea.Msg) (OverviewModel, tea.Cmd) {
 		}
 	case BalanceMsg:
 		m.balance = msg.USDC
+
+	case WalletAddedMsg:
+		// Avoid duplicates
+		for _, w := range m.wallets {
+			if w.id == msg.ID {
+				return m, nil
+			}
+		}
+		m.wallets = append(m.wallets, walletSummaryRow{
+			id:      msg.ID,
+			label:   msg.Label,
+			enabled: msg.Enabled,
+		})
+
+	case WalletRemovedMsg:
+		for i, w := range m.wallets {
+			if w.id == msg.ID {
+				m.wallets = append(m.wallets[:i], m.wallets[i+1:]...)
+				break
+			}
+		}
+
+	case WalletChangedMsg:
+		for i, w := range m.wallets {
+			if w.id == msg.ID {
+				m.wallets[i].enabled = msg.Enabled
+				break
+			}
+		}
+
+	case WalletStatsMsg:
+		found := false
+		for i, w := range m.wallets {
+			if w.id == msg.ID {
+				m.wallets[i].label = msg.Label
+				m.wallets[i].enabled = msg.Enabled
+				m.wallets[i].balance = msg.BalanceUSD
+				m.wallets[i].pnl = msg.PnLUSD
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.wallets = append(m.wallets, walletSummaryRow{
+				id:      msg.ID,
+				label:   msg.Label,
+				enabled: msg.Enabled,
+				balance: msg.BalanceUSD,
+				pnl:     msg.PnLUSD,
+			})
+		}
 	}
 	return m, nil
 }
@@ -99,6 +160,82 @@ func (m OverviewModel) View() string {
 
 	leftBox := StyleBorderActive.Width(half - 2).Render(left.String())
 	rightBox := StyleBorder.Width(half - 2).Render(right.String())
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	// Bottom: wallet summary (only when wallets are registered)
+	if len(m.wallets) == 0 {
+		return topRow
+	}
+
+	var totalBal, totalPnL float64
+	activeCount := 0
+	for _, w := range m.wallets {
+		totalBal += w.balance
+		totalPnL += w.pnl
+		if w.enabled {
+			activeCount++
+		}
+	}
+
+	t := i18n.T()
+	var wb strings.Builder
+	wb.WriteString(StyleSectionTitle.Render(t.OverviewWallets) + "\n")
+
+	// Aggregate line
+	totalPnLStr := fmt.Sprintf("%+.2f", totalPnL)
+	if totalPnL >= 0 {
+		totalPnLStr = StyleSuccess.Render(totalPnLStr)
+	} else {
+		totalPnLStr = StyleError.Render(totalPnLStr)
+	}
+	fmt.Fprintf(&wb, " %s %s  │  %s %s  │  %s %d/%d\n",
+		label(t.OverviewTotalBalance+":")+" ", val(fmt.Sprintf("$%.2f", totalBal)),
+		label(t.OverviewTotalPnL+":")+" ", totalPnLStr,
+		label(t.OverviewActiveWallets+":")+" ", activeCount, len(m.wallets),
+	)
+	wb.WriteString("\n")
+
+	// Per-wallet rows
+	colW := (m.width - 8) / 4
+	if colW < 10 {
+		colW = 10
+	}
+	hdr := StyleFgDim.Render(
+		fmt.Sprintf("  %-*s  %-*s  %-*s  %s",
+			colW, "Label",
+			12, "Balance",
+			12, "P&L",
+			"Status",
+		),
+	)
+	wb.WriteString(hdr + "\n")
+
+	for _, w := range m.wallets {
+		lbl := w.label
+		if len(lbl) > colW {
+			lbl = lbl[:colW-1] + "…"
+		}
+		balStr := fmt.Sprintf("$%.2f", w.balance)
+		wPnLStr := fmt.Sprintf("%+.2f", w.pnl)
+		if w.pnl >= 0 {
+			wPnLStr = StyleSuccess.Render(wPnLStr)
+		} else {
+			wPnLStr = StyleError.Render(wPnLStr)
+		}
+		var statusStr string
+		if w.enabled {
+			statusStr = StyleSuccess.Render("● ON")
+		} else {
+			statusStr = StyleMuted.Render("○ OFF")
+		}
+		fmt.Fprintf(&wb, "  %-*s  %-12s  %-12s  %s\n",
+			colW, lbl,
+			balStr,
+			wPnLStr,
+			statusStr,
+		)
+	}
+
+	walletsBox := StyleBorder.Width(m.width - 4).Render(wb.String())
+	return lipgloss.JoinVertical(lipgloss.Left, topRow, walletsBox)
 }

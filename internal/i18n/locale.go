@@ -17,15 +17,19 @@ type Locale struct {
 	HelpGlobal string `json:"help_global"`
 
 	// Overview
-	OverviewSubsystems  string `json:"overview_subsystems"`
-	OverviewStats       string `json:"overview_stats"`
-	OverviewActive      string `json:"overview_active"`
-	OverviewInactive    string `json:"overview_inactive"`
-	OverviewBalance     string `json:"overview_balance"`
-	OverviewOpenOrders  string `json:"overview_open_orders"`
-	OverviewPositions   string `json:"overview_positions"`
-	OverviewPnLToday    string `json:"overview_pnl_today"`
-	OverviewCopyTraders string `json:"overview_copy_traders"`
+	OverviewSubsystems    string `json:"overview_subsystems"`
+	OverviewStats         string `json:"overview_stats"`
+	OverviewActive        string `json:"overview_active"`
+	OverviewInactive      string `json:"overview_inactive"`
+	OverviewBalance       string `json:"overview_balance"`
+	OverviewOpenOrders    string `json:"overview_open_orders"`
+	OverviewPositions     string `json:"overview_positions"`
+	OverviewPnLToday      string `json:"overview_pnl_today"`
+	OverviewCopyTraders   string `json:"overview_copy_traders"`
+	OverviewWallets       string `json:"overview_wallets"`
+	OverviewTotalBalance  string `json:"overview_total_balance"`
+	OverviewTotalPnL      string `json:"overview_total_pnl"`
+	OverviewActiveWallets string `json:"overview_active_wallets"`
 
 	// Orders tab
 	OrdersColMarket string `json:"orders_col_market"`
