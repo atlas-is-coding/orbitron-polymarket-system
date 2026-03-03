@@ -2,11 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -62,30 +60,6 @@ var allFields = []FieldDef{
 		Kind:    KindPassword,
 		Get:     func(c *config.Config) string { return c.Auth.PrivateKey },
 		Set:     func(c *config.Config, v string) error { c.Auth.PrivateKey = v; return nil },
-	},
-	{
-		Section: func() string { return i18n.T().SectionAuth },
-		Label:   func() string { return i18n.T().FieldAPIKey },
-		Tooltip: func() string { return i18n.T().TooltipAPIKey },
-		Kind:    KindString,
-		Get:     func(c *config.Config) string { return c.Auth.APIKey },
-		Set:     func(c *config.Config, v string) error { c.Auth.APIKey = v; return nil },
-	},
-	{
-		Section: func() string { return i18n.T().SectionAuth },
-		Label:   func() string { return i18n.T().FieldAPISecret },
-		Tooltip: func() string { return i18n.T().TooltipAPISecret },
-		Kind:    KindPassword,
-		Get:     func(c *config.Config) string { return c.Auth.APISecret },
-		Set:     func(c *config.Config, v string) error { c.Auth.APISecret = v; return nil },
-	},
-	{
-		Section: func() string { return i18n.T().SectionAuth },
-		Label:   func() string { return i18n.T().FieldPassphrase },
-		Tooltip: func() string { return i18n.T().TooltipPassphrase },
-		Kind:    KindPassword,
-		Get:     func(c *config.Config) string { return c.Auth.Passphrase },
-		Set:     func(c *config.Config, v string) error { c.Auth.Passphrase = v; return nil },
 	},
 	{
 		Section: func() string { return i18n.T().SectionAuth },
@@ -213,6 +187,14 @@ var allFields = []FieldDef{
 			return nil
 		},
 	},
+	{
+		Section: func() string { return i18n.T().SectionTradesMonitor },
+		Label:   func() string { return i18n.T().FieldTrackPositions },
+		Tooltip: func() string { return i18n.T().TooltipTradesTrack },
+		Kind:    KindBool,
+		Get:     func(c *config.Config) string { return boolStr(c.Monitor.Trades.TrackPositions) },
+		Set:     func(c *config.Config, v string) error { c.Monitor.Trades.TrackPositions = parseBool(v); return nil },
+	},
 	// ── Trading ──────────────────────────────────────────────────────────────
 	{
 		Section: func() string { return i18n.T().SectionTrading },
@@ -259,6 +241,15 @@ var allFields = []FieldDef{
 		Kind:    KindBool,
 		Get:     func(c *config.Config) string { return boolStr(c.Trading.NegRisk) },
 		Set:     func(c *config.Config, v string) error { c.Trading.NegRisk = parseBool(v); return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionTrading },
+		Label:   func() string { return i18n.T().FieldDefaultOrderType },
+		Tooltip: func() string { return i18n.T().TooltipDefaultOrderType },
+		Kind:    KindEnum,
+		Options: []string{"GTC", "GTD", "FOK", "FAK"},
+		Get:     func(c *config.Config) string { return c.Trading.DefaultOrderType },
+		Set:     func(c *config.Config, v string) error { c.Trading.DefaultOrderType = v; return nil },
 	},
 	// ── Copytrading ──────────────────────────────────────────────────────────
 	{
@@ -353,6 +344,31 @@ var allFields = []FieldDef{
 		Options: []string{"pretty", "json"},
 		Get:     func(c *config.Config) string { return c.Log.Format },
 		Set:     func(c *config.Config, v string) error { c.Log.Format = v; return nil },
+	},
+	// ── Web UI ───────────────────────────────────────────────────────────────
+	{
+		Section: func() string { return i18n.T().SectionWebUI },
+		Label:   func() string { return i18n.T().FieldEnabled },
+		Tooltip: func() string { return i18n.T().TooltipWebUIEnabled },
+		Kind:    KindBool,
+		Get:     func(c *config.Config) string { return boolStr(c.WebUI.Enabled) },
+		Set:     func(c *config.Config, v string) error { c.WebUI.Enabled = parseBool(v); return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionWebUI },
+		Label:   func() string { return i18n.T().FieldWebUIListen },
+		Tooltip: func() string { return i18n.T().TooltipWebUIListen },
+		Kind:    KindString,
+		Get:     func(c *config.Config) string { return c.WebUI.Listen },
+		Set:     func(c *config.Config, v string) error { c.WebUI.Listen = v; return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionWebUI },
+		Label:   func() string { return i18n.T().FieldWebUIJWTSecret },
+		Tooltip: func() string { return i18n.T().TooltipWebUIJWTSecret },
+		Kind:    KindPassword,
+		Get:     func(c *config.Config) string { return c.WebUI.JWTSecret },
+		Set:     func(c *config.Config, v string) error { c.WebUI.JWTSecret = v; return nil },
 	},
 }
 
@@ -582,7 +598,7 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 					return m, nil
 				}
 			}
-			if err := saveConfig(m.cfgPath, &cfgCopy); err != nil {
+			if err := config.Save(m.cfgPath, &cfgCopy); err != nil {
 				m.errMsg = fmt.Sprintf(i18n.T().SettingsErrSave, err)
 				return m, nil
 			}
@@ -821,14 +837,4 @@ func (m SettingsModel) View() string {
 		errLine,
 		help,
 	)
-}
-
-// saveConfig serialises cfg back to TOML at path.
-func saveConfig(path string, cfg *config.Config) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return toml.NewEncoder(f).Encode(cfg)
 }
