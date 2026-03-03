@@ -38,7 +38,7 @@ func (m *Manager) AddActive(inst *WalletInstance) {
 	defer m.mu.Unlock()
 	m.instances = append(m.instances, inst)
 	if m.bus != nil {
-		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID})
+		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID, Label: inst.Cfg.Label, Enabled: inst.Cfg.Enabled})
 	}
 }
 
@@ -105,6 +105,62 @@ func (m *Manager) Remove(id string) error {
 		}
 	}
 	return fmt.Errorf("wallet %q not found", id)
+}
+
+// WalletLabel returns the display label of the wallet with the given ID.
+// Returns an empty string if not found.
+// Implements tui.WalletProvider.
+func (m *Manager) WalletLabel(id string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, w := range m.instances {
+		if w.Cfg.ID == id {
+			return w.Cfg.Label
+		}
+	}
+	return ""
+}
+
+// WalletAddress returns the derived Ethereum address of the wallet with the given ID.
+// Returns an empty string if not found or if the wallet is watch-only.
+// Implements tui.WalletProvider.
+func (m *Manager) WalletAddress(id string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, w := range m.instances {
+		if w.Cfg.ID == id {
+			return w.Address
+		}
+	}
+	return ""
+}
+
+// WalletEnabled reports whether the wallet with the given ID is enabled.
+// Returns false if not found.
+// Implements tui.WalletProvider.
+func (m *Manager) WalletEnabled(id string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, w := range m.instances {
+		if w.Cfg.ID == id {
+			return w.Cfg.Enabled
+		}
+	}
+	return false
+}
+
+// WalletStats returns a cached statistics snapshot for the wallet with the given ID.
+// Returns zero values if not found.
+// Implements tui.WalletProvider.
+func (m *Manager) WalletStats(id string) (balanceUSD, pnlUSD float64, openOrders, totalTrades int) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, w := range m.instances {
+		if w.Cfg.ID == id {
+			return w.Stats.Get()
+		}
+	}
+	return 0, 0, 0, 0
 }
 
 // Toggle enables or disables a wallet. Disabling triggers graceful drain (Stop).

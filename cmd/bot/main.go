@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
@@ -235,6 +236,9 @@ func run() error {
 			startSubsystem("Copytrading ["+label+"]", func() error { return ct.Run(ctx) })
 		}
 	}
+
+	// --- Stats poller (wallet balance / P&L via Data API) ---
+	go wm.RunStatsPoller(ctx, dataClient, 30*time.Second)
 
 	// --- Telegram Bot (interactive) ---
 	// Initialised before subsystems so it can be started alongside them.

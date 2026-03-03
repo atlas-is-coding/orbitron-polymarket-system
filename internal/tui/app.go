@@ -164,6 +164,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case WalletAddedMsg, WalletRemovedMsg, WalletChangedMsg, WalletStatsMsg:
 		m.wallets, _ = m.wallets.Update(msg)
+		m.overview, _ = m.overview.Update(msg)
 		return m, m.bus.WaitForEvent()
 
 	case LanguageChangedMsg:

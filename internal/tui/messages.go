@@ -90,8 +90,12 @@ func (b *EventBus) WaitForEvent() tea.Cmd {
 	}
 }
 
-// WalletAddedMsg is sent when a new active wallet is added (reserved for AddActive, not yet used by AddInactive).
-type WalletAddedMsg struct{ ID string }
+// WalletAddedMsg is sent when a new active wallet is added.
+type WalletAddedMsg struct {
+	ID      string
+	Label   string
+	Enabled bool
+}
 
 // WalletRemovedMsg is sent when a wallet is removed.
 type WalletRemovedMsg struct{ ID string }
@@ -105,6 +109,8 @@ type WalletChangedMsg struct {
 // WalletStatsMsg carries a statistics snapshot for one wallet.
 type WalletStatsMsg struct {
 	ID          string
+	Label       string
+	Enabled     bool
 	BalanceUSD  float64
 	PnLUSD      float64
 	OpenOrders  int
