@@ -58,6 +58,18 @@ func applyConfigKey(cfg *config.Config, key, value string) error {
 		cfg.Log.Level = value
 	case "log.format":
 		cfg.Log.Format = value
+	case "monitor.trades.alert_on_fill":
+		cfg.Monitor.Trades.AlertOnFill = parseBoolKey(value)
+	case "monitor.trades.alert_on_cancel":
+		cfg.Monitor.Trades.AlertOnCancel = parseBoolKey(value)
+	case "trading.default_order_type":
+		cfg.Trading.DefaultOrderType = value
+	case "webui.enabled":
+		cfg.WebUI.Enabled = parseBoolKey(value)
+	case "webui.listen":
+		cfg.WebUI.Listen = value
+	case "webui.jwt_secret":
+		cfg.WebUI.JWTSecret = value
 	default:
 		return fmt.Errorf("unknown or read-only key: %q", key)
 	}
