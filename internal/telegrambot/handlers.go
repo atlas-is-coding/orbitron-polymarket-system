@@ -343,6 +343,53 @@ func settingsSectionsKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+// langPickerKeyboard returns an inline keyboard for language selection.
+// currentLang is the active language code (e.g. "en", "ru").
+func langPickerKeyboard(currentLang string) tgbotapi.InlineKeyboardMarkup {
+	type lang struct {
+		code  string
+		label string
+	}
+	langs := []lang{
+		{"en", "🇬🇧 English"},
+		{"ru", "🇷🇺 Русский"},
+		{"zh", "🇨🇳 中文"},
+		{"ja", "🇯🇵 日本語"},
+		{"ko", "🇰🇷 한국어"},
+	}
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(langs); i += 2 {
+		if i+1 < len(langs) {
+			l1, l2 := langs[i], langs[i+1]
+			label1, label2 := l1.label, l2.label
+			if l1.code == currentLang {
+				label1 += " ✓"
+			}
+			if l2.code == currentLang {
+				label2 += " ✓"
+			}
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(label1, "setlang:"+l1.code),
+				tgbotapi.NewInlineKeyboardButtonData(label2, "setlang:"+l2.code),
+			))
+		} else {
+			l := langs[i]
+			label := l.label
+			if l.code == currentLang {
+				label += " ✓"
+			}
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(label, "setlang:"+l.code),
+			))
+		}
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Settings", "cmd:settings"),
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 // sectionFieldsKeyboard builds per-field buttons for a settings section.
 // Bool fields get a toggle button. String/number fields get an edit button.
 func sectionFieldsKeyboard(sectionName string, keys []string, cfg *config.Config, isAdmin bool) tgbotapi.InlineKeyboardMarkup {
@@ -531,6 +578,13 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(data, "toggle:"):
 		key := strings.TrimPrefix(data, "toggle:")
 		b.doToggleSetting(ctx, chatID, key)
+	// Language picker — intercept before generic edit:* handler
+	case data == "edit:ui.language":
+		b.sendLanguagePicker(chatID)
+	case strings.HasPrefix(data, "setlang:"):
+		code := strings.TrimPrefix(data, "setlang:")
+		b.doSetSetting(ctx, chatID, "ui.language", code)
+		b.sendSettingsSection(chatID, "UI")
 	case strings.HasPrefix(data, "edit:"):
 		key := strings.TrimPrefix(data, "edit:")
 		b.state.SetPending("edit:"+key, "")
@@ -635,6 +689,18 @@ func (b *Bot) sendLogs(chatID int64) {
 	b.sendOrEdit(chatID, RenderLogs(b.state.Logs()), logsKeyboard)
 }
 
+
+func (b *Bot) sendLanguagePicker(chatID int64) {
+	b.cfgMu.RLock()
+	currentLang := b.cfg.UI.Language
+	b.cfgMu.RUnlock()
+
+	if currentLang == "" {
+		currentLang = "en"
+	}
+	text := "🌐 <b>Язык интерфейса</b>\n\nВыберите язык:"
+	b.sendOrEdit(chatID, text, langPickerKeyboard(currentLang))
+}
 
 func (b *Bot) sendSettings(chatID int64) {
 	text := "⚙️ <b>Settings</b>\n\nВыберите раздел для просмотра и редактирования:"
