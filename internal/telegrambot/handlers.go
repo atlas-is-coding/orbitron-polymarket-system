@@ -295,7 +295,7 @@ func cancelAllConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
 func backKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("← Back to Menu", "cmd:menu"),
+			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
 		),
 	)
 }
@@ -333,6 +333,41 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboardMarkup {
+	ordersLabel := "📋 Orders"
+	posLabel := "💼 Positions"
+	if subTab == "orders" {
+		ordersLabel = "📋 Orders ✓"
+	} else {
+		posLabel = "💼 Positions ✓"
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(ordersLabel, "trading:orders"),
+		tgbotapi.NewInlineKeyboardButtonData(posLabel, "trading:positions"),
+	))
+
+	if subTab == "orders" {
+		for i, o := range orders {
+			label := fmt.Sprintf("❌ Cancel #%d (%s)", i+1, o.Side)
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(label, "cancel:"+o.ID),
+			))
+		}
+		if len(orders) > 0 {
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("❌ Cancel ALL", "cancelall:confirm"),
+			))
+		}
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 // --- Command dispatch ---
 
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
@@ -342,6 +377,8 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		b.sendMenu(msg.Chat.ID)
 	case "status", "overview":
 		b.sendOverview(msg.Chat.ID)
+	case "trading":
+		b.sendTrading(msg.Chat.ID, "orders")
 	case "orders":
 		b.sendOrders(msg.Chat.ID)
 	case "cancel":
@@ -448,6 +485,12 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		addr := strings.TrimPrefix(data, "trader:remove:")
 		b.doRemoveTrader(ctx, chatID, addr)
 		b.sendCopytrading(chatID)
+	case data == "cmd:trading":
+		b.sendTrading(chatID, "orders")
+	case data == "trading:orders":
+		b.sendTrading(chatID, "orders")
+	case data == "trading:positions":
+		b.sendTrading(chatID, "positions")
 	}
 }
 
@@ -466,6 +509,13 @@ func (b *Bot) sendOverview(chatID int64) {
 	positions := b.state.Positions()
 	text := RenderOverview(b.state.Balance(), subsystems, len(orders), len(positions))
 	b.sendWithKeyboard(chatID, text, backKeyboard())
+}
+
+func (b *Bot) sendTrading(chatID int64, subTab string) {
+	orders := b.state.Orders()
+	positions := b.state.Positions()
+	text := RenderTrading(subTab, orders, positions)
+	b.sendOrEdit(chatID, text, tradingKeyboard(subTab, orders))
 }
 
 func (b *Bot) sendOrders(chatID int64) {
