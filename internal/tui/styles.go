@@ -38,8 +38,8 @@ var (
 			Bold(true)
 
 	StyleHeaderMuted = lipgloss.NewStyle().
-				Foreground(ColorFgDim).
-				Background(ColorPrimary2)
+			Foreground(ColorFgDim).
+			Background(ColorPrimary2)
 
 	// ── Tab bar ───────────────────────────────────────────────────────────────
 	StyleTabActive = lipgloss.NewStyle().
@@ -49,9 +49,9 @@ var (
 			Padding(0, 2)
 
 	StyleTabInactive = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Background(ColorBg).
-				Padding(0, 2)
+			Foreground(ColorMuted).
+			Background(ColorBg).
+			Padding(0, 2)
 
 	StyleTabSep = lipgloss.NewStyle().
 			Foreground(ColorBorder).
@@ -63,18 +63,18 @@ var (
 			Padding(0, 0)
 
 	StyleTabBarLine = lipgloss.NewStyle().
-				Foreground(ColorBorder)
+			Foreground(ColorBorder)
 
 	// ── Sub-tab (Trading) ─────────────────────────────────────────────────────
 	StyleSubTabActive = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(ColorAccent).
-				Underline(true).
-				Padding(0, 1)
+			Bold(true).
+			Foreground(ColorAccent).
+			Underline(true).
+			Padding(0, 1)
 
 	StyleSubTabInactive = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Padding(0, 1)
+			Foreground(ColorMuted).
+			Padding(0, 1)
 
 	// ── Misc ─────────────────────────────────────────────────────────────────
 	StyleHelpBar = lipgloss.NewStyle().
@@ -91,8 +91,8 @@ var (
 			BorderForeground(ColorBorder)
 
 	StyleBorderActive = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorPrimary)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorPrimary)
 
 	StyleBorderGlow = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -113,12 +113,12 @@ var (
 			Bold(true)
 
 	StyleToastSuccess = lipgloss.NewStyle().
-				Foreground(ColorFg).
-				Background(ColorSurface2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorSuccess).
-				Padding(0, 2).
-				Bold(true)
+			Foreground(ColorFg).
+			Background(ColorSurface2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorSuccess).
+			Padding(0, 2).
+			Bold(true)
 
 	StyleToastError = lipgloss.NewStyle().
 			Foreground(ColorFg).
@@ -129,12 +129,12 @@ var (
 			Bold(true)
 
 	StyleToastWarning = lipgloss.NewStyle().
-				Foreground(ColorFg).
-				Background(ColorSurface2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorWarning).
-				Padding(0, 2).
-				Bold(true)
+			Foreground(ColorFg).
+			Background(ColorSurface2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorWarning).
+			Padding(0, 2).
+			Bold(true)
 
 	// ── Text ─────────────────────────────────────────────────────────────────
 	StyleTooltip = lipgloss.NewStyle().Foreground(ColorFgDim)
@@ -165,13 +165,13 @@ var (
 			Bold(true)
 
 	StyleFieldActive = lipgloss.NewStyle().
-				Background(ColorRowActive).
-				Foreground(ColorFg)
+			Background(ColorRowActive).
+			Foreground(ColorFg)
 
 	StyleSectionTitle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(ColorAccent).
-				PaddingBottom(1)
+			Bold(true).
+			Foreground(ColorAccent).
+			PaddingBottom(1)
 
 	// ── Empty state ───────────────────────────────────────────────────────────
 	StyleEmptyState = lipgloss.NewStyle().
@@ -184,7 +184,7 @@ var (
 			Bold(true)
 
 	StyleSplashSubtitle = lipgloss.NewStyle().
-				Foreground(ColorFgDim)
+			Foreground(ColorFgDim)
 
 	StyleSplashBox = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
