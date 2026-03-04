@@ -155,29 +155,50 @@ func (m WizardModel) writeConfig() error {
 
 func (m WizardModel) View() string {
 	s := m.steps[m.step]
-	progress := fmt.Sprintf(i18n.T().WizardProgress, m.step+1, len(m.steps), s.Label)
+	t := i18n.T()
+
+	// Progress dots: ● filled = done/current, ○ = future
+	var progressDots strings.Builder
+	for i := range m.steps {
+		if i < m.step {
+			progressDots.WriteString(StyleSuccess.Render("● "))
+		} else if i == m.step {
+			progressDots.WriteString(StyleGlow.Render("● "))
+		} else {
+			progressDots.WriteString(StyleMuted.Render("○ "))
+		}
+	}
+
+	stepLabel := StyleAccent.Render(fmt.Sprintf(t.WizardProgress, m.step+1, len(m.steps), s.Label))
 
 	errLine := ""
 	if m.errMsg != "" {
-		errLine = "\n" + StyleError.Render(m.errMsg)
+		errLine = "\n" + StyleError.Render("  ✗ "+m.errMsg)
 	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
-		StyleBold.Render(progress),
 		"",
-		m.inputs[m.step].View(),
+		StyleGlow.Render("  ◈ POLYTRADE BOT"),
+		StyleFgDim.Render("  Polymarket Trading Bot"),
 		"",
-		StyleTooltip.Render(s.Hint),
+		StyleMuted.Render("  ────────────────────────────"),
+		"",
+		"  "+progressDots.String(),
+		"  "+stepLabel,
+		"",
+		"  "+m.inputs[m.step].View(),
+		"",
+		StyleTooltip.Render("  "+s.Hint),
 		errLine,
 		"",
-		StyleMuted.Render(i18n.T().WizardContinue),
+		StyleMuted.Render("  "+t.WizardContinue),
+		"",
 	)
 
-	w := m.width - 6
-	if w < 40 {
-		w = 40
+	w := m.width - 8
+	if w < 44 {
+		w = 44
 	}
-	box := StyleBorder.Width(w).Padding(1, 2).Render(body)
-	title := StyleHeader.Render(i18n.T().WizardTitle)
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", box)
+	box := StyleSplashBox.Width(w).Render(body)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
