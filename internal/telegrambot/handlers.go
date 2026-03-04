@@ -488,7 +488,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	case "logs":
 		b.sendLogs(msg.Chat.ID)
 	case "settings":
-		b.sendSettings(msg.Chat.ID, b.isAdmin(msg.Chat.ID))
+		b.sendSettings(msg.Chat.ID)
 	case "set":
 		args := strings.Fields(msg.CommandArguments())
 		if len(args) < 2 {
@@ -524,7 +524,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case data == "cmd:logs":
 		b.sendLogs(chatID)
 	case data == "cmd:settings":
-		b.sendSettings(chatID, b.isAdmin(chatID))
+		b.sendSettings(chatID)
 	case strings.HasPrefix(data, "settings:section:"):
 		section := strings.TrimPrefix(data, "settings:section:")
 		b.sendSettingsSection(chatID, section)
@@ -592,10 +592,6 @@ func (b *Bot) sendTrading(chatID int64, subTab string) {
 	b.sendOrEdit(chatID, text, tradingKeyboard(subTab, orders))
 }
 
-func (b *Bot) sendPositions(chatID int64) {
-	b.sendOrEdit(chatID, RenderPositions(b.state.Positions()), backKeyboard())
-}
-
 func (b *Bot) sendCopytrading(chatID int64) {
 	b.cfgMu.RLock()
 	traders := make([]config.TraderConfig, len(b.cfg.Copytrading.Traders))
@@ -640,7 +636,7 @@ func (b *Bot) sendLogs(chatID int64) {
 }
 
 
-func (b *Bot) sendSettings(chatID int64, isAdmin bool) {
+func (b *Bot) sendSettings(chatID int64) {
 	text := "⚙️ <b>Settings</b>\n\nВыберите раздел для просмотра и редактирования:"
 	b.sendOrEdit(chatID, text, settingsSectionsKeyboard())
 }
