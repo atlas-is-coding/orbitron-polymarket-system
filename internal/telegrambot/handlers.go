@@ -328,7 +328,10 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Back", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add Trader", "addtrader:start"),
+	))
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -485,6 +488,9 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		addr := strings.TrimPrefix(data, "trader:remove:")
 		b.doRemoveTrader(ctx, chatID, addr)
 		b.sendCopytrading(chatID)
+	case data == "addtrader:start":
+		b.state.SetPending("addtrader_addr", "")
+		b.sendText(chatID, "📝 Введите адрес кошелька трейдера:\n<i>(или /menu для отмены)</i>")
 	case data == "cmd:trading":
 		b.sendTrading(chatID, "orders")
 	case data == "trading:orders":

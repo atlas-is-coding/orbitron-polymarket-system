@@ -5,6 +5,7 @@ package telegrambot
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -271,4 +272,55 @@ func (b *Bot) sendOrEdit(chatID int64, text string, keyboard tgbotapi.InlineKeyb
 		return
 	}
 	b.state.SetMenuMsgID(sent.MessageID)
+}
+
+// handlePendingInput routes incoming text to the active conversation step.
+func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
+	input, data := b.state.Pending()
+	text := strings.TrimSpace(msg.Text)
+
+	switch input {
+	case "addtrader_addr":
+		if text == "" {
+			b.sendText(msg.Chat.ID, RenderError("Адрес не может быть пустым."))
+			return
+		}
+		b.state.SetPending("addtrader_label", text)
+		b.sendText(msg.Chat.ID, "🏷 Введите label (отображаемое имя) или <code>-</code> для пропуска:")
+
+	case "addtrader_label":
+		addr := data
+		label := text
+		if label == "-" {
+			label = ""
+		}
+		b.state.SetPending("addtrader_alloc", addr+"|"+label)
+		b.sendText(msg.Chat.ID, "📊 Введите allocation % (например <code>5</code>) или <code>-</code> для значения по умолчанию (5%):")
+
+	case "addtrader_alloc":
+		parts := strings.SplitN(data, "|", 2)
+		addr := parts[0]
+		label := ""
+		if len(parts) > 1 {
+			label = parts[1]
+		}
+		allocPct := 5.0
+		if text != "-" && text != "" {
+			if v, err := strconv.ParseFloat(text, 64); err == nil {
+				allocPct = v
+			}
+		}
+		b.state.ClearPending()
+		args := []string{addr, label, strconv.FormatFloat(allocPct, 'f', 1, 64)}
+		b.doAddTrader(ctx, msg.Chat.ID, args)
+		b.sendCopytrading(msg.Chat.ID)
+
+	default:
+		// Generic setting edit: "edit:some.key"
+		if strings.HasPrefix(input, "edit:") {
+			key := strings.TrimPrefix(input, "edit:")
+			b.state.ClearPending()
+			b.doSetSetting(ctx, msg.Chat.ID, key, text)
+		}
+	}
 }
