@@ -15,13 +15,14 @@ import (
 //go:embed web/dist
 var staticFiles embed.FS
 
-// New creates a Server. canceler and wallets may be nil.
+// New creates a Server. canceler, wallets, and adder may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
 	bus *tui.EventBus,
 	canceler OrderCanceler,
 	wallets WalletMutator,
+	adder WalletAdder,
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -31,6 +32,7 @@ func New(
 		bus:      bus,
 		canceler: canceler,
 		wallets:  wallets,
+		adder:    adder,
 		state:    newWebState(),
 		hub:      newHub(),
 	}
@@ -116,9 +118,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Wallets
 	mux.HandleFunc("/api/v1/wallets", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			s.handleGetWallets(w, r)
-		} else {
+		case http.MethodPost:
+			s.handleAddWallet(w, r)
+		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	}))
