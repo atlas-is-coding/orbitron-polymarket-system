@@ -452,7 +452,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	case "cancelall":
 		b.sendWithKeyboard(msg.Chat.ID, "⚠️ Cancel ALL open orders?", cancelAllConfirmKeyboard())
 	case "positions":
-		b.sendPositions(msg.Chat.ID)
+		b.sendTrading(msg.Chat.ID, "positions")
 	case "wallets":
 		b.sendWallets(msg.Chat.ID)
 	case "togglewallet":
@@ -497,7 +497,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		}
 		b.doSetSetting(ctx, msg.Chat.ID, args[0], strings.Join(args[1:], " "))
 	default:
-		b.sendText(msg.Chat.ID, "Unknown command. Use /start for the menu.")
+		b.sendText(msg.Chat.ID, "❓ Неизвестная команда.\n\nИспользуйте /start для главного меню.")
 	}
 }
 
