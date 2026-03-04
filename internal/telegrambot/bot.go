@@ -216,7 +216,10 @@ func (b *Bot) handleUpdate(ctx context.Context, update tgbotapi.Update) {
 			return
 		}
 		if update.Message.IsCommand() {
+			b.state.ClearPending() // commands always reset conversation
 			b.handleCommand(ctx, update.Message)
+		} else if pi, _ := b.state.Pending(); pi != "" {
+			b.handlePendingInput(ctx, update.Message)
 		}
 	case update.CallbackQuery != nil:
 		if !b.IsAllowed(update.CallbackQuery.Message.Chat.ID) {
@@ -243,4 +246,29 @@ func (b *Bot) sendWithKeyboard(chatID int64, text string, keyboard tgbotapi.Inli
 	if _, err := b.api.Send(msg); err != nil {
 		b.log.Warn().Err(err).Int64("chat_id", chatID).Msg("failed to send keyboard message")
 	}
+}
+
+// sendOrEdit edits the active menu message if menuMsgID is set,
+// otherwise sends a new message and stores its ID.
+func (b *Bot) sendOrEdit(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+	if mid := b.state.MenuMsgID(); mid != 0 {
+		edit := tgbotapi.NewEditMessageText(chatID, mid, text)
+		edit.ParseMode = tgbotapi.ModeHTML
+		edit.ReplyMarkup = &keyboard
+		if _, err := b.api.Send(edit); err != nil {
+			// Edit failed (e.g. message deleted) — fall back to new message
+			b.state.SetMenuMsgID(0)
+			b.sendOrEdit(chatID, text, keyboard)
+		}
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = tgbotapi.ModeHTML
+	msg.ReplyMarkup = keyboard
+	sent, err := b.api.Send(msg)
+	if err != nil {
+		b.log.Warn().Err(err).Int64("chat_id", chatID).Msg("failed to send menu message")
+		return
+	}
+	b.state.SetMenuMsgID(sent.MessageID)
 }
