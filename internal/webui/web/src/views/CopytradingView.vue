@@ -1,43 +1,39 @@
 <template>
   <div class="view">
-    <div class="view-header">
-      <h2 class="view-title">{{ $t('nav.copytrading') }}</h2>
-      <div class="header-right">
+    <div class="view-header anim-in">
+      <div class="header-left">
+        <h2 class="view-title">{{ $t('nav.copytrading') }}</h2>
         <span class="status-badge" :class="ct.enabled ? 'badge--ok' : 'badge--off'">
           {{ ct.enabled ? $t('copytrading.enabled') : $t('copytrading.disabled') }}
         </span>
-        <button class="btn-add" @click="showAdd = true">+ {{ $t('copytrading.addTrader') }}</button>
       </div>
+      <button class="btn-add" @click="showAdd = true">+ {{ $t('copytrading.addTrader') }}</button>
     </div>
 
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>{{ $t('copytrading.label') }}</th>
-            <th>{{ $t('copytrading.address') }}</th>
-            <th>{{ $t('copytrading.allocation') }}</th>
-            <th>{{ $t('common.connected') }}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in ct.traders" :key="t.address">
-            <td>{{ t.label || '—' }}</td>
-            <td class="mono addr">{{ t.address?.slice(0, 10) }}…</td>
-            <td class="mono">{{ t.allocation_pct }}%</td>
-            <td>
-              <span class="sub-dot" :class="t.enabled ? 'sub-dot--on' : 'sub-dot--off'" />
-            </td>
-            <td class="actions">
-              <button class="btn-xs" @click="doToggle(t.address)">{{ $t('copytrading.toggle') }}</button>
-              <button class="btn-xs-danger" @click="doRemove(t.address)">{{ $t('copytrading.remove') }}</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="!ct.traders?.length" class="empty">{{ $t('copytrading.noTraders') }}</div>
+    <!-- Trader cards -->
+    <div v-if="ct.traders?.length" class="traders-grid">
+      <div v-for="t in ct.traders" :key="t.address" class="trader-card anim-in">
+        <div class="card-top">
+          <span class="card-status-dot" :class="t.enabled ? 'dot--on' : 'dot--off'" />
+          <span class="card-label">{{ t.label || 'Unnamed' }}</span>
+          <span class="card-alloc">{{ t.allocation_pct }}%</span>
+        </div>
+        <div class="card-addr mono">{{ t.address?.slice(0, 10) }}…{{ t.address?.slice(-4) }}</div>
+        <div class="card-actions">
+          <button
+            class="btn-xs"
+            :disabled="togglingAddr === t.address"
+            @click="doToggle(t.address)"
+          >
+            <span :class="{ spin: togglingAddr === t.address }">
+              {{ togglingAddr === t.address ? '⟳' : $t('copytrading.toggle') }}
+            </span>
+          </button>
+          <button class="btn-xs-danger" @click="removeTarget = t">{{ $t('copytrading.remove') }}</button>
+        </div>
+      </div>
     </div>
+    <div v-else class="empty anim-in">{{ $t('copytrading.noTraders') }}</div>
 
     <!-- Add trader dialog -->
     <div v-if="showAdd" class="overlay" @click.self="showAdd = false">
@@ -53,13 +49,31 @@
             <input v-model="form.label" class="field-input" />
           </div>
           <div class="field">
-            <label class="field-label">{{ $t('copytrading.allocation') }}</label>
+            <label class="field-label">{{ $t('copytrading.allocation') }} (%)</label>
             <input v-model.number="form.allocPct" type="number" min="0" max="100" class="field-input" />
           </div>
         </div>
         <div class="dialog-actions">
           <button class="btn-ghost" @click="showAdd = false">{{ $t('common.cancel') }}</button>
-          <button class="btn-primary" @click="doAdd" :disabled="!form.address">{{ $t('common.confirm') }}</button>
+          <button class="btn-primary" :disabled="!form.address || adding" @click="doAdd">
+            <span :class="{ spin: adding }">{{ adding ? '⟳' : $t('common.confirm') }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm remove dialog -->
+    <div v-if="removeTarget" class="overlay" @click.self="removeTarget = null">
+      <div class="dialog">
+        <h3 class="dialog-title">{{ $t('copytrading.remove') }}</h3>
+        <p class="dialog-body">Remove trader <span class="mono">{{ removeTarget.label || removeTarget.address?.slice(0, 10) }}…</span>?</p>
+        <div class="dialog-actions">
+          <button class="btn-ghost" @click="removeTarget = null">{{ $t('common.cancel') }}</button>
+          <button class="btn-danger-solid" :disabled="removingAddr === removeTarget?.address" @click="doRemove">
+            <span :class="{ spin: removingAddr === removeTarget?.address }">
+              {{ removingAddr === removeTarget?.address ? '⟳' : $t('common.confirm') }}
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -71,157 +85,115 @@ import { onMounted, ref, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
-RouterView
+
 const app = useAppStore()
 const { copytrading: ct } = storeToRefs(app)
 const api = useApi()
 
 const showAdd = ref(false)
 const form = reactive({ address: '', label: '', allocPct: 5 })
+const adding = ref(false)
+const togglingAddr = ref(null)
+const removingAddr = ref(null)
+const removeTarget = ref(null)
 
 onMounted(async () => {
   try { app.copytrading = await api.getCopytrading() } catch {}
 })
 
 async function doToggle(addr) {
-  try {
-    await api.toggleTrader(addr)
-    app.copytrading = await api.getCopytrading()
-  } catch {}
+  togglingAddr.value = addr
+  try { await api.toggleTrader(addr); app.copytrading = await api.getCopytrading() } catch {}
+  togglingAddr.value = null
 }
 
-async function doRemove(addr) {
+async function doRemove() {
+  if (!removeTarget.value) return
+  const addr = removeTarget.value.address
+  removingAddr.value = addr
   try {
     await api.removeTrader(addr)
     app.copytrading = await api.getCopytrading()
   } catch {}
+  removingAddr.value = null
+  removeTarget.value = null
 }
 
 async function doAdd() {
+  adding.value = true
   try {
     await api.addTrader(form.address, form.label, form.allocPct)
     app.copytrading = await api.getCopytrading()
     showAdd.value = false
     form.address = ''; form.label = ''; form.allocPct = 5
   } catch {}
+  adding.value = false
 }
 </script>
 
 <style scoped>
 .view { display: flex; flex-direction: column; gap: 1rem; }
 .view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
-.view-title  { font-size: 1.4rem; font-weight: 700; }
-.header-right { display: flex; align-items: center; gap: 0.75rem; }
+.header-left { display: flex; align-items: center; gap: 0.75rem; }
+.view-title { font-size: 1.1rem; font-weight: 700; }
 
-.status-badge {
-  font-size: 0.75rem; font-weight: 600;
-  padding: 0.2rem 0.6rem; border-radius: 999px;
-}
-.badge--ok  { background: rgba(63,185,80,0.15); color: var(--success); }
-.badge--off { background: var(--badge-bg); color: var(--text-muted); }
+.status-badge { font-size: 0.65rem; font-weight: 600; padding: 0.18rem 0.5rem; border-radius: 999px; }
+.badge--ok  { background: var(--success-dim); color: var(--success); }
+.badge--off { background: var(--badge-bg);    color: var(--text-muted); }
 
-.btn-add {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  padding: 0.35rem 0.9rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background var(--transition);
-}
+.btn-add { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 0.3rem 0.85rem; font-size: 0.78rem; cursor: pointer; font-family: var(--font-mono); transition: background var(--transition); }
 .btn-add:hover { background: var(--accent-hover); }
 
-.table-wrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow-x: auto;
-}
-.data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.data-table th {
-  padding: 0.6rem 1rem; text-align: left;
-  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-secondary); border-bottom: 1px solid var(--border);
-}
-.data-table td {
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-primary);
-}
-.data-table tr:last-child td { border-bottom: none; }
-.data-table tr:hover td { background: var(--bg-hover); }
+/* Trader cards grid */
+.traders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
 
-.mono { font-family: var(--font-mono); font-size: 0.82rem; }
-.addr { color: var(--text-secondary); }
-
-.sub-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.sub-dot--on  { background: var(--success); box-shadow: 0 0 6px var(--success); }
-.sub-dot--off { background: var(--text-muted); }
-
-.actions { display: flex; gap: 0.4rem; }
-
-.btn-xs {
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: var(--radius);
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
+.trader-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  transition: border-color var(--transition);
 }
-.btn-xs:hover { color: var(--text-primary); }
+.trader-card:hover { border-color: var(--accent); }
 
-.btn-xs-danger {
-  background: rgba(248,81,73,0.1);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  border-radius: var(--radius);
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
+.card-top { display: flex; align-items: center; gap: 0.5rem; }
+.card-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot--on  { background: var(--success); box-shadow: 0 0 5px var(--success); animation: pulse-dot 2.5s ease infinite; }
+.dot--off { background: var(--text-muted); }
+.card-label { flex: 1; font-size: 0.85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-alloc { font-size: 0.72rem; color: var(--accent-bright); font-family: var(--font-mono); font-weight: 600; }
+
+.card-addr { font-size: 0.72rem; color: var(--text-secondary); }
+
+.card-actions { display: flex; gap: 0.4rem; }
+
+.btn-xs { background: var(--bg-hover); border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 0.2rem 0.55rem; font-size: 0.72rem; cursor: pointer; font-family: var(--font-mono); transition: all var(--transition); }
+.btn-xs:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent); }
+.btn-xs:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-xs-danger { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); padding: 0.2rem 0.55rem; font-size: 0.72rem; cursor: pointer; font-family: var(--font-mono); }
 .btn-xs-danger:hover { background: var(--danger); color: #fff; }
 
 .empty { padding: 2rem; text-align: center; color: var(--text-muted); }
 
-.overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-  display: flex; align-items: center; justify-content: center; z-index: 200;
-}
-.dialog {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.5rem; min-width: 320px;
-  box-shadow: var(--shadow);
-}
-.dialog-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 1.25rem; }
+.mono { font-family: var(--font-mono); }
+
+.overlay { position: fixed; inset: 0; background: var(--bg-overlay); display: flex; align-items: center; justify-content: center; z-index: 200; }
+.dialog { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; min-width: 320px; box-shadow: var(--shadow); }
+.dialog-title { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+.dialog-body { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem; }
+
 .form-fields { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; }
-.field-label {
-  font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--text-secondary);
-}
-.field-input {
-  padding: 0.5rem 0.7rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-family: var(--font-mono);
-  outline: none;
-}
+.field-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+.field-input { padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-mono); outline: none; }
 .field-input:focus { border-color: var(--accent); }
 
 .dialog-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
-.btn-ghost {
-  background: none; border: 1px solid var(--border); color: var(--text-secondary);
-  border-radius: var(--radius); padding: 0.35rem 0.9rem; font-size: 0.85rem; cursor: pointer;
-}
-.btn-primary {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: var(--radius); padding: 0.35rem 0.9rem; font-size: 0.85rem; cursor: pointer;
-}
+.btn-ghost { background: none; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
+.btn-ghost:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; font-family: var(--font-mono); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger-solid { background: var(--danger); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
+.btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
