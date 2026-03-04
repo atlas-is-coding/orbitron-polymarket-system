@@ -654,21 +654,6 @@ func (b *Bot) sendLogs(chatID int64) {
 	b.sendWithKeyboard(chatID, RenderLogs(b.state.Logs()), backKeyboard())
 }
 
-// settingsSections defines the display order of settings sections with their keys.
-var settingsSections = []struct {
-	name string
-	keys []string
-}{
-	{"UI", []string{"ui.language"}},
-	{"Auth", []string{"auth.private_key", "auth.api_key", "auth.api_secret", "auth.passphrase", "auth.chain_id"}},
-	{"Monitor", []string{"monitor.enabled", "monitor.poll_interval_ms"}},
-	{"Trades Monitor", []string{"monitor.trades.enabled", "monitor.trades.poll_interval_ms", "monitor.trades.alert_on_fill", "monitor.trades.alert_on_cancel"}},
-	{"Trading", []string{"trading.enabled", "trading.max_position_usd", "trading.slippage_pct", "trading.neg_risk"}},
-	{"Copytrading", []string{"copytrading.enabled", "copytrading.poll_interval_ms", "copytrading.size_mode"}},
-	{"Telegram", []string{"telegram.enabled", "telegram.bot_token", "telegram.admin_chat_id"}},
-	{"Database", []string{"database.enabled", "database.path"}},
-	{"Log", []string{"log.level", "log.format"}},
-}
 
 func (b *Bot) sendSettings(chatID int64, isAdmin bool) {
 	text := "⚙️ <b>Settings</b>\n\nВыберите раздел для просмотра и редактирования:"
