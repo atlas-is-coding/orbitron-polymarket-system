@@ -300,20 +300,22 @@ func run() error {
 		go watcher.Run(ctx)
 
 		// Запускаем TUI
-		appModel := tui.NewAppModel(cfg, *cfgPath, bus, 0, 0, nil, wm)
+		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, 0, 0, nil, wm)
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {
 			if inst.Address != "" && inst.Cfg.Enabled {
-				appModel.SetWallet(inst.Address)
+				rootModel.SetWallet(inst.Address)
 				break
 			}
 		}
 
-		p := tea.NewProgram(appModel, tea.WithAltScreen(), tea.WithMouseCellMotion())
+		p := tea.NewProgram(rootModel, tea.WithAltScreen(), tea.WithMouseCellMotion())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("tui: %w", err)
 		}
+		// Goodbye message (printed after alt screen is restored)
+		fmt.Println("\n  ◈ polytrade-bot — shutdown complete. Goodbye!\n")
 		cancel()
 		return nil
 	}
