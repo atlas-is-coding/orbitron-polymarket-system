@@ -32,6 +32,17 @@ type BotState struct {
 	logs       []string
 	subsystems map[string]bool
 	wallets    map[string]WalletEntry
+
+	// Navigation: ID of the active menu message (for edit-in-place).
+	menuMsgID int
+
+	// Conversation state: non-empty while bot awaits text input from user.
+	// Examples: "addtrader_addr", "addtrader_label", "addtrader_alloc",
+	//           "edit:monitor.poll_interval_ms"
+	pendingInput string
+	// pendingData accumulates values across conversation steps.
+	// For addtrader: "addr|label" (pipe-separated as steps complete).
+	pendingData string
 }
 
 // NewBotState creates an empty BotState.
@@ -150,4 +161,40 @@ func (s *BotState) Subsystems() []SubsystemStatus {
 		result = append(result, SubsystemStatus{Name: name, Active: active})
 	}
 	return result
+}
+
+// --- Navigation state ---
+
+func (s *BotState) SetMenuMsgID(id int) {
+	s.mu.Lock()
+	s.menuMsgID = id
+	s.mu.Unlock()
+}
+
+func (s *BotState) MenuMsgID() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.menuMsgID
+}
+
+// --- Conversation state ---
+
+func (s *BotState) SetPending(input, data string) {
+	s.mu.Lock()
+	s.pendingInput = input
+	s.pendingData = data
+	s.mu.Unlock()
+}
+
+func (s *BotState) ClearPending() {
+	s.mu.Lock()
+	s.pendingInput = ""
+	s.pendingData = ""
+	s.mu.Unlock()
+}
+
+func (s *BotState) Pending() (input, data string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.pendingInput, s.pendingData
 }
