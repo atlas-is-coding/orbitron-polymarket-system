@@ -2,11 +2,13 @@ package webui
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/atlasdev/polytrade-bot/internal/auth"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
@@ -26,6 +28,11 @@ type WalletMutator interface {
 	Remove(id string) error
 }
 
+// WalletAdder allows the Web UI to register a new wallet in the manager.
+type WalletAdder interface {
+	AddInactive(cfg config.WalletConfig)
+}
+
 // Server is the Web UI HTTP server.
 // NOTE: Additional fields (log, embed fs wiring) added in server.go (Task 6).
 type Server struct {
@@ -36,6 +43,7 @@ type Server struct {
 	bus      *tui.EventBus
 	canceler OrderCanceler
 	wallets  WalletMutator // may be nil
+	adder    WalletAdder   // may be nil
 	state    *WebState
 	hub      *hub
 }
@@ -324,6 +332,75 @@ func (s *Server) handleToggleTrader(w http.ResponseWriter, r *http.Request) {
 // handleGetWallets returns the cached wallet list from WebState.
 func (s *Server) handleGetWallets(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.state.Wallets())
+}
+
+// handleAddWallet handles POST /api/v1/wallets
+// Body: {"private_key": "hex (with or without 0x prefix)"}
+func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PrivateKey string `json:"private_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PrivateKey == "" {
+		writeError(w, http.StatusBadRequest, "private_key required")
+		return
+	}
+	l1, err := auth.NewL1Signer(req.PrivateKey)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid private key")
+		return
+	}
+	addr := l1.Address()
+
+	s.cfgMu.Lock()
+	// Check for duplicate by address
+	for _, wc := range s.cfg.Wallets {
+		existingL1, err2 := auth.NewL1Signer(wc.PrivateKey)
+		if err2 == nil && existingL1.Address() == addr {
+			s.cfgMu.Unlock()
+			writeError(w, http.StatusConflict, "wallet already exists")
+			return
+		}
+	}
+	id := fmt.Sprintf("w%d", time.Now().UnixMilli())
+	chainID := int64(137)
+	if len(s.cfg.Wallets) > 0 && s.cfg.Wallets[0].ChainID != 0 {
+		chainID = s.cfg.Wallets[0].ChainID
+	}
+	wCfg := config.WalletConfig{
+		ID:         id,
+		Label:      addr[:8] + "…" + addr[len(addr)-4:],
+		PrivateKey: strings.TrimPrefix(req.PrivateKey, "0x"),
+		ChainID:    chainID,
+		Enabled:    true,
+	}
+	cfgCopy := *s.cfg
+	newWallets := make([]config.WalletConfig, len(s.cfg.Wallets)+1)
+	copy(newWallets, s.cfg.Wallets)
+	newWallets[len(s.cfg.Wallets)] = wCfg
+	cfgCopy.Wallets = newWallets
+	if err := config.Save(s.cfgPath, &cfgCopy); err != nil {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+
+	if s.adder != nil {
+		s.adder.AddInactive(wCfg)
+	}
+	if s.bus != nil {
+		s.bus.Send(tui.WalletAddedMsg{ID: id, Label: wCfg.Label, Enabled: true})
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id":          id,
+		"address":     addr,
+		"label":       wCfg.Label,
+		"enabled":     true,
+		"balance_usd": 0,
+		"pnl_usd":     0,
+		"open_orders": 0,
+	})
 }
 
 // handleUpdateWallet handles PATCH /api/v1/wallets/:id
