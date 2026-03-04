@@ -148,6 +148,18 @@ type SettingField struct {
 	Value string
 }
 
+// RenderWelcome formats the welcome / main menu message shown on /start.
+func RenderWelcome(balance float64, openOrders, positions int) string {
+	return fmt.Sprintf(
+		"🤖 <b>polytrade-bot</b>\n\n"+
+			"Добро пожаловать! Я помогу вам управлять торговлей на Polymarket.\n\n"+
+			"💰 Баланс: <b>%.2f USDC</b>\n"+
+			"📋 Ордеров: <b>%d</b>  |  💼 Позиций: <b>%d</b>\n\n"+
+			"Выберите раздел:",
+		balance, openOrders, positions,
+	)
+}
+
 // RenderError formats an error message.
 func RenderError(msg string) string {
 	return fmt.Sprintf("❌ <b>Error:</b> %s", msg)

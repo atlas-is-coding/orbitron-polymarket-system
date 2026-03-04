@@ -230,18 +230,15 @@ func IsSecretKey(key string) bool {
 func mainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Orders", "cmd:orders"),
-			tgbotapi.NewInlineKeyboardButtonData("💼 Positions", "cmd:positions"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Overview", "cmd:overview"),
+			tgbotapi.NewInlineKeyboardButtonData("📈 Trading", "cmd:trading"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("ℹ️ Overview", "cmd:overview"),
 			tgbotapi.NewInlineKeyboardButtonData("🔄 Copytrading", "cmd:copytrading"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("👛 Wallets", "cmd:wallets"),
-			tgbotapi.NewInlineKeyboardButtonData("📝 Logs", "cmd:logs"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📝 Logs", "cmd:logs"),
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "cmd:settings"),
 		),
 	)
@@ -341,7 +338,8 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	switch msg.Command() {
 	case "start", "menu":
-		b.sendWithKeyboard(msg.Chat.ID, "polytrade-bot\n\nChoose a section:", mainMenuKeyboard())
+		b.state.SetMenuMsgID(0) // force new message on /start
+		b.sendMenu(msg.Chat.ID)
 	case "status", "overview":
 		b.sendOverview(msg.Chat.ID)
 	case "orders":
@@ -416,7 +414,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 
 	switch {
 	case data == "cmd:menu":
-		b.sendWithKeyboard(chatID, "polytrade-bot\n\nChoose a section:", mainMenuKeyboard())
+		b.sendMenu(chatID)
 	case data == "cmd:overview":
 		b.sendOverview(chatID)
 	case data == "cmd:orders":
@@ -454,6 +452,13 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 }
 
 // --- View helpers ---
+
+func (b *Bot) sendMenu(chatID int64) {
+	orders := b.state.Orders()
+	positions := b.state.Positions()
+	text := RenderWelcome(b.state.Balance(), len(orders), len(positions))
+	b.sendOrEdit(chatID, text, mainMenuKeyboard())
+}
 
 func (b *Bot) sendOverview(chatID int64) {
 	subsystems := b.state.Subsystems()
