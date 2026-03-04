@@ -1,17 +1,24 @@
 <template>
-  <div class="app-root">
-    <AppHeader v-if="auth.isAuthenticated" />
-    <main class="app-main">
-      <RouterView />
-    </main>
+  <div v-if="auth.isAuthenticated" class="app-layout">
+    <AppTopbar />
+    <div class="app-body">
+      <AppSidebar />
+      <main class="app-content">
+        <RouterView />
+      </main>
+    </div>
+    <ToastContainer />
   </div>
+  <RouterView v-else />
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
-import AppHeader from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocket } from '@/composables/useWebSocket'
+import AppTopbar from '@/components/AppHeader.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
+import ToastContainer from '@/components/ToastContainer.vue'
 
 const auth = useAuthStore()
 const { connect } = useWebSocket()
@@ -25,17 +32,24 @@ onMounted(() => {
 <style>
 @import '@/assets/theme.css';
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+#app { height: 100%; }
 
-html { font-family: var(--font-ui); }
-
-body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
-  transition: background var(--transition), color var(--transition);
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
-
-.app-root { display: flex; flex-direction: column; min-height: 100vh; }
-.app-main  { flex: 1; padding: 1.5rem; max-width: 1400px; width: 100%; margin: 0 auto; }
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
 </style>
