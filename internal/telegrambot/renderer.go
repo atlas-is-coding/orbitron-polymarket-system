@@ -170,6 +170,15 @@ func RenderSuccess(msg string) string {
 	return fmt.Sprintf("✅ %s", msg)
 }
 
+// RenderTrading renders Orders or Positions depending on subTab.
+// subTab: "orders" | "positions"
+func RenderTrading(subTab string, orders []tui.OrderRow, positions []tui.PositionRow) string {
+	if subTab == "positions" {
+		return RenderPositions(positions)
+	}
+	return RenderOrders(orders)
+}
+
 // RenderWallets formats the wallet list as an HTML Telegram message.
 func RenderWallets(wallets []WalletEntry) string {
 	if len(wallets) == 0 {
