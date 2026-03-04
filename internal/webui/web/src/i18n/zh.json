@@ -82,7 +82,8 @@
     "level": "级别",
     "message": "消息",
     "noLogs": "暂无日志",
-    "clear": "清空"
+    "clear": "清空",
+    "autoScroll": "自动滚动"
   },
   "settings": {
     "title": "设置",

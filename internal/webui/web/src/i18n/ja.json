@@ -82,7 +82,8 @@
     "level": "レベル",
     "message": "メッセージ",
     "noLogs": "ログなし",
-    "clear": "クリア"
+    "clear": "クリア",
+    "autoScroll": "自動スクロール"
   },
   "settings": {
     "title": "設定",

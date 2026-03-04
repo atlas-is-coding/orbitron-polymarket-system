@@ -82,7 +82,8 @@
     "level": "Level",
     "message": "Message",
     "noLogs": "No logs yet",
-    "clear": "Clear"
+    "clear": "Clear",
+    "autoScroll": "Auto-scroll"
   },
   "settings": {
     "title": "Settings",
