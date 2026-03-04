@@ -687,7 +687,7 @@ func (m SettingsModel) renderWidget(i int) string {
 			}
 			return lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorMuted2).
+				BorderForeground(ColorBorder).
 				Padding(0, 1).
 				Render(s)
 		}
@@ -701,7 +701,7 @@ func (m SettingsModel) renderWidget(i int) string {
 		}
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorMuted2).
+			BorderForeground(ColorBorder).
 			Padding(0, 1).
 			Render(s)
 
@@ -722,7 +722,7 @@ func (m SettingsModel) renderWidget(i int) string {
 		}
 		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorMuted2).
+			BorderForeground(ColorBorder).
 			Padding(0, 0).
 			Render(StyleMuted.Render("‹") + StyleFgDim.Render(fmt.Sprintf(" %-14s", cur)) + StyleMuted.Render("›"))
 
