@@ -336,6 +336,79 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+// settingsSectionsKeyboard returns buttons for each settings section.
+func settingsSectionsKeyboard() tgbotapi.InlineKeyboardMarkup {
+	sections := []string{"UI", "Monitor", "Trades Monitor", "Trading", "Copytrading", "Telegram", "Database", "Log", "Auth"}
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(sections); i += 2 {
+		if i+1 < len(sections) {
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i], "settings:section:"+sections[i]),
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i+1], "settings:section:"+sections[i+1]),
+			))
+		} else {
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i], "settings:section:"+sections[i]),
+			))
+		}
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// sectionFieldsKeyboard builds per-field buttons for a settings section.
+// Bool fields get a toggle button. String/number fields get an edit button.
+func sectionFieldsKeyboard(sectionName string, keys []string, cfg *config.Config, isAdmin bool) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, k := range keys {
+		if IsSecretKey(k) && !isAdmin {
+			continue
+		}
+		val, ok := GetSetting(cfg, k)
+		if !ok {
+			continue
+		}
+		short := k
+		if idx := strings.LastIndex(k, "."); idx >= 0 {
+			short = k[idx+1:]
+		}
+
+		if val == "true" || val == "false" {
+			icon := "🔴"
+			if val == "true" {
+				icon = "🟢"
+			}
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					fmt.Sprintf("%s %s: %s", icon, short, val),
+					"toggle:"+k,
+				),
+			))
+		} else {
+			display := val
+			if display == "" {
+				display = "—"
+			}
+			if len(display) > 20 {
+				display = display[:9] + "…" + display[len(display)-8:]
+			}
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					fmt.Sprintf("✏️ %s: %s", short, display),
+					"edit:"+k,
+				),
+			))
+		}
+	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Settings", "cmd:settings"),
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboardMarkup {
 	ordersLabel := "📋 Orders"
 	posLabel := "💼 Positions"
@@ -467,6 +540,16 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.sendLogs(chatID)
 	case data == "cmd:settings":
 		b.sendSettings(chatID, b.isAdmin(chatID))
+	case strings.HasPrefix(data, "settings:section:"):
+		section := strings.TrimPrefix(data, "settings:section:")
+		b.sendSettingsSection(chatID, section)
+	case strings.HasPrefix(data, "toggle:"):
+		key := strings.TrimPrefix(data, "toggle:")
+		b.doToggleSetting(ctx, chatID, key)
+	case strings.HasPrefix(data, "edit:"):
+		key := strings.TrimPrefix(data, "edit:")
+		b.state.SetPending("edit:"+key, "")
+		b.sendText(chatID, fmt.Sprintf("✏️ Введите новое значение для <code>%s</code>:\n<i>(или /menu для отмены)</i>", key))
 	case data == "cmd:wallets":
 		b.sendWallets(chatID)
 	case strings.HasPrefix(data, "wallet:toggle:"):
@@ -588,34 +671,52 @@ var settingsSections = []struct {
 }
 
 func (b *Bot) sendSettings(chatID int64, isAdmin bool) {
+	text := "⚙️ <b>Settings</b>\n\nВыберите раздел для просмотра и редактирования:"
+	b.sendOrEdit(chatID, text, settingsSectionsKeyboard())
+}
+
+// sectionKeys maps display section names to their dot-notation config keys.
+var sectionKeys = map[string][]string{
+	"UI":             {"ui.language"},
+	"Auth":           {"auth.private_key", "auth.api_key", "auth.api_secret", "auth.passphrase", "auth.chain_id"},
+	"Monitor":        {"monitor.enabled", "monitor.poll_interval_ms"},
+	"Trades Monitor": {"monitor.trades.enabled", "monitor.trades.poll_interval_ms", "monitor.trades.alert_on_fill", "monitor.trades.alert_on_cancel"},
+	"Trading":        {"trading.enabled", "trading.max_position_usd", "trading.slippage_pct", "trading.neg_risk"},
+	"Copytrading":    {"copytrading.enabled", "copytrading.poll_interval_ms", "copytrading.size_mode"},
+	"Telegram":       {"telegram.enabled", "telegram.bot_token", "telegram.admin_chat_id"},
+	"Database":       {"database.enabled", "database.path"},
+	"Log":            {"log.level", "log.format"},
+}
+
+func (b *Bot) sendSettingsSection(chatID int64, sectionName string) {
+	keys, ok := sectionKeys[sectionName]
+	if !ok {
+		b.sendText(chatID, RenderError("Unknown section: "+sectionName))
+		return
+	}
+	isAdmin := b.isAdmin(chatID)
+
 	b.cfgMu.RLock()
 	cfg := *b.cfg
 	b.cfgMu.RUnlock()
 
-	var parts []string
-	for _, sec := range settingsSections {
-		fields := make([]SettingField, 0, len(sec.keys))
-		for _, k := range sec.keys {
-			// short key = last segment after the last dot
-			short := k
-			if idx := strings.LastIndex(k, "."); idx >= 0 {
-				short = k[idx+1:]
-			}
-			v, ok := GetSetting(&cfg, k)
-			if !ok {
-				continue
-			}
-			fields = append(fields, SettingField{Key: short, Value: v})
+	fields := make([]SettingField, 0, len(keys))
+	for _, k := range keys {
+		if IsSecretKey(k) && !isAdmin {
+			continue
 		}
-		parts = append(parts, RenderSettingsSection(sec.name, fields, isAdmin))
+		short := k
+		if idx := strings.LastIndex(k, "."); idx >= 0 {
+			short = k[idx+1:]
+		}
+		v, ok2 := GetSetting(&cfg, k)
+		if !ok2 {
+			continue
+		}
+		fields = append(fields, SettingField{Key: short, Value: v})
 	}
-
-	footer := "\n<i>Use /set &lt;key&gt; &lt;value&gt; to change a setting.</i>"
-	if isAdmin {
-		footer = "\n<i>Admin mode — all fields editable.\nUse /set &lt;key&gt; &lt;value&gt;</i>"
-	}
-	text := strings.Join(parts, "\n") + footer
-	b.sendWithKeyboard(chatID, text, backKeyboard())
+	text := RenderSettingsSection(sectionName, fields, isAdmin)
+	b.sendOrEdit(chatID, text, sectionFieldsKeyboard(sectionName, keys, &cfg, isAdmin))
 }
 
 // --- Action helpers ---
@@ -675,6 +776,43 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
 
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf("<code>%s</code> = <code>%s</code>\nConfig saved. TUI updated.", key, value)))
+}
+
+func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
+	if IsSecretKey(key) && !b.isAdmin(chatID) {
+		b.sendText(chatID, RenderError(fmt.Sprintf("Key %q requires admin access.", key)))
+		return
+	}
+	b.cfgMu.Lock()
+	cfgCopy := *b.cfg
+	cur, ok := GetSetting(&cfgCopy, key)
+	if !ok {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Unknown key: %q", key)))
+		return
+	}
+	newVal := "true"
+	if cur == "true" {
+		newVal = "false"
+	}
+	if err := SetSetting(&cfgCopy, key, newVal); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(err.Error()))
+		return
+	}
+	if e, ok2 := settingsMap[key]; ok2 && e.onSet != nil {
+		e.onSet(newVal)
+	}
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save: %v", err)))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+
+	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf("<code>%s</code> = <code>%s</code>  Config saved.", key, newVal)))
 }
 
 func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
