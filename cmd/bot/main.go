@@ -315,7 +315,7 @@ func run() error {
 			return fmt.Errorf("tui: %w", err)
 		}
 		// Goodbye message (printed after alt screen is restored)
-		fmt.Println("\n  ◈ polytrade-bot — shutdown complete. Goodbye!\n")
+		fmt.Println("\n  ◈ polytrade-bot — shutdown complete. Goodbye!")
 		cancel()
 		return nil
 	}
