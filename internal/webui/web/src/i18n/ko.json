@@ -82,7 +82,8 @@
     "level": "레벨",
     "message": "메시지",
     "noLogs": "로그 없음",
-    "clear": "지우기"
+    "clear": "지우기",
+    "autoScroll": "자동 스크롤"
   },
   "settings": {
     "title": "설정",
