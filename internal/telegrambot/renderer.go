@@ -2,6 +2,7 @@ package telegrambot
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/atlasdev/polytrade-bot/internal/tui"
@@ -20,20 +21,25 @@ var secretFields = map[string]bool{
 
 // RenderOverview formats the overview page as an HTML Telegram message.
 func RenderOverview(balance float64, subsystems []SubsystemStatus, openOrders, positions int) string {
+	sorted := make([]SubsystemStatus, len(subsystems))
+	copy(sorted, subsystems)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+
 	var sb strings.Builder
-	sb.WriteString("<b>📊 Overview</b>\n\n")
-	sb.WriteString(fmt.Sprintf("💰 Balance: <b>%.2f USDC</b>\n", balance))
-	sb.WriteString(fmt.Sprintf("📋 Open orders: <b>%d</b>\n", openOrders))
-	sb.WriteString(fmt.Sprintf("💼 Positions: <b>%d</b>\n\n", positions))
-	sb.WriteString("<b>Subsystems:</b>\n")
-	for _, s := range subsystems {
-		dot := "🔴"
-		status := "inactive"
-		if s.Active {
-			dot = "🟢"
-			status = "active"
+	sb.WriteString("📊 <b>Overview</b>\n\n")
+	sb.WriteString(fmt.Sprintf("💰 Баланс: <b>%.2f USDC</b>\n", balance))
+	sb.WriteString(fmt.Sprintf("📋 Ордеров: <b>%d</b>  |  💼 Позиций: <b>%d</b>\n\n", openOrders, positions))
+	if len(sorted) > 0 {
+		sb.WriteString("<b>Subsystems:</b>\n")
+		for _, s := range sorted {
+			dot := "🔴"
+			status := "inactive"
+			if s.Active {
+				dot = "🟢"
+				status = "active"
+			}
+			sb.WriteString(fmt.Sprintf("%s %s — %s\n", dot, s.Name, status))
 		}
-		sb.WriteString(fmt.Sprintf("%s %s — %s\n", dot, s.Name, status))
 	}
 	return sb.String()
 }

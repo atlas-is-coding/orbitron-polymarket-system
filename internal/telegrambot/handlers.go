@@ -263,22 +263,7 @@ func walletsKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Back", "cmd:menu"),
-	))
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
-}
-
-func ordersKeyboard(orders []tui.OrderRow) tgbotapi.InlineKeyboardMarkup {
-	var rows [][]tgbotapi.InlineKeyboardButton
-	for i, o := range orders {
-		label := fmt.Sprintf("❌ Cancel #%d (%s)", i+1, o.Side)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(label, "cancel:"+o.ID),
-		))
-	}
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("❌ Cancel ALL", "cancelall:confirm"),
-		tgbotapi.NewInlineKeyboardButtonData("← Back", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -456,7 +441,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	case "trading":
 		b.sendTrading(msg.Chat.ID, "orders")
 	case "orders":
-		b.sendOrders(msg.Chat.ID)
+		b.sendTrading(msg.Chat.ID, "orders")
 	case "cancel":
 		id := strings.TrimSpace(msg.CommandArguments())
 		if id == "" {
@@ -531,9 +516,9 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case data == "cmd:overview":
 		b.sendOverview(chatID)
 	case data == "cmd:orders":
-		b.sendOrders(chatID)
+		b.sendTrading(chatID, "orders")
 	case data == "cmd:positions":
-		b.sendPositions(chatID)
+		b.sendTrading(chatID, "positions")
 	case data == "cmd:copytrading":
 		b.sendCopytrading(chatID)
 	case data == "cmd:logs":
@@ -597,7 +582,7 @@ func (b *Bot) sendOverview(chatID int64) {
 	orders := b.state.Orders()
 	positions := b.state.Positions()
 	text := RenderOverview(b.state.Balance(), subsystems, len(orders), len(positions))
-	b.sendWithKeyboard(chatID, text, backKeyboard())
+	b.sendOrEdit(chatID, text, backKeyboard())
 }
 
 func (b *Bot) sendTrading(chatID int64, subTab string) {
@@ -607,14 +592,8 @@ func (b *Bot) sendTrading(chatID int64, subTab string) {
 	b.sendOrEdit(chatID, text, tradingKeyboard(subTab, orders))
 }
 
-func (b *Bot) sendOrders(chatID int64) {
-	orders := b.state.Orders()
-	text := RenderOrders(orders)
-	b.sendWithKeyboard(chatID, text, ordersKeyboard(orders))
-}
-
 func (b *Bot) sendPositions(chatID int64) {
-	b.sendWithKeyboard(chatID, RenderPositions(b.state.Positions()), backKeyboard())
+	b.sendOrEdit(chatID, RenderPositions(b.state.Positions()), backKeyboard())
 }
 
 func (b *Bot) sendCopytrading(chatID int64) {
@@ -624,13 +603,13 @@ func (b *Bot) sendCopytrading(chatID int64) {
 	b.cfgMu.RUnlock()
 
 	text := RenderCopytrading(b.state.Traders())
-	b.sendWithKeyboard(chatID, text, copytradingKeyboard(traders))
+	b.sendOrEdit(chatID, text, copytradingKeyboard(traders))
 }
 
 func (b *Bot) sendWallets(chatID int64) {
 	wallets := b.state.Wallets()
 	text := RenderWallets(wallets)
-	b.sendWithKeyboard(chatID, text, walletsKeyboard(wallets))
+	b.sendOrEdit(chatID, text, walletsKeyboard(wallets))
 }
 
 func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
@@ -651,7 +630,13 @@ func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
 }
 
 func (b *Bot) sendLogs(chatID int64) {
-	b.sendWithKeyboard(chatID, RenderLogs(b.state.Logs()), backKeyboard())
+	logsKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", "cmd:logs"),
+			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		),
+	)
+	b.sendOrEdit(chatID, RenderLogs(b.state.Logs()), logsKeyboard)
 }
 
 
