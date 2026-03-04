@@ -4,6 +4,7 @@ package i18n
 type Locale struct {
 	// Tabs
 	TabOverview    string `json:"tab_overview"`
+	TabTrading     string `json:"tab_trading"`
 	TabOrders      string `json:"tab_orders"`
 	TabPositions   string `json:"tab_positions"`
 	TabWallets     string `json:"tab_wallets"`
@@ -40,6 +41,7 @@ type Locale struct {
 	OrdersColStatus string `json:"orders_col_status"`
 	OrdersColAge    string `json:"orders_col_age"`
 	OrdersHelp      string `json:"orders_help"`
+	OrdersEmpty     string `json:"orders_empty"`
 
 	// Positions tab
 	PosColMarket  string `json:"pos_col_market"`
@@ -50,6 +52,7 @@ type Locale struct {
 	PosColPnL     string `json:"pos_col_pnl"`
 	PosColPnLPct  string `json:"pos_col_pnl_pct"`
 	PosHelp       string `json:"pos_help"`
+	PosEmpty      string `json:"pos_empty"`
 
 	// Copytrading tab
 	CopyColAddress   string `json:"copy_col_address"`
@@ -76,14 +79,15 @@ type Locale struct {
 	SectionTelegram      string `json:"section_telegram"`
 	SectionDatabase      string `json:"section_database"`
 	SectionLog           string `json:"section_log"`
+	SectionWebUI         string `json:"section_webui"`
 
 	// Settings field labels
-	FieldLanguage       string `json:"field_language"`
-	FieldPrivKey        string `json:"field_priv_key"`
-	FieldAPIKey         string `json:"field_api_key"`
-	FieldAPISecret      string `json:"field_api_secret"`
-	FieldPassphrase     string `json:"field_passphrase"`
-	FieldChainID        string `json:"field_chain_id"`
+	FieldLanguage         string `json:"field_language"`
+	FieldPrivKey          string `json:"field_priv_key"`
+	FieldChainID          string `json:"field_chain_id"`
+	FieldDefaultOrderType string `json:"field_default_order_type"`
+	FieldWebUIListen      string `json:"field_webui_listen"`
+	FieldWebUIJWTSecret   string `json:"field_webui_jwt_secret"`
 	FieldTimeout        string `json:"field_timeout"`
 	FieldMaxRetries     string `json:"field_max_retries"`
 	FieldEnabled        string `json:"field_enabled"`
@@ -106,10 +110,11 @@ type Locale struct {
 	// Settings tooltips
 	TooltipLanguage        string `json:"tooltip_language"`
 	TooltipPrivKey         string `json:"tooltip_priv_key"`
-	TooltipAPIKey          string `json:"tooltip_api_key"`
-	TooltipAPISecret       string `json:"tooltip_api_secret"`
-	TooltipPassphrase      string `json:"tooltip_passphrase"`
 	TooltipChainID         string `json:"tooltip_chain_id"`
+	TooltipDefaultOrderType string `json:"tooltip_default_order_type"`
+	TooltipWebUIEnabled     string `json:"tooltip_webui_enabled"`
+	TooltipWebUIListen      string `json:"tooltip_webui_listen"`
+	TooltipWebUIJWTSecret   string `json:"tooltip_webui_jwt_secret"`
 	TooltipTimeout         string `json:"tooltip_timeout"`
 	TooltipMaxRetries      string `json:"tooltip_max_retries"`
 	TooltipMonitorEnabled  string `json:"tooltip_monitor_enabled"`
@@ -161,15 +166,9 @@ type Locale struct {
 
 	// Wizard step labels
 	WizardStep1Label string `json:"wizard_step1_label"`
-	WizardStep2Label string `json:"wizard_step2_label"`
-	WizardStep3Label string `json:"wizard_step3_label"`
-	WizardStep4Label string `json:"wizard_step4_label"`
 
 	// Wizard step hints
 	WizardStep1Hint string `json:"wizard_step1_hint"`
-	WizardStep2Hint string `json:"wizard_step2_hint"`
-	WizardStep3Hint string `json:"wizard_step3_hint"`
-	WizardStep4Hint string `json:"wizard_step4_hint"`
 
 	// Log messages (zerolog)
 	LogBotStarting          string `json:"log_bot_starting"`
