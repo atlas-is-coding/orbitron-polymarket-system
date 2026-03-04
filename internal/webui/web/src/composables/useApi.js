@@ -27,9 +27,26 @@ export function useApi() {
     return (await axios.patch(`/api/v1/copytrading/traders/${addr}`)).data
   }
 
+  async function getWallets() {
+    return (await axios.get('/api/v1/wallets')).data
+  }
+  async function toggleWallet(id, enabled) {
+    return (await axios.post(`/api/v1/wallets/${id}/toggle`, { enabled })).data
+  }
+  async function renameWallet(id, label) {
+    return (await axios.patch(`/api/v1/wallets/${id}`, { label })).data
+  }
+  async function removeWallet(id) {
+    return (await axios.delete(`/api/v1/wallets/${id}`)).data
+  }
+  async function addWallet(privateKey) {
+    return (await axios.post('/api/v1/wallets', { private_key: privateKey })).data
+  }
+
   return {
     getOverview, getOrders, getPositions, getLogs,
     getCopytrading, getSettings, cancelOrder, cancelAll,
-    postSettings, addTrader, removeTrader, toggleTrader
+    postSettings, addTrader, removeTrader, toggleTrader,
+    getWallets, toggleWallet, renameWallet, removeWallet, addWallet
   }
 }
