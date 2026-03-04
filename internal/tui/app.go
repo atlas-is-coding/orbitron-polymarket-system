@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -10,12 +11,20 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 )
 
+const toastDuration = 3 * time.Second
+
+// toastEntry holds an active toast notification.
+type toastEntry struct {
+	text    string
+	kind    string
+	created time.Time
+}
+
 // AppModel is the root Bubble Tea model for the TUI dashboard.
 type AppModel struct {
 	activeTab  TabID
 	overview   OverviewModel
-	orders     OrdersModel
-	positions  PositionsModel
+	trading    TradingModel
 	wallets    WalletsModel
 	copytrader CopytradingModel
 	logs       LogsModel
@@ -28,6 +37,12 @@ type AppModel struct {
 	wallet  string
 	width   int
 	height  int
+
+	// Clock
+	now time.Time
+
+	// Toast overlay
+	toast *toastEntry
 }
 
 // NewAppModel creates the root app model.
@@ -54,9 +69,9 @@ func NewAppModel(
 		bus:        bus,
 		width:      width,
 		height:     height,
+		now:        time.Now(),
 		overview:   NewOverviewModel(width, cw),
-		orders:     NewOrdersModel(width, cw),
-		positions:  NewPositionsModel(width, cw),
+		trading:    NewTradingModel(width, cw),
 		wallets:    NewWalletsModel(wm, cfgPath, width, cw),
 		copytrader: NewCopytradingModel(cfg, cfgPath, width, cw),
 		logs:       NewLogsModel(width, cw),
@@ -69,12 +84,27 @@ func (m *AppModel) SetWallet(addr string) {
 	m.wallet = addr
 }
 
+func clockTick() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return clockTickMsg{} })
+}
+
 func (m AppModel) Init() tea.Cmd {
-	return m.bus.WaitForEvent()
+	return tea.Batch(m.bus.WaitForEvent(), clockTick())
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case clockTickMsg:
+		m.now = time.Now()
+		if m.toast != nil && time.Since(m.toast.created) >= toastDuration {
+			m.toast = nil
+		}
+		return m, tea.Batch(clockTick(), m.bus.WaitForEvent())
+
+	case ToastMsg:
+		m.toast = &toastEntry{text: msg.Text, kind: msg.Kind, created: time.Now()}
+		return m, m.bus.WaitForEvent()
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -87,7 +117,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "tab":
-			// Don't switch tabs when a text field is being edited in settings
+			// Don't switch tabs when a text field is being edited
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
@@ -115,7 +145,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab--
 			}
 			return m, m.bus.WaitForEvent()
-		case "1", "2", "3", "4", "5", "6", "7":
+		case "1", "2", "3", "4", "5", "6":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
@@ -129,16 +159,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "1":
 				m.activeTab = TabOverview
 			case "2":
-				m.activeTab = TabOrders
+				m.activeTab = TabTrading
 			case "3":
-				m.activeTab = TabPositions
-			case "4":
 				m.activeTab = TabWallets
-			case "5":
+			case "4":
 				m.activeTab = TabCopytrading
-			case "6":
+			case "5":
 				m.activeTab = TabLogs
-			case "7":
+			case "6":
 				m.activeTab = TabSettings
 			}
 		}
@@ -167,10 +195,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overview, _ = m.overview.Update(msg)
 		return m, m.bus.WaitForEvent()
 
+	case OrdersUpdateMsg:
+		m.trading.SetOrderRows(msg.Rows)
+		return m, m.bus.WaitForEvent()
+
+	case PositionsUpdateMsg:
+		m.trading.SetPositionRows(msg.Rows)
+		return m, m.bus.WaitForEvent()
+
 	case LanguageChangedMsg:
 		cw := max(m.height-6, 10)
-		m.orders = NewOrdersModel(m.width, cw)
-		m.positions = NewPositionsModel(m.width, cw)
+		m.trading = NewTradingModel(m.width, cw)
 		m.copytrader = NewCopytradingModel(m.cfg, m.cfgPath, m.width, cw)
 		// settings NOT rebuilt — FieldDef labels/tooltips use func() string closures,
 		// sectionNames() is computed dynamically, and optionIdx is already updated.
@@ -183,10 +218,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.activeTab {
 	case TabOverview:
 		m.overview, cmd = m.overview.Update(msg)
-	case TabOrders:
-		m.orders, cmd = m.orders.Update(msg)
-	case TabPositions:
-		m.positions, cmd = m.positions.Update(msg)
+	case TabTrading:
+		m.trading, cmd = m.trading.Update(msg)
 	case TabWallets:
 		m.wallets, cmd = m.wallets.Update(msg)
 	case TabCopytrading:
@@ -201,28 +234,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) View() string {
-	walletShort := m.wallet
-	if len(walletShort) > 12 {
-		walletShort = walletShort[:6] + "..." + walletShort[len(walletShort)-4:]
-	}
-	dot := StyleHeaderDot.Render("●")
-	walletPart := ""
-	if walletShort != "" {
-		walletPart = "  │  " + i18n.T().AppWallet + ": " + walletShort
-	}
-	header := StyleHeader.Width(m.width).Render(
-		fmt.Sprintf(" polytrade-bot  %s %s%s ", dot, i18n.T().AppRunning, walletPart),
-	)
+	header := m.renderHeader()
 	tabBar := RenderTabBar(m.activeTab, m.width)
 
 	var content string
 	switch m.activeTab {
 	case TabOverview:
 		content = m.overview.View()
-	case TabOrders:
-		content = m.orders.View()
-	case TabPositions:
-		content = m.positions.View()
+	case TabTrading:
+		content = m.trading.View()
 	case TabWallets:
 		content = m.wallets.View()
 	case TabCopytrading:
@@ -237,5 +257,54 @@ func (m AppModel) View() string {
 		"  " + i18n.T().HelpGlobal + "  ",
 	)
 
-	return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, helpBar)
+	base := lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, helpBar)
+
+	if m.toast != nil {
+		return m.overlayToast(base)
+	}
+	return base
+}
+
+func (m AppModel) renderHeader() string {
+	walletShort := m.wallet
+	if len(walletShort) > 12 {
+		walletShort = walletShort[:6] + "..." + walletShort[len(walletShort)-4:]
+	}
+
+	dot := StyleHeaderDot.Render("●")
+	live := StyleHeaderDot.Render("LIVE")
+	logo := StyleHeaderGlow.Render("◈ POLYTRADE")
+	clock := StyleHeaderMuted.Render(m.now.UTC().Format("15:04:05 UTC"))
+
+	walletPart := ""
+	if walletShort != "" {
+		walletPart = StyleHeaderMuted.Render("  │  " + i18n.T().AppWallet + ": " + walletShort)
+	}
+
+	content := fmt.Sprintf(" %s  %s %s%s  %s  Chain:Polygon ", logo, dot, live, walletPart, clock)
+	return StyleHeader.Width(m.width).Render(content)
+}
+
+func (m AppModel) overlayToast(base string) string {
+	var s lipgloss.Style
+	var prefix string
+	switch m.toast.kind {
+	case "success":
+		s = StyleToastSuccess
+		prefix = "✓ "
+	case "error":
+		s = StyleToastError
+		prefix = "✗ "
+	case "warning":
+		s = StyleToastWarning
+		prefix = "⚠ "
+	default:
+		s = StyleToastInfo
+		prefix = "◈ "
+	}
+	toast := s.Render(prefix + m.toast.text)
+	return base + "\n" + lipgloss.NewStyle().
+		Width(m.width).
+		Align(lipgloss.Right).
+		Render(toast)
 }
