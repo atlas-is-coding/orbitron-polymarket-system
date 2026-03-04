@@ -116,3 +116,16 @@ type WalletStatsMsg struct {
 	OpenOrders  int
 	TotalTrades int
 }
+
+// ToastMsg displays a short notification overlay.
+// Kind: "info" | "success" | "error" | "warning"
+type ToastMsg struct {
+	Text string
+	Kind string
+}
+
+// clockTickMsg is sent every second to update the header clock.
+type clockTickMsg struct{}
+
+// SplashDoneMsg signals the splash screen to hand off to AppModel.
+type SplashDoneMsg struct{}
