@@ -287,7 +287,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, nil, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 

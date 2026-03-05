@@ -8,9 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/auth"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/polytrade-bot/internal/markets"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -33,6 +35,14 @@ type WalletAdder interface {
 	AddInactive(cfg config.WalletConfig)
 }
 
+// MarketsProvider exposes markets data to the Web UI.
+type MarketsProvider interface {
+	GetByTag(slug string) []gamma.Market
+	GetMarket(conditionID string) (gamma.Market, bool)
+	Tags() []gamma.Tag
+	AddAlert(rule markets.AlertRule) string
+}
+
 // Server is the Web UI HTTP server.
 // NOTE: Additional fields (log, embed fs wiring) added in server.go (Task 6).
 type Server struct {
@@ -44,6 +54,7 @@ type Server struct {
 	canceler OrderCanceler
 	wallets  WalletMutator // may be nil
 	adder    WalletAdder   // may be nil
+	mkts     MarketsProvider // may be nil
 	state    *WebState
 	hub      *hub
 }
@@ -463,4 +474,87 @@ func (s *Server) handleDeleteWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
+// ── Markets handlers ──────────────────────────────────────────────────────────
+
+// handleMarketsList handles GET /api/v1/markets?tag=crypto&limit=50&offset=0
+func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
+	tag := r.URL.Query().Get("tag")
+	var result []gamma.Market
+	if s.mkts != nil {
+		result = s.mkts.GetByTag(tag)
+	}
+	if result == nil {
+		result = []gamma.Market{}
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleMarketsTags handles GET /api/v1/markets/tags
+func (s *Server) handleMarketsTags(w http.ResponseWriter, r *http.Request) {
+	var tags []gamma.Tag
+	if s.mkts != nil {
+		tags = s.mkts.Tags()
+	}
+	if tags == nil {
+		tags = []gamma.Tag{}
+	}
+	writeJSON(w, http.StatusOK, tags)
+}
+
+// handleMarketDetail handles GET /api/v1/markets/{conditionID}
+func (s *Server) handleMarketDetail(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/markets/")
+	if id == "" || id == "tags" {
+		writeError(w, http.StatusBadRequest, "missing conditionID")
+		return
+	}
+	if s.mkts == nil {
+		writeError(w, http.StatusServiceUnavailable, "markets service not running")
+		return
+	}
+	m, ok := s.mkts.GetMarket(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "market not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
+}
+
+// handleCreateAlert handles POST /api/v1/alerts
+func (s *Server) handleCreateAlert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	var req struct {
+		ConditionID string  `json:"conditionId"`
+		TokenID     string  `json:"tokenId"`
+		Direction   string  `json:"direction"` // "above" or "below"
+		Threshold   float64 `json:"threshold"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Direction != "above" && req.Direction != "below" {
+		writeError(w, http.StatusBadRequest, "direction must be 'above' or 'below'")
+		return
+	}
+	if req.Threshold < 0.01 || req.Threshold > 0.99 {
+		writeError(w, http.StatusBadRequest, "threshold must be between 0.01 and 0.99")
+		return
+	}
+	if s.mkts == nil {
+		writeError(w, http.StatusServiceUnavailable, "markets service not running")
+		return
+	}
+	id := s.mkts.AddAlert(markets.AlertRule{
+		ConditionID: req.ConditionID,
+		TokenID:     req.TokenID,
+		Direction:   req.Direction,
+		Threshold:   req.Threshold,
+	})
+	writeJSON(w, http.StatusOK, map[string]string{"id": id})
 }
