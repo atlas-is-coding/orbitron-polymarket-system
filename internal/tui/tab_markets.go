@@ -120,7 +120,7 @@ func (m MarketsModel) updateList(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 			m.mode = modeDetail
 		}
 	case "f":
-		m.cycleTag()
+		m.activeTag = cycleTagSlug(m.activeTag, m.tags)
 		m.cursor = 0
 	}
 	return m, nil
@@ -208,27 +208,23 @@ func (m MarketsModel) submitOrder() (MarketsModel, tea.Cmd) {
 	return m, cmd
 }
 
-func (m MarketsModel) cycleTag() {
-	if len(m.tags) == 0 {
-		return
+// cycleTagSlug returns the next tag slug after currentSlug, or "" (all) after the last tag.
+func cycleTagSlug(currentSlug string, tags []gamma.Tag) string {
+	if len(tags) == 0 {
+		return ""
 	}
-	if m.activeTag == "" {
-		if len(m.tags) > 0 {
-			m.activeTag = m.tags[0].Slug
-		}
-		return
+	if currentSlug == "" {
+		return tags[0].Slug
 	}
-	for i, tg := range m.tags {
-		if tg.Slug == m.activeTag {
-			if i+1 < len(m.tags) {
-				m.activeTag = m.tags[i+1].Slug
-			} else {
-				m.activeTag = ""
+	for i, tg := range tags {
+		if tg.Slug == currentSlug {
+			if i+1 < len(tags) {
+				return tags[i+1].Slug
 			}
-			return
+			return ""
 		}
 	}
-	m.activeTag = ""
+	return ""
 }
 
 func (m MarketsModel) filtered() []gamma.Market {
