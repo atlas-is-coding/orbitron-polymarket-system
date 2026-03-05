@@ -183,20 +183,27 @@ func (m *Manager) Primary() *WalletInstance {
 }
 
 // SetPrimary marks walletID as primary and clears Primary on all others.
+// Callers are responsible for persisting the change via config.Save.
 func (m *Manager) SetPrimary(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// Pre-check existence
 	found := false
 	for _, w := range m.instances {
 		if w.Cfg.ID == id {
-			w.Cfg.Primary = true
 			found = true
-		} else {
-			w.Cfg.Primary = false
+			break
 		}
 	}
 	if !found {
 		return fmt.Errorf("wallet %q not found", id)
+	}
+	// Now safe to mutate
+	for _, w := range m.instances {
+		w.Cfg.Primary = w.Cfg.ID == id
+	}
+	if m.bus != nil {
+		m.bus.Send(tui.WalletChangedMsg{ID: id, Enabled: true})
 	}
 	return nil
 }
