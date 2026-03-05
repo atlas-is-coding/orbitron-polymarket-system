@@ -163,6 +163,44 @@ func (m *Manager) WalletStats(id string) (balanceUSD, pnlUSD float64, openOrders
 	return 0, 0, 0, 0
 }
 
+// Primary returns the wallet marked as primary, or the first enabled wallet if none is marked.
+func (m *Manager) Primary() *WalletInstance {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var first *WalletInstance
+	for _, w := range m.instances {
+		if !w.Cfg.Enabled {
+			continue
+		}
+		if first == nil {
+			first = w
+		}
+		if w.Cfg.Primary {
+			return w
+		}
+	}
+	return first
+}
+
+// SetPrimary marks walletID as primary and clears Primary on all others.
+func (m *Manager) SetPrimary(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	found := false
+	for _, w := range m.instances {
+		if w.Cfg.ID == id {
+			w.Cfg.Primary = true
+			found = true
+		} else {
+			w.Cfg.Primary = false
+		}
+	}
+	if !found {
+		return fmt.Errorf("wallet %q not found", id)
+	}
+	return nil
+}
+
 // Toggle enables or disables a wallet. Disabling triggers graceful drain (Stop).
 // Callers are responsible for persisting the change via config.Save.
 func (m *Manager) Toggle(id string, enabled bool) error {
