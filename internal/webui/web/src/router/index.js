@@ -33,6 +33,12 @@ const routes = [
     component: () => import('@/views/CopytradingView.vue')
   },
   {
+    path: '/markets',
+    name: 'markets',
+    meta: { requiresAuth: true },
+    component: () => import('@/views/MarketsView.vue')
+  },
+  {
     path: '/logs',
     name: 'logs',
     component: () => import('@/views/LogsView.vue')

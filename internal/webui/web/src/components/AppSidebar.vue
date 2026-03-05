@@ -20,6 +20,7 @@ const navItems = [
   { to: '/positions',   label: 'nav.positions',   icon: '▣' },
   { to: '/copytrading', label: 'nav.copytrading', icon: '⇌' },
   { to: '/wallets',     label: 'nav.wallets',     icon: '◎' },
+  { to: '/markets',     label: 'nav.markets',     icon: '⊛' },
   { to: '/logs',        label: 'nav.logs',        icon: '▦' },
   { to: '/settings',    label: 'nav.settings',    icon: '✦' },
 ]
