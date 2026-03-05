@@ -27,6 +27,7 @@ type AppModel struct {
 	trading    TradingModel
 	wallets    WalletsModel
 	copytrader CopytradingModel
+	markets    MarketsModel
 	logs       LogsModel
 	settings   SettingsModel
 
@@ -74,6 +75,7 @@ func NewAppModel(
 		trading:    NewTradingModel(width, cw),
 		wallets:    NewWalletsModel(wm, cfgPath, width, cw),
 		copytrader: NewCopytradingModel(cfg, cfgPath, width, cw),
+		markets:    NewMarketsModel(nil, ""),
 		logs:       NewLogsModel(width, cw),
 		settings:   NewSettingsModel(cfg, cfgPath, width, cw, onSave),
 	}
@@ -110,6 +112,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		cw := max(m.height-6, 10)
 		m.logs = NewLogsModel(m.width, cw)
+		m.markets, _ = m.markets.Update(msg)
+		return m, m.bus.WaitForEvent()
+
+	case MarketsUpdatedMsg:
+		var cmd tea.Cmd
+		m.markets, cmd = m.markets.Update(msg)
+		return m, tea.Batch(cmd, m.bus.WaitForEvent())
+
+	case PlaceOrderMsg:
+		// Actual order execution is wired in a later task.
 		return m, m.bus.WaitForEvent()
 
 	case tea.KeyMsg:
@@ -145,7 +157,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab--
 			}
 			return m, m.bus.WaitForEvent()
-		case "1", "2", "3", "4", "5", "6":
+		case "1", "2", "3", "4", "5", "6", "7":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
@@ -165,8 +177,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "4":
 				m.activeTab = TabCopytrading
 			case "5":
-				m.activeTab = TabLogs
+				m.activeTab = TabMarkets
 			case "6":
+				m.activeTab = TabLogs
+			case "7":
 				m.activeTab = TabSettings
 			}
 		}
@@ -224,6 +238,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wallets, cmd = m.wallets.Update(msg)
 	case TabCopytrading:
 		m.copytrader, cmd = m.copytrader.Update(msg)
+	case TabMarkets:
+		m.markets, cmd = m.markets.Update(msg)
 	case TabLogs:
 		m.logs, cmd = m.logs.Update(msg)
 	case TabSettings:
@@ -247,6 +263,8 @@ func (m AppModel) View() string {
 		content = m.wallets.View()
 	case TabCopytrading:
 		content = m.copytrader.View()
+	case TabMarkets:
+		content = m.markets.View()
 	case TabLogs:
 		content = m.logs.View()
 	case TabSettings:

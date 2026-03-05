@@ -15,12 +15,13 @@ const (
 	TabTrading           // Orders + Positions merged
 	TabWallets
 	TabCopytrading
+	TabMarkets
 	TabLogs
 	TabSettings
 	tabCount // sentinel
 )
 
-var tabKeys = []string{"1", "2", "3", "4", "5", "6"}
+var tabKeys = []string{"1", "2", "3", "4", "5", "6", "7"}
 
 // tabNames returns tab display names in the current locale.
 func tabNames() []string {
@@ -30,13 +31,14 @@ func tabNames() []string {
 		t.TabTrading,
 		t.TabWallets,
 		t.TabCopytrading,
+		t.TabMarkets,
 		t.TabLogs,
 		t.TabSettings,
 	}
 }
 
 // tabIcons are unicode prefixes for each tab.
-var tabIcons = []string{"◈", "⊹", "◎", "⟳", "≡", "⚙"}
+var tabIcons = []string{"◈", "⊹", "◎", "⟳", "⊛", "≡", "⚙"}
 
 // RenderTabBar renders a clean tab bar with the active tab highlighted.
 func RenderTabBar(active TabID, width int) string {
