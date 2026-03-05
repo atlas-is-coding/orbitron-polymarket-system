@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 )
 
@@ -129,3 +130,28 @@ type clockTickMsg struct{}
 
 // SplashDoneMsg signals the splash screen to hand off to AppModel.
 type SplashDoneMsg struct{}
+
+// MarketsUpdatedMsg is published by MarketsService after each successful poll.
+type MarketsUpdatedMsg struct {
+	Markets []gamma.Market
+	Tags    []gamma.Tag
+}
+
+// MarketAlertMsg is published when a price threshold alert triggers.
+type MarketAlertMsg struct {
+	ConditionID  string
+	Question     string
+	Threshold    float64
+	Direction    string // "above" or "below"
+	CurrentPrice float64
+}
+
+// PlaceOrderMsg requests placement of an order from one or more wallets.
+type PlaceOrderMsg struct {
+	ConditionID string
+	WalletIDs   []string
+	Side        string  // "YES" or "NO"
+	Price       float64
+	Size        float64
+	OrderType   string  // "GTC", "FOK", "FAK"
+}
