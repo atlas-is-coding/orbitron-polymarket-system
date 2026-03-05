@@ -15,7 +15,7 @@ import (
 //go:embed web/dist
 var staticFiles embed.FS
 
-// New creates a Server. canceler, wallets, and adder may be nil.
+// New creates a Server. canceler, wallets, adder, and mkts may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
@@ -23,6 +23,7 @@ func New(
 	canceler OrderCanceler,
 	wallets WalletMutator,
 	adder WalletAdder,
+	mkts MarketsProvider,
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -33,6 +34,7 @@ func New(
 		canceler: canceler,
 		wallets:  wallets,
 		adder:    adder,
+		mkts:     mkts,
 		state:    newWebState(),
 		hub:      newHub(),
 	}
@@ -139,6 +141,12 @@ func (s *Server) Run(ctx context.Context) error {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	}))
+
+	// Markets — order matters: tags before the wildcard path
+	mux.HandleFunc("/api/v1/markets/tags", s.jwtMiddleware(s.handleMarketsTags))
+	mux.HandleFunc("/api/v1/markets/", s.jwtMiddleware(s.handleMarketDetail))
+	mux.HandleFunc("/api/v1/markets", s.jwtMiddleware(s.handleMarketsList))
+	mux.HandleFunc("/api/v1/alerts", s.jwtMiddleware(s.handleCreateAlert))
 
 	// WebSocket
 	mux.HandleFunc("/ws", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
