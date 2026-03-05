@@ -143,6 +143,21 @@ func TestManagerSetPrimary(t *testing.T) {
 	}
 }
 
+func TestManagerSetPrimaryNotFound(t *testing.T) {
+	mgr := wallet.NewManager(nil)
+	mgr.AddInactive(config.WalletConfig{ID: "w1", Label: "One", Enabled: true, Primary: true})
+
+	err := mgr.SetPrimary("nonexistent")
+	if err == nil {
+		t.Fatal("SetPrimary nonexistent: expected error, got nil")
+	}
+	// w1 must still be primary (state not corrupted)
+	p := mgr.Primary()
+	if p == nil || p.Cfg.ID != "w1" {
+		t.Fatalf("SetPrimary nonexistent: w1 should still be primary, got %v", p)
+	}
+}
+
 func TestWalletStats(t *testing.T) {
 	stats := &wallet.WalletStats{}
 	stats.Set(100.0, 10.0, 3, 15)
