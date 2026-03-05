@@ -17,6 +17,7 @@ type WalletConfig struct {
 	Passphrase string `toml:"passphrase"`
 	ChainID    int64  `toml:"chain_id"`
 	Enabled    bool   `toml:"enabled"`
+	Primary    bool   `toml:"primary"`
 	NegRisk    bool   `toml:"neg_risk"`
 }
 
