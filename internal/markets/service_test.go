@@ -36,7 +36,7 @@ func TestServiceAddRemoveAlert(t *testing.T) {
 
 func TestServiceGetByTag(t *testing.T) {
 	svc := markets.NewService(nil, nil)
-	svc.SetMarketsForTest([]gamma.Market{
+	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0x1", Tags: []gamma.Tag{{Slug: "crypto"}}},
 		{ConditionID: "0x2", Tags: []gamma.Tag{{Slug: "politics"}}},
 		{ConditionID: "0x3", Tags: []gamma.Tag{{Slug: "crypto"}}},
@@ -50,7 +50,7 @@ func TestServiceGetByTag(t *testing.T) {
 
 func TestServiceGetByTagAll(t *testing.T) {
 	svc := markets.NewService(nil, nil)
-	svc.SetMarketsForTest([]gamma.Market{
+	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0x1"},
 		{ConditionID: "0x2"},
 	})
@@ -63,7 +63,7 @@ func TestServiceGetByTagAll(t *testing.T) {
 
 func TestServiceGetMarket(t *testing.T) {
 	svc := markets.NewService(nil, nil)
-	svc.SetMarketsForTest([]gamma.Market{
+	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0xABC", Question: "Will it?"},
 	})
 

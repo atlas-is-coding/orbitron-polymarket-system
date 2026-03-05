@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -99,7 +100,7 @@ func (s *Service) poll() error {
 }
 
 func (s *Service) checkAlerts(markets []gamma.Market) {
-	// Build price map: conditionID → YES price
+	// Build price map outside any lock (operates on passed slice, not s.markets)
 	priceMap := map[string]float64{}
 	for _, m := range markets {
 		if len(m.OutcomePrices) > 0 {
@@ -109,8 +110,9 @@ func (s *Service) checkAlerts(markets []gamma.Market) {
 		}
 	}
 
+	// Collect fired alerts under lock, send outside lock
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	var fired []tui.MarketAlertMsg
 	for _, a := range s.alerts {
 		if a.Triggered {
 			continue
@@ -119,18 +121,23 @@ func (s *Service) checkAlerts(markets []gamma.Market) {
 		if !ok {
 			continue
 		}
-		fired := (a.Direction == "above" && price >= a.Threshold) ||
+		f := (a.Direction == "above" && price >= a.Threshold) ||
 			(a.Direction == "below" && price <= a.Threshold)
-		if fired {
+		if f {
 			a.Triggered = true
-			if s.bus != nil {
-				s.bus.Send(tui.MarketAlertMsg{
-					ConditionID:  a.ConditionID,
-					Threshold:    a.Threshold,
-					Direction:    a.Direction,
-					CurrentPrice: price,
-				})
-			}
+			fired = append(fired, tui.MarketAlertMsg{
+				ConditionID:  a.ConditionID,
+				Threshold:    a.Threshold,
+				Direction:    a.Direction,
+				CurrentPrice: price,
+			})
+		}
+	}
+	s.mu.Unlock()
+
+	if s.bus != nil {
+		for _, msg := range fired {
+			s.bus.Send(msg)
 		}
 	}
 }
@@ -205,8 +212,9 @@ func (s *Service) Alerts() []AlertRule {
 	return out
 }
 
-// SetMarketsForTest injects markets directly (used in unit tests only).
-func (s *Service) SetMarketsForTest(markets []gamma.Market) {
+// SetMarketsForTest injects markets directly. The tb argument ensures this method
+// can only be called from test code.
+func (s *Service) SetMarketsForTest(_ testing.TB, markets []gamma.Market) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.markets = markets
