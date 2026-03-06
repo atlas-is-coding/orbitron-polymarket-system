@@ -50,6 +50,7 @@
     "label": "라벨",
     "allocation": "배분%",
     "toggle": "전환",
+    "edit": "편집",
     "remove": "삭제",
     "noTraders": "설정된 트레이더 없음",
     "enable": "카피트레이딩 활성화",

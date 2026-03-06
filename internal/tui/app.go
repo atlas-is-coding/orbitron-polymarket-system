@@ -217,6 +217,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trading.SetPositionRows(msg.Rows)
 		return m, m.bus.WaitForEvent()
 
+	case CopytradingTradeMsg:
+		m.copytrader.AddTrade(msg.Line)
+		return m, m.bus.WaitForEvent()
+
 	case LanguageChangedMsg:
 		cw := max(m.height-6, 10)
 		m.trading = NewTradingModel(m.width, cw)

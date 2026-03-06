@@ -24,7 +24,12 @@ export function useApi() {
     return (await axios.delete(`/api/v1/copytrading/traders/${addr}`)).data
   }
   async function toggleTrader(addr) {
-    return (await axios.patch(`/api/v1/copytrading/traders/${addr}`)).data
+    return (await axios.patch(`/api/v1/copytrading/traders/${addr}/toggle`)).data
+  }
+  async function editTrader(addr, label, allocPct, maxPositionUsd) {
+    return (await axios.patch(`/api/v1/copytrading/traders/${addr}/edit`, {
+      label, alloc_pct: allocPct, max_position_usd: maxPositionUsd
+    })).data
   }
 
   async function getWallets() {
@@ -47,6 +52,7 @@ export function useApi() {
     getOverview, getOrders, getPositions, getLogs,
     getCopytrading, getSettings, cancelOrder, cancelAll,
     postSettings, addTrader, removeTrader, toggleTrader,
-    getWallets, toggleWallet, renameWallet, removeWallet, addWallet
+    getWallets, toggleWallet, renameWallet, removeWallet, addWallet,
+    editTrader
   }
 }

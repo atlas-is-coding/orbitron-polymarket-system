@@ -8,6 +8,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
@@ -238,7 +239,10 @@ func mainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("👛 Wallets", "cmd:wallets"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏪 Markets", "cmd:markets"),
 			tgbotapi.NewInlineKeyboardButtonData("📝 Logs", "cmd:logs"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "cmd:settings"),
 		),
 	)
@@ -306,10 +310,8 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 				fmt.Sprintf("%s  %s", label, toggleIcon),
 				"trader:toggle:"+addr,
 			),
-			tgbotapi.NewInlineKeyboardButtonData(
-				"🗑 Remove",
-				"trader:remove:"+addr,
-			),
+			tgbotapi.NewInlineKeyboardButtonData("✏️ Edit", "trader:edit:"+addr),
+			tgbotapi.NewInlineKeyboardButtonData("🗑 Remove", "trader:remove:"+addr),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
@@ -476,6 +478,103 @@ func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboa
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+// marketsListKeyboard builds the Markets list view keyboard.
+// Shows up to 5 tag filter buttons and up to 10 market items.
+func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	// Tag filter row(s) — up to 5 tags, 2 per row
+	if len(tags) > 0 {
+		shown := tags
+		if len(shown) > 5 {
+			shown = shown[:5]
+		}
+		for i := 0; i < len(shown); i += 2 {
+			var row []tgbotapi.InlineKeyboardButton
+			t1 := shown[i]
+			label1 := t1.Label
+			if t1.Slug == currentTag {
+				label1 = "✓ " + label1
+			}
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(label1, "markets:tag:"+t1.Slug))
+			if i+1 < len(shown) {
+				t2 := shown[i+1]
+				label2 := t2.Label
+				if t2.Slug == currentTag {
+					label2 = "✓ " + label2
+				}
+				row = append(row, tgbotapi.NewInlineKeyboardButtonData(label2, "markets:tag:"+t2.Slug))
+			}
+			rows = append(rows, row)
+		}
+		// "All" filter
+		allLabel := "All markets"
+		if currentTag == "" {
+			allLabel = "✓ All markets"
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(allLabel, "markets:tag:"),
+		))
+	}
+
+	// Market items — up to 10
+	shown := mkts
+	if len(shown) > 10 {
+		shown = shown[:10]
+	}
+	for i, m := range shown {
+		q := m.Question
+		if len(q) > 38 {
+			q = q[:35] + "…"
+		}
+		suffix := ""
+		nOutcomes := len(m.OutcomePrices)
+		switch {
+		case nOutcomes == 2:
+			// Binary YES/NO — show YES price
+			suffix = " [" + string(m.OutcomePrices[0]) + "]"
+		case nOutcomes > 2:
+			// Categorical — show number of options
+			suffix = fmt.Sprintf(" [%d opts]", nOutcomes)
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(q+suffix, fmt.Sprintf("market:detail:%d", i)),
+		))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+	))
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// marketDetailKeyboard builds the market detail view keyboard.
+func marketDetailKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔔 Set Alert", "market:alert"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("← Markets", "cmd:markets"),
+			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		),
+	)
+}
+
+// alertDirectionKeyboard builds the alert direction picker keyboard.
+func alertDirectionKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📈 Above (price rises above)", "alert:above"),
+			tgbotapi.NewInlineKeyboardButtonData("📉 Below (price falls below)", "alert:below"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("← Market", "market:back"),
+			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		),
+	)
+}
+
 // --- Command dispatch ---
 
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
@@ -532,6 +631,8 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 			return
 		}
 		b.doToggleTrader(ctx, msg.Chat.ID, addr)
+	case "markets":
+		b.sendMarkets(msg.Chat.ID, "")
 	case "logs":
 		b.sendLogs(msg.Chat.ID)
 	case "settings":
@@ -602,6 +703,10 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(data, "cancel:"):
 		orderID := strings.TrimPrefix(data, "cancel:")
 		b.doCancelOrder(ctx, chatID, orderID)
+	case strings.HasPrefix(data, "trader:edit:"):
+		addr := strings.TrimPrefix(data, "trader:edit:")
+		b.state.SetPending("edittrader_label", addr)
+		b.sendText(chatID, fmt.Sprintf("✏️ <b>Edit Trader</b> <code>%s</code>\n\nВведите новый label (или <code>-</code> чтобы оставить пустым):", addr))
 	case strings.HasPrefix(data, "trader:toggle:"):
 		addr := strings.TrimPrefix(data, "trader:toggle:")
 		b.doToggleTrader(ctx, chatID, addr)
@@ -619,6 +724,52 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.sendTrading(chatID, "orders")
 	case data == "trading:positions":
 		b.sendTrading(chatID, "positions")
+
+	// Markets
+	case data == "cmd:markets":
+		b.sendMarkets(chatID, "")
+	case strings.HasPrefix(data, "markets:tag:"):
+		slug := strings.TrimPrefix(data, "markets:tag:")
+		b.sendMarkets(chatID, slug)
+	case strings.HasPrefix(data, "market:detail:"):
+		idxStr := strings.TrimPrefix(data, "market:detail:")
+		idx, err := strconv.Atoi(idxStr)
+		if err != nil {
+			b.sendText(chatID, RenderError("Invalid market index"))
+			return
+		}
+		m, ok := b.state.ViewMarket(idx)
+		if !ok {
+			b.sendText(chatID, RenderError("Market not found. Please refresh the market list."))
+			return
+		}
+		b.sendMarketDetail(chatID, m)
+	case data == "market:alert":
+		// Ask for direction; conditionID is in pendingData
+		_, condID := b.state.Pending()
+		if condID == "" {
+			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			return
+		}
+		b.sendOrEdit(chatID, "🔔 <b>Set Alert</b>\n\nВыберите направление:", alertDirectionKeyboard())
+	case data == "alert:above":
+		_, condID := b.state.Pending()
+		if condID == "" {
+			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			return
+		}
+		b.state.SetPending("alert_threshold", "above|"+condID)
+		b.sendText(chatID, "📈 Введите цену порога (0.01–0.99), <b>выше</b> которого придёт алерт:\n<i>(или /menu для отмены)</i>")
+	case data == "alert:below":
+		_, condID := b.state.Pending()
+		if condID == "" {
+			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			return
+		}
+		b.state.SetPending("alert_threshold", "below|"+condID)
+		b.sendText(chatID, "📉 Введите цену порога (0.01–0.99), <b>ниже</b> которого придёт алерт:\n<i>(или /menu для отмены)</i>")
+	case data == "market:back":
+		b.sendMarkets(chatID, "")
 	}
 }
 
@@ -689,6 +840,25 @@ func (b *Bot) sendLogs(chatID int64) {
 	b.sendOrEdit(chatID, RenderLogs(b.state.Logs()), logsKeyboard)
 }
 
+
+func (b *Bot) sendMarkets(chatID int64, tagSlug string) {
+	if b.mkts == nil {
+		b.sendOrEdit(chatID, "🏪 <b>Markets</b>\n\n<i>Markets service not running.</i>", backKeyboard())
+		return
+	}
+	mkts := b.mkts.GetByTag(tagSlug)
+	tags := b.mkts.Tags()
+	b.state.SetViewMarkets(mkts)
+	text := RenderMarkets(mkts, tagSlug, len(tags))
+	b.sendOrEdit(chatID, text, marketsListKeyboard(mkts, tags, tagSlug))
+}
+
+func (b *Bot) sendMarketDetail(chatID int64, m gamma.Market) {
+	// Store conditionID in pending so alert callbacks can retrieve it.
+	b.state.SetPending("market_view", m.ConditionID)
+	text := RenderMarketDetail(m)
+	b.sendOrEdit(chatID, text, marketDetailKeyboard())
+}
 
 func (b *Bot) sendLanguagePicker(chatID int64) {
 	b.cfgMu.RLock()
@@ -965,4 +1135,40 @@ func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
 		state = "enabled"
 	}
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> %s.", addr, state)))
+}
+
+func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, allocPct, maxPos float64) {
+	b.cfgMu.Lock()
+	cfgCopy := *b.cfg
+	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
+	copy(traders, cfgCopy.Copytrading.Traders)
+	cfgCopy.Copytrading.Traders = traders
+
+	found := false
+	for i, t := range cfgCopy.Copytrading.Traders {
+		if t.Address == addr {
+			cfgCopy.Copytrading.Traders[i].Label = label
+			cfgCopy.Copytrading.Traders[i].AllocationPct = allocPct
+			cfgCopy.Copytrading.Traders[i].MaxPositionUSD = maxPos
+			found = true
+			break
+		}
+	}
+	if !found {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		return
+	}
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save: %v", err)))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
+		"Trader <code>%s</code> updated.\nlabel: %s | alloc: %.1f%% | max: $%.0f",
+		addr, label, allocPct, maxPos,
+	)))
 }

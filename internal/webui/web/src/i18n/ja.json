@@ -50,6 +50,7 @@
     "label": "ラベル",
     "allocation": "配分%",
     "toggle": "切替",
+    "edit": "編集",
     "remove": "削除",
     "noTraders": "トレーダー未設定",
     "enable": "コピートレード有効化",

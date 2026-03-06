@@ -139,6 +139,8 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 			"threshold":    m.Threshold,
 			"currentPrice": m.CurrentPrice,
 		}})
+	case tui.CopytradingTradeMsg:
+		h.broadcast(WsEvent{Type: "copy_trade", Data: map[string]string{"line": m.Line}})
 	}
 }
 

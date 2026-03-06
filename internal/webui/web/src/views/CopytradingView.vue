@@ -29,11 +29,19 @@
               {{ togglingAddr === t.address ? '⟳' : $t('copytrading.toggle') }}
             </span>
           </button>
+          <button class="btn-xs" @click="startEdit(t)">✏️ {{ $t('copytrading.edit') }}</button>
           <button class="btn-xs-danger" @click="removeTarget = t">{{ $t('copytrading.remove') }}</button>
         </div>
       </div>
     </div>
     <div v-else class="empty anim-in">{{ $t('copytrading.noTraders') }}</div>
+
+    <!-- Recent Copy Trades -->
+    <div class="section-header anim-in">Recent Trades</div>
+    <div class="trades-feed anim-in">
+      <div v-if="!copyTrades.length" class="empty">No recent copy trades.</div>
+      <div v-for="(line, i) in copyTrades" :key="i" class="trade-line mono">{{ line }}</div>
+    </div>
 
     <!-- Add trader dialog -->
     <div v-if="showAdd" class="overlay" @click.self="showAdd = false">
@@ -62,6 +70,33 @@
       </div>
     </div>
 
+    <!-- Edit trader dialog -->
+    <div v-if="editTarget" class="overlay" @click.self="editTarget = null">
+      <div class="dialog">
+        <h3 class="dialog-title">{{ $t('copytrading.edit') }} Trader</h3>
+        <div class="form-fields">
+          <div class="field">
+            <label class="field-label">{{ $t('copytrading.label') }}</label>
+            <input v-model="editForm.label" class="field-input" />
+          </div>
+          <div class="field">
+            <label class="field-label">{{ $t('copytrading.allocation') }} (%)</label>
+            <input v-model.number="editForm.allocPct" type="number" min="0" max="100" class="field-input" />
+          </div>
+          <div class="field">
+            <label class="field-label">Max Position (USD)</label>
+            <input v-model.number="editForm.maxPositionUsd" type="number" min="0" class="field-input" />
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn-ghost" @click="editTarget = null">{{ $t('common.cancel') }}</button>
+          <button class="btn-primary" :disabled="editing" @click="doEdit">
+            <span :class="{ spin: editing }">{{ editing ? '⟳' : 'Save' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Confirm remove dialog -->
     <div v-if="removeTarget" class="overlay" @click.self="removeTarget = null">
       <div class="dialog">
@@ -81,13 +116,13 @@
 </template>
 
 <script setup>
-import { onMounted, ref, reactive } from 'vue'
+import { onMounted, ref, reactive, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
 
 const app = useAppStore()
-const { copytrading: ct } = storeToRefs(app)
+const { copytrading: ct, copyTrades } = storeToRefs(app)
 const api = useApi()
 
 const showAdd = ref(false)
@@ -96,6 +131,30 @@ const adding = ref(false)
 const togglingAddr = ref(null)
 const removingAddr = ref(null)
 const removeTarget = ref(null)
+
+const editTarget = ref(null)
+const editForm = reactive({ label: '', allocPct: 5, maxPositionUsd: 50 })
+const editing = ref(false)
+
+function startEdit(t) {
+  editTarget.value = t
+  editForm.label = t.label || ''
+  editForm.allocPct = t.allocation_pct || 5
+  editForm.maxPositionUsd = t.max_position_usd || 50
+}
+
+async function doEdit() {
+  if (!editTarget.value) return
+  editing.value = true
+  try {
+    await api.editTrader(editTarget.value.address, editForm.label, editForm.allocPct, editForm.maxPositionUsd)
+    app.copytrading = await api.getCopytrading()
+    editTarget.value = null
+  } catch (e) {
+    app.toast(e?.response?.data?.error || 'Edit failed', 'error')
+  }
+  editing.value = false
+}
 
 onMounted(async () => {
   try { app.copytrading = await api.getCopytrading() } catch {}
@@ -196,4 +255,13 @@ async function doAdd() {
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-danger-solid { background: var(--danger); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
 .btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.section-header { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
+.trades-feed {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.5rem 1rem;
+  max-height: 220px; overflow-y: auto;
+}
+.trade-line { font-size: 0.78rem; padding: 0.2rem 0; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); }
+.trade-line:last-child { border-bottom: none; }
 </style>

@@ -22,6 +22,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/copytrading"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/logger"
+	"github.com/atlasdev/polytrade-bot/internal/markets"
 	"github.com/atlasdev/polytrade-bot/internal/monitor"
 	"github.com/atlasdev/polytrade-bot/internal/notify"
 	telegramNotify "github.com/atlasdev/polytrade-bot/internal/notify/telegram"
@@ -171,7 +172,7 @@ func run() error {
 			Stats:      &wallet.WalletStats{},
 		}
 		if cfg.Monitor.Trades.Enabled {
-			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log)
+			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr)
 			if bus != nil {
 				tm.SetBus(bus)
 			}
@@ -190,6 +191,9 @@ func run() error {
 				wClobClient,
 				log,
 			)
+			if bus != nil {
+				ct.SetBus(bus)
+			}
 			inst.CopyTrader = ct
 		}
 		wm.AddActive(inst)
@@ -200,6 +204,14 @@ func run() error {
 
 	// --- Market Monitor ---
 	mon := monitor.New(gammaClient, notifier, &cfg.Monitor, log)
+
+	// --- Markets Service ---
+	var marketsService *markets.Service
+	if bus != nil || cfg.WebUI.Enabled {
+		marketsService = markets.NewService(gammaClient, bus).WithLogger(&log)
+	} else {
+		marketsService = markets.NewService(gammaClient, nil).WithLogger(&log)
+	}
 
 	// --- Context с graceful shutdown ---
 	ctx, cancel := context.WithCancel(context.Background())
@@ -228,6 +240,7 @@ func run() error {
 	}
 
 	startSubsystem("WebSocket", func() error { return wsClient.Run(ctx) })
+	startSubsystem("Markets", func() error { return marketsService.Run(ctx) })
 
 	if cfg.Monitor.Enabled {
 		startSubsystem("Monitor", func() error { return mon.Run(ctx) })
@@ -268,7 +281,7 @@ func run() error {
 				break
 			}
 		}
-		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, &log)
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, marketsService, &log)
 		if err != nil {
 			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
 			tgBot = nil
@@ -287,7 +300,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, nil, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, marketsService, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 
