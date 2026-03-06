@@ -338,6 +338,55 @@ func (s *Server) handleToggleTrader(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
 }
 
+func (s *Server) handleEditTrader(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/copytrading/traders/")
+	addr := strings.TrimSuffix(path, "/edit")
+	var req struct {
+		Label          string  `json:"label"`
+		AllocPct       float64 `json:"alloc_pct"`
+		MaxPositionUSD float64 `json:"max_position_usd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
+	copy(traders, cfgCopy.Copytrading.Traders)
+	cfgCopy.Copytrading.Traders = traders
+	found := false
+	for i, t := range cfgCopy.Copytrading.Traders {
+		if t.Address == addr {
+			cfgCopy.Copytrading.Traders[i].Label = req.Label
+			if req.AllocPct > 0 {
+				cfgCopy.Copytrading.Traders[i].AllocationPct = req.AllocPct
+			}
+			if req.MaxPositionUSD > 0 {
+				cfgCopy.Copytrading.Traders[i].MaxPositionUSD = req.MaxPositionUSD
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusNotFound, "trader not found")
+		return
+	}
+	if err := config.Save(s.cfgPath, &cfgCopy); err != nil {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	if s.bus != nil {
+		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
 // ── Wallet handlers ───────────────────────────────────────────────────────────
 
 // handleGetWallets returns the cached wallet list from WebState.

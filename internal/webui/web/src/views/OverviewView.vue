@@ -48,6 +48,45 @@
         </div>
         <div v-if="!overview.subsystems?.length" class="empty">{{ $t('common.loading') }}</div>
       </div>
+
+      <!-- Wallet Summary -->
+      <template v-if="wallets.length">
+        <div class="section-header anim-in">Wallets</div>
+        <div class="wallet-summary anim-in">
+          <div class="wallet-aggregate">
+            <span class="ws-label">Total Balance:</span>
+            <span class="ws-val mono">${{ fmt2(totalBalance) }}</span>
+            <span class="ws-sep">│</span>
+            <span class="ws-label">Total P&amp;L:</span>
+            <span class="ws-val mono" :class="totalPnL >= 0 ? 'pnl-pos' : 'pnl-neg'">
+              {{ totalPnL >= 0 ? '+' : '' }}{{ fmt2(totalPnL) }}
+            </span>
+            <span class="ws-sep">│</span>
+            <span class="ws-label">Active:</span>
+            <span class="ws-val mono">{{ activeWallets }}/{{ wallets.length }}</span>
+          </div>
+          <table class="wallet-table">
+            <thead>
+              <tr>
+                <th>Label</th><th>Balance</th><th>P&amp;L</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="w in wallets" :key="w.id">
+                <td>{{ w.label || w.id }}</td>
+                <td class="mono">${{ fmt2(w.balance_usd) }}</td>
+                <td class="mono" :class="w.pnl_usd >= 0 ? 'pnl-pos' : 'pnl-neg'">
+                  {{ w.pnl_usd >= 0 ? '+' : '' }}{{ fmt2(w.pnl_usd) }}
+                </td>
+                <td>
+                  <span class="sub-dot" :class="w.enabled ? 'sub-dot--on' : 'sub-dot--off'" />
+                  {{ w.enabled ? 'ON' : 'OFF' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -60,8 +99,13 @@ import { useApi } from '@/composables/useApi'
 import { createChart } from 'lightweight-charts'
 
 const app = useAppStore()
-const { overview } = storeToRefs(app)
+const { overview, walletsMap } = storeToRefs(app)
 const api = useApi()
+
+const wallets = computed(() => Object.values(walletsMap.value))
+const totalBalance = computed(() => wallets.value.reduce((s, w) => s + (w.balance_usd || 0), 0))
+const totalPnL = computed(() => wallets.value.reduce((s, w) => s + (w.pnl_usd || 0), 0))
+const activeWallets = computed(() => wallets.value.filter(w => w.enabled).length)
 
 const showWelcome = ref(true)
 const chartEl = ref(null)
@@ -196,4 +240,29 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
 
 .mono  { font-family: var(--font-mono); }
 .empty { padding: 1rem; color: var(--text-muted); text-align: center; }
+
+/* Wallet summary */
+.wallet-summary {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.wallet-aggregate {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.ws-label { color: var(--text-secondary); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.ws-val { font-weight: 600; font-family: var(--font-mono); }
+.ws-sep { color: var(--border); }
+.wallet-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.wallet-table th {
+  padding: 0.4rem 1rem; text-align: left; font-size: 0.65rem;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-secondary); border-bottom: 1px solid var(--border);
+}
+.wallet-table td { padding: 0.4rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+.wallet-table tr:last-child td { border-bottom: none; }
+.wallet-table tr:hover td { background: var(--bg-hover); }
+.pnl-pos { color: var(--success); }
+.pnl-neg { color: var(--danger); }
 </style>
