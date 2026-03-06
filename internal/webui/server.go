@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
@@ -96,11 +97,14 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}))
 	mux.HandleFunc("/api/v1/copytrading/traders/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodDelete:
+		path := r.URL.Path
+		switch {
+		case r.Method == http.MethodDelete:
 			s.handleRemoveTrader(w, r)
-		case http.MethodPatch:
+		case r.Method == http.MethodPatch && strings.HasSuffix(path, "/toggle"):
 			s.handleToggleTrader(w, r)
+		case r.Method == http.MethodPatch && strings.HasSuffix(path, "/edit"):
+			s.handleEditTrader(w, r)
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}

@@ -9,8 +9,9 @@ export const useAppStore = defineStore('app', () => {
   const copytrading = ref({ enabled: false, traders: [] })
   const settings = ref({})
   const connected = ref(false)
-  // wallets: map id -> entry object
   const walletsMap = ref({})
+  const settingsStale = ref(false)
+  const copyTrades = ref([])   // recent copy trades feed (last 30)
 
   const toasts = ref([])
   let _toastId = 0
@@ -48,8 +49,25 @@ export const useAppStore = defineStore('app', () => {
       case 'wallet_stats':
         walletsMap.value = { ...walletsMap.value, [event.data.id]: event.data }
         break
+      case 'market_alert':
+        toast(
+          `🔔 ${event.data.question || event.data.conditionId}: price went ${event.data.direction} ${Number(event.data.threshold).toFixed(3)} (now ${Number(event.data.currentPrice).toFixed(3)})`,
+          'info',
+          8000
+        )
+        break
+      case 'config_reloaded':
+        settingsStale.value = true
+        break
+      case 'copy_trade':
+        copyTrades.value = [event.data.line, ...copyTrades.value].slice(0, 30)
+        break
     }
   }
 
-  return { overview, orders, positions, logs, copytrading, settings, connected, walletsMap, applyEvent, toasts, toast }
+  return {
+    overview, orders, positions, logs, copytrading, settings,
+    connected, walletsMap, settingsStale, copyTrades,
+    applyEvent, toasts, toast
+  }
 })

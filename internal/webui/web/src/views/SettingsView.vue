@@ -191,7 +191,8 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
 import { LANGS } from '@/i18n'
@@ -199,6 +200,17 @@ import { LANGS } from '@/i18n'
 const app = useAppStore()
 const api = useApi()
 const savedMsg = ref(false)
+
+const { settingsStale } = storeToRefs(app)
+
+watch(settingsStale, async (stale) => {
+  if (!stale) return
+  try {
+    const s = await api.getSettings()
+    applySettings(s)
+  } catch {}
+  app.settingsStale = false
+})
 
 const logLevels = ['trace', 'debug', 'info', 'warn', 'error']
 const logFormats = ['pretty', 'json']
