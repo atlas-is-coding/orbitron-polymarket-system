@@ -50,6 +50,7 @@
     "label": "标签",
     "allocation": "分配%",
     "toggle": "切换",
+    "edit": "编辑",
     "remove": "删除",
     "noTraders": "未配置跟单员",
     "enable": "启用跟单",

@@ -50,6 +50,7 @@
     "label": "Label",
     "allocation": "Allocation %",
     "toggle": "Toggle",
+    "edit": "Edit",
     "remove": "Remove",
     "noTraders": "No traders configured",
     "enable": "Enable copytrading",

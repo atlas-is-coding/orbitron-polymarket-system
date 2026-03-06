@@ -9,6 +9,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/notify"
 	"github.com/atlasdev/polytrade-bot/internal/storage"
+	"github.com/atlasdev/polytrade-bot/internal/tui"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
@@ -22,6 +23,7 @@ type TraderTracker struct {
 	sizer        *SizeCalculator
 	store        storage.CopyTradeStore
 	notifier     notify.Notifier
+	bus          *tui.EventBus
 	logger       zerolog.Logger
 	getMyBalance func() (float64, error)
 
@@ -36,6 +38,7 @@ func NewTraderTracker(
 	store storage.CopyTradeStore,
 	notifier notify.Notifier,
 	getMyBalance func() (float64, error),
+	bus *tui.EventBus,
 	log zerolog.Logger,
 ) *TraderTracker {
 	sizer := NewSizeCalculator(trader.SizeMode, trader.AllocationPct, trader.MaxPositionUSD)
@@ -46,6 +49,7 @@ func NewTraderTracker(
 		sizer:        sizer,
 		store:        store,
 		notifier:     notifier,
+		bus:          bus,
 		logger:       log.With().Str("trader", trader.Label).Str("address", trader.Address).Logger(),
 		getMyBalance: getMyBalance,
 		prev:         make(TraderState),
@@ -205,6 +209,12 @@ func (t *TraderTracker) openPosition(ctx context.Context, pos data.Position) {
 		"📈 Opened copy trade: [%s] %s (%s)\nSize: $%.2f @ %.4f",
 		t.trader.Label, pos.Title, pos.Outcome, sizeUSD, result.Price,
 	))
+	if t.bus != nil {
+		t.bus.Send(tui.CopytradingTradeMsg{Line: fmt.Sprintf(
+			"📈 Opened [%s] %s (%s) $%.2f @ %.4f",
+			t.trader.Label, pos.Title, pos.Outcome, sizeUSD, result.Price,
+		)})
+	}
 }
 
 // handleTraderClosed обрабатывает исчезновение позиции у трейдера.
@@ -257,6 +267,12 @@ func (t *TraderTracker) closePosition(ctx context.Context, trade *storage.CopyTr
 			"📉 Closed copy trade: [%s] asset=%s\nPnL: $%.2f",
 			t.trader.Label, trade.AssetID, result.PnL,
 		))
+		if t.bus != nil {
+			t.bus.Send(tui.CopytradingTradeMsg{Line: fmt.Sprintf(
+				"📉 Closed [%s] asset=%s P&L: $%.2f",
+				t.trader.Label, trade.AssetID, result.PnL,
+			)})
+		}
 	}
 }
 

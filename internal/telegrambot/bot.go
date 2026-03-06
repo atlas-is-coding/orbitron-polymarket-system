@@ -353,6 +353,51 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		b.doAddTrader(ctx, msg.Chat.ID, args)
 		b.sendCopytrading(msg.Chat.ID)
 
+	case "edittrader_label":
+		addr := data
+		label := text
+		if label == "-" {
+			label = ""
+		}
+		b.state.SetPending("edittrader_alloc", addr+"|"+label)
+		b.sendText(msg.Chat.ID, "📊 Введите allocation % (например <code>5</code>) или <code>-</code> для значения по умолчанию:")
+
+	case "edittrader_alloc":
+		parts := strings.SplitN(data, "|", 2)
+		addr, label := parts[0], ""
+		if len(parts) > 1 {
+			label = parts[1]
+		}
+		allocPct := "-"
+		if text != "-" && text != "" {
+			allocPct = text
+		}
+		b.state.SetPending("edittrader_maxpos", addr+"|"+label+"|"+allocPct)
+		b.sendText(msg.Chat.ID, "💰 Введите max position USD (например <code>50</code>) или <code>-</code> для значения по умолчанию:")
+
+	case "edittrader_maxpos":
+		parts := strings.SplitN(data, "|", 3)
+		if len(parts) < 3 {
+			b.state.ClearPending()
+			return
+		}
+		addr, label, allocStr := parts[0], parts[1], parts[2]
+		allocPct := 5.0
+		if allocStr != "-" && allocStr != "" {
+			if v, err := strconv.ParseFloat(allocStr, 64); err == nil {
+				allocPct = v
+			}
+		}
+		maxPos := 50.0
+		if text != "-" && text != "" {
+			if v, err := strconv.ParseFloat(text, 64); err == nil {
+				maxPos = v
+			}
+		}
+		b.state.ClearPending()
+		b.doEditTrader(ctx, msg.Chat.ID, addr, label, allocPct, maxPos)
+		b.sendCopytrading(msg.Chat.ID)
+
 	case "alert_threshold":
 		parts := strings.SplitN(data, "|", 2)
 		if len(parts) != 2 {
