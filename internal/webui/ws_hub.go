@@ -130,6 +130,15 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 		}
 		state.UpsertWallet(e)
 		h.broadcast(WsEvent{Type: "wallet_stats", Data: e})
+
+	case tui.MarketAlertMsg:
+		h.broadcast(WsEvent{Type: "market_alert", Data: map[string]any{
+			"conditionId":  m.ConditionID,
+			"question":     m.Question,
+			"direction":    m.Direction,
+			"threshold":    m.Threshold,
+			"currentPrice": m.CurrentPrice,
+		}})
 	}
 }
 
