@@ -146,6 +146,10 @@ type MarketAlertMsg struct {
 	CurrentPrice float64
 }
 
+// CopytradingTradeMsg is emitted after each successfully executed copy-trade.
+// Line is a human-readable summary: "📈 Opened [label] market (outcome) $size @ price".
+type CopytradingTradeMsg struct{ Line string }
+
 // PlaceOrderMsg requests placement of an order from one or more wallets.
 type PlaceOrderMsg struct {
 	ConditionID string

@@ -4,6 +4,7 @@ package telegrambot
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,7 +13,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/markets"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -29,13 +32,23 @@ type WalletMutator interface {
 	WalletEnabled(id string) bool
 }
 
+// MarketsProvider allows the bot to query markets data.
+// Implemented by *markets.Service.
+type MarketsProvider interface {
+	GetByTag(slug string) []gamma.Market
+	GetMarket(conditionID string) (gamma.Market, bool)
+	Tags() []gamma.Tag
+	AddAlert(rule markets.AlertRule) string
+}
+
 // Bot is the interactive Telegram Bot.
 type Bot struct {
 	api      *tgbotapi.BotAPI
 	bus      *tui.EventBus
 	state    *BotState
-	canceler OrderCanceler // optional; nil if TradesMonitor not running
-	wallets  WalletMutator // optional; nil if wallet manager unavailable
+	canceler OrderCanceler  // optional; nil if TradesMonitor not running
+	wallets  WalletMutator  // optional; nil if wallet manager unavailable
+	mkts     MarketsProvider // optional; nil if Markets service not running
 	log      zerolog.Logger
 
 	cfgMu   sync.RWMutex
@@ -46,10 +59,10 @@ type Bot struct {
 }
 
 // New creates a new Bot.
-// canceler and wallets may be nil.
+// canceler, wallets, and mkts may be nil.
 // log may be nil (uses nop logger).
 // Returns (nil, nil) if bot_token is empty — caller must check.
-func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, log *zerolog.Logger) (*Bot, error) {
+func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, mkts MarketsProvider, log *zerolog.Logger) (*Bot, error) {
 	var adminID int64
 	if cfg.Telegram.AdminChatID != "" {
 		if id, err := strconv.ParseInt(cfg.Telegram.AdminChatID, 10, 64); err == nil {
@@ -67,6 +80,7 @@ func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCa
 		state:    NewBotState(),
 		canceler: canceler,
 		wallets:  wallets,
+		mkts:     mkts,
 		log:      l,
 		cfg:      cfg,
 		cfgPath:  cfgPath,
@@ -184,8 +198,32 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 			Balance: m.BalanceUSD,
 			PnL:     m.PnLUSD,
 		})
+
+	case tui.LanguageChangedMsg:
+		// no-op: Telegram bot uses hardcoded strings; handler present for completeness
+
+	case tui.MarketAlertMsg:
+		// Forward triggered market price alert as a notification message.
+		text := fmt.Sprintf(
+			"🔔 <b>Market Alert</b>\n\n"+
+				"Price went <b>%s</b> threshold %.3f\n"+
+				"Current: <b>%.3f</b>\n\n"+
+				"<code>%s</code>",
+			m.Direction, m.Threshold, m.CurrentPrice, m.ConditionID,
+		)
+		if m.Question != "" {
+			text = fmt.Sprintf(
+				"🔔 <b>Market Alert</b>\n\n"+
+					"%s\n\nPrice went <b>%s</b> %.3f\nCurrent: <b>%.3f</b>",
+				m.Question, m.Direction, m.Threshold, m.CurrentPrice,
+			)
+		}
+		if b.adminID != 0 {
+			b.sendText(b.adminID, text)
+		}
 	}
 }
+
 
 // pollTelegram runs the getUpdates long-polling loop.
 func (b *Bot) pollTelegram(ctx context.Context) error {
@@ -314,6 +352,42 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		args := []string{addr, label, strconv.FormatFloat(allocPct, 'f', 1, 64)}
 		b.doAddTrader(ctx, msg.Chat.ID, args)
 		b.sendCopytrading(msg.Chat.ID)
+
+	case "alert_threshold":
+		parts := strings.SplitN(data, "|", 2)
+		if len(parts) != 2 {
+			b.state.ClearPending()
+			b.sendText(msg.Chat.ID, RenderError("Внутренняя ошибка: неверный формат данных алерта."))
+			return
+		}
+		direction := parts[0]
+		condID := parts[1]
+		threshold, err := strconv.ParseFloat(text, 64)
+		if err != nil || threshold <= 0 || threshold >= 1 {
+			b.sendText(msg.Chat.ID, RenderError("Введите число от 0.01 до 0.99"))
+			return
+		}
+		b.state.ClearPending()
+		if b.mkts == nil {
+			b.sendText(msg.Chat.ID, RenderError("Markets service unavailable"))
+			return
+		}
+		alertID := b.mkts.AddAlert(markets.AlertRule{
+			ConditionID: condID,
+			Direction:   direction,
+			Threshold:   threshold,
+		})
+		dirIcon := "📈"
+		if direction == "below" {
+			dirIcon = "📉"
+		}
+		b.sendText(msg.Chat.ID, RenderSuccess(fmt.Sprintf(
+			"Алерт создан! %s Price %s <b>%.3f</b>\n<code>ID: %s</code>",
+			dirIcon, direction, threshold, alertID,
+		)))
+
+	case "market_view":
+		// User typed something while on market detail — ignore silently.
 
 	default:
 		// Generic setting edit: "edit:some.key"
