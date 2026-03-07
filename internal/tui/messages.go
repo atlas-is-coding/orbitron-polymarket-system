@@ -96,15 +96,17 @@ type WalletAddedMsg struct {
 	ID      string
 	Label   string
 	Enabled bool
+	Primary bool
 }
 
 // WalletRemovedMsg is sent when a wallet is removed.
 type WalletRemovedMsg struct{ ID string }
 
-// WalletChangedMsg is sent when a wallet's enabled state changes.
+// WalletChangedMsg is sent when a wallet's enabled state or primary flag changes.
 type WalletChangedMsg struct {
 	ID      string
 	Enabled bool
+	Primary bool
 }
 
 // WalletStatsMsg carries a statistics snapshot for one wallet.
@@ -112,6 +114,7 @@ type WalletStatsMsg struct {
 	ID          string
 	Label       string
 	Enabled     bool
+	Primary     bool
 	BalanceUSD  float64
 	PnLUSD      float64
 	OpenOrders  int
@@ -158,4 +161,12 @@ type PlaceOrderMsg struct {
 	Price       float64
 	Size        float64
 	OrderType   string  // "GTC", "FOK", "FAK"
+}
+
+// BatchPlaceOrderMsg places the same order on multiple markets sequentially (one wallet).
+type BatchPlaceOrderMsg struct {
+	ConditionIDs []string
+	Side         string  // "YES" / "NO"
+	Size         float64 // USD per market
+	WalletID     string
 }

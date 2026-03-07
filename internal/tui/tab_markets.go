@@ -31,8 +31,17 @@ type MarketsModel struct {
 	markets   []gamma.Market
 	tags      []gamma.Tag
 	activeTag string
+	tagIdx    int
 	cursor    int
 	detail    *gamma.Market
+
+	// multi-select
+	selected  map[string]bool // conditionID → selected for batch buy
+
+	// batch buy form
+	batchMode bool
+	batchSide string
+	batchSize textinput.Model
 
 	// order form
 	orderSide  string
@@ -57,6 +66,10 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 	si.Placeholder = "100"
 	si.Width = 8
 
+	bs := textinput.New()
+	bs.Placeholder = "50"
+	bs.Width = 8
+
 	sel := make(map[string]bool)
 	if primaryID != "" {
 		sel[primaryID] = true
@@ -64,6 +77,8 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 
 	return MarketsModel{
 		mode:       modeList,
+		selected:   make(map[string]bool),
+		batchSize:  bs,
 		orderSide:  "YES",
 		orderType:  "GTC",
 		priceInput: pi,
@@ -86,6 +101,10 @@ func (m MarketsModel) Update(msg tea.Msg) (MarketsModel, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// Batch form intercepts keys when open
+		if m.batchMode {
+			return m.updateBatch(msg)
+		}
 		switch m.mode {
 		case modeList:
 			return m.updateList(msg)
@@ -119,9 +138,37 @@ func (m MarketsModel) updateList(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 			m.detail = &cp
 			m.mode = modeDetail
 		}
-	case "f":
-		m.activeTag = cycleTagSlug(m.activeTag, m.tags)
+	case "f", "F":
+		if msg.String() == "F" {
+			m.activeTag = reverseCycleTagSlug(m.activeTag, m.tags)
+		} else {
+			m.activeTag = cycleTagSlug(m.activeTag, m.tags)
+		}
 		m.cursor = 0
+	case "space":
+		if m.cursor < len(filtered) {
+			cid := filtered[m.cursor].ConditionID
+			if m.selected[cid] {
+				delete(m.selected, cid)
+			} else {
+				m.selected[cid] = true
+			}
+		}
+	case "b":
+		if len(m.selected) > 0 {
+			m.batchMode = true
+			m.batchSide = "YES"
+			m.batchSize.Focus()
+		}
+	case "n":
+		if len(m.selected) > 0 {
+			m.batchMode = true
+			m.batchSide = "NO"
+			m.batchSize.Focus()
+		}
+	case "escape", "esc":
+		m.selected = make(map[string]bool)
+		m.batchMode = false
 	}
 	return m, nil
 }
@@ -133,10 +180,16 @@ func (m MarketsModel) updateDetail(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 		m.detail = nil
 	case "b":
 		m.orderSide = "YES"
+		if len(m.detail.OutcomePrices) > 0 {
+			m.priceInput.SetValue(string(m.detail.OutcomePrices[0]))
+		}
 		m.mode = modeOrder
 		m.priceInput.Focus()
 	case "s":
 		m.orderSide = "NO"
+		if len(m.detail.OutcomePrices) > 1 {
+			m.priceInput.SetValue(string(m.detail.OutcomePrices[1]))
+		}
 		m.mode = modeOrder
 		m.priceInput.Focus()
 	}
@@ -227,18 +280,45 @@ func cycleTagSlug(currentSlug string, tags []gamma.Tag) string {
 	return ""
 }
 
+func reverseCycleTagSlug(currentSlug string, tags []gamma.Tag) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	if currentSlug == "" {
+		return tags[len(tags)-1].Slug
+	}
+	for i, tg := range tags {
+		if tg.Slug == currentSlug {
+			if i > 0 {
+				return tags[i-1].Slug
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
 func (m MarketsModel) filtered() []gamma.Market {
 	if m.activeTag == "" {
 		return m.markets
 	}
 	var out []gamma.Market
 	for _, mk := range m.markets {
+		// Match by tag slug
 		for _, tg := range mk.Tags {
 			if tg.Slug == m.activeTag {
 				out = append(out, mk)
-				break
+				goto next
 			}
 		}
+		// Also match by category slug
+		if mk.Category != "" {
+			slug := strings.ToLower(strings.ReplaceAll(mk.Category, " ", "-"))
+			if slug == m.activeTag {
+				out = append(out, mk)
+			}
+		}
+	next:
 	}
 	return out
 }
@@ -258,13 +338,29 @@ func (m MarketsModel) View() string {
 func (m MarketsModel) viewList() string {
 	var sb strings.Builder
 
+	// Tag filter row
 	tagLabel := "All"
-	if m.activeTag != "" {
-		tagLabel = m.activeTag
+	for _, tg := range m.tags {
+		if tg.Slug == m.activeTag {
+			tagLabel = tg.Label
+			break
+		}
 	}
-	sb.WriteString(StyleMuted.Render(fmt.Sprintf(
-		"Filter: [%s]  [f] cycle tag  [Enter] detail  [↑↓/jk] navigate\n\n", tagLabel,
-	)))
+	filterLine := fmt.Sprintf("Filter: [%s]  [f/F] cycle  [Space] select  [b/n] batch buy", tagLabel)
+	sb.WriteString(StyleMuted.Render(filterLine) + "\n")
+
+	// Selection / batch status bar
+	if len(m.selected) > 0 {
+		status := fmt.Sprintf("  %d selected", len(m.selected))
+		if m.batchMode {
+			sb.WriteString(StyleFieldActive.Render(status+" · Batch "+m.batchSide) + "\n")
+			sb.WriteString(fmt.Sprintf("  Size per market ($): %s\n", m.batchSize.View()))
+			sb.WriteString(StyleHelpBar.Render("  [Enter] execute  [Esc] cancel") + "\n")
+		} else {
+			sb.WriteString(StyleFieldActive.Render(status+" · [b] Buy YES  [n] Buy NO  [Esc] clear") + "\n")
+		}
+	}
+	sb.WriteString("\n")
 
 	filtered := m.filtered()
 	if len(filtered) == 0 {
@@ -272,7 +368,7 @@ func (m MarketsModel) viewList() string {
 		return sb.String()
 	}
 
-	visibleH := m.height - 8
+	visibleH := m.height - 10
 	if visibleH < 5 {
 		visibleH = 5
 	}
@@ -288,8 +384,13 @@ func (m MarketsModel) viewList() string {
 	for i := start; i < end; i++ {
 		mk := filtered[i]
 		yesPrice := mktYesProb(mk)
-		line := fmt.Sprintf("%-52s YES %-5s  Vol $%s",
-			mktTruncate(mk.Question, 52),
+		sel := " "
+		if m.selected[mk.ConditionID] {
+			sel = "✓"
+		}
+		line := fmt.Sprintf("[%s] %-50s YES %-5s  Vol $%s",
+			sel,
+			mktTruncate(mk.Question, 50),
 			fmt.Sprintf("%.0f%%", yesPrice*100),
 			mktFormatVolume(float64(mk.Volume)),
 		)
@@ -300,7 +401,9 @@ func (m MarketsModel) viewList() string {
 		}
 	}
 
-	sb.WriteString("\n" + StyleHelpBar.Render("[b] Buy YES  [s] Buy NO  [a] Alert  [Esc] Back  in detail view"))
+	if len(m.selected) == 0 {
+		sb.WriteString("\n" + StyleHelpBar.Render("[Enter] detail  [Space] select  [f/F] filter  [↑↓/jk] navigate"))
+	}
 	return sb.String()
 }
 
@@ -332,7 +435,7 @@ func (m MarketsModel) viewDetail() string {
 		}
 	}
 	sb.WriteString(StyleMuted.Render("Wallet: "+walletLabel) + "\n\n")
-	sb.WriteString(StyleHelpBar.Render("[b] Buy YES  [s] Buy NO  [Esc] Back"))
+	sb.WriteString(StyleHelpBar.Render("[b] Buy YES  [s] Buy NO  [Esc] Back  (price auto-filled)"))
 	return sb.String()
 }
 
@@ -355,6 +458,48 @@ func (m MarketsModel) viewOrder() string {
 	}
 	sb.WriteString("\n" + StyleHelpBar.Render("[Tab] switch field  [Enter] submit  [Esc] cancel"))
 	return sb.String()
+}
+
+func (m MarketsModel) updateBatch(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.batchMode = false
+		m.batchSize.Blur()
+		m.batchSize.Reset()
+		return m, nil
+	case "enter":
+		return m.submitBatch()
+	}
+	var cmd tea.Cmd
+	m.batchSize, cmd = m.batchSize.Update(msg)
+	return m, cmd
+}
+
+func (m MarketsModel) submitBatch() (MarketsModel, tea.Cmd) {
+	var size float64
+	fmt.Sscanf(m.batchSize.Value(), "%f", &size)
+	if size <= 0 || len(m.selected) == 0 {
+		return m, nil
+	}
+	cids := make([]string, 0, len(m.selected))
+	for cid := range m.selected {
+		cids = append(cids, cid)
+	}
+	side := m.batchSide
+	walletID := m.primaryID
+	cmd := func() tea.Msg {
+		return BatchPlaceOrderMsg{
+			ConditionIDs: cids,
+			Side:         side,
+			Size:         size,
+			WalletID:     walletID,
+		}
+	}
+	m.batchMode = false
+	m.selected = make(map[string]bool)
+	m.batchSize.Blur()
+	m.batchSize.Reset()
+	return m, cmd
 }
 
 // --- package-level helpers with mkt prefix to avoid conflicts ---
