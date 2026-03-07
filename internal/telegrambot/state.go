@@ -3,6 +3,7 @@ package telegrambot
 import (
 	"sync"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -17,6 +18,7 @@ type WalletEntry struct {
 	ID      string
 	Label   string
 	Enabled bool
+	Primary bool
 	Balance float64
 	PnL     float64
 }
@@ -32,6 +34,12 @@ type BotState struct {
 	logs       []string
 	subsystems map[string]bool
 	wallets    map[string]WalletEntry
+
+	// Recent copy trades feed (capped at 10).
+	copyTrades []string
+
+	// Markets: snapshot of the currently displayed market list (for index-based navigation).
+	viewMarkets []gamma.Market
 
 	// Navigation: ID of the active menu message (for edit-in-place).
 	menuMsgID int
@@ -197,4 +205,40 @@ func (s *BotState) Pending() (input, data string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.pendingInput, s.pendingData
+}
+
+func (s *BotState) AddCopyTrade(line string) {
+	s.mu.Lock()
+	s.copyTrades = append([]string{line}, s.copyTrades...)
+	if len(s.copyTrades) > 10 {
+		s.copyTrades = s.copyTrades[:10]
+	}
+	s.mu.Unlock()
+}
+
+func (s *BotState) CopyTrades() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cp := make([]string, len(s.copyTrades))
+	copy(cp, s.copyTrades)
+	return cp
+}
+
+// --- Markets navigation state ---
+
+// SetViewMarkets stores the current market list snapshot (for index-based callbacks).
+func (s *BotState) SetViewMarkets(markets []gamma.Market) {
+	s.mu.Lock()
+	s.viewMarkets = markets
+	s.mu.Unlock()
+}
+
+// ViewMarket returns the market at index idx from the last SetViewMarkets snapshot.
+func (s *BotState) ViewMarket(idx int) (gamma.Market, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if idx < 0 || idx >= len(s.viewMarkets) {
+		return gamma.Market{}, false
+	}
+	return s.viewMarkets[idx], true
 }

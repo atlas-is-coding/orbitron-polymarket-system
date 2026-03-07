@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
+	"github.com/atlasdev/polytrade-bot/internal/auth"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
@@ -264,8 +266,12 @@ func walletsKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
 				fmt.Sprintf("👛 %s  %s", label, toggleIcon),
 				"wallet:toggle:"+w.ID,
 			),
+			tgbotapi.NewInlineKeyboardButtonData("🗑 Remove", "wallet:remove:"+w.ID),
 		))
 	}
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Add Wallet", "wallet:add:start"),
+	))
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
 	))
@@ -394,7 +400,7 @@ func langPickerKeyboard(currentLang string) tgbotapi.InlineKeyboardMarkup {
 
 // sectionFieldsKeyboard builds per-field buttons for a settings section.
 // Bool fields get a toggle button. String/number fields get an edit button.
-func sectionFieldsKeyboard(sectionName string, keys []string, cfg *config.Config, isAdmin bool) tgbotapi.InlineKeyboardMarkup {
+func sectionFieldsKeyboard(_ string, keys []string, cfg *config.Config, isAdmin bool) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, k := range keys {
 		if IsSecretKey(k) && !isAdmin {
@@ -478,6 +484,31 @@ func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboa
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+// categoryIcon returns an emoji for known category slugs.
+func categoryIcon(slug string) string {
+	icons := map[string]string{
+		"politics":    "🏛",
+		"us-politics": "🏛",
+		"sports":      "⚽",
+		"crypto":      "🔮",
+		"science":     "🔬",
+		"business":    "💼",
+		"culture":     "🎭",
+		"tech":        "💻",
+		"weather":     "🌦",
+		"entertainment": "🎬",
+		"economics":   "📈",
+		"world":       "🌍",
+		"nba":         "🏀",
+		"nfl":         "🏈",
+		"soccer":      "⚽",
+	}
+	if icon, ok := icons[slug]; ok {
+		return icon + " "
+	}
+	return ""
+}
+
 // marketsListKeyboard builds the Markets list view keyboard.
 // Shows up to 5 tag filter buttons and up to 10 market items.
 func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag string) tgbotapi.InlineKeyboardMarkup {
@@ -492,14 +523,14 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 		for i := 0; i < len(shown); i += 2 {
 			var row []tgbotapi.InlineKeyboardButton
 			t1 := shown[i]
-			label1 := t1.Label
+			label1 := categoryIcon(t1.Slug) + t1.Label
 			if t1.Slug == currentTag {
 				label1 = "✓ " + label1
 			}
 			row = append(row, tgbotapi.NewInlineKeyboardButtonData(label1, "markets:tag:"+t1.Slug))
 			if i+1 < len(shown) {
 				t2 := shown[i+1]
-				label2 := t2.Label
+				label2 := categoryIcon(t2.Slug) + t2.Label
 				if t2.Slug == currentTag {
 					label2 = "✓ " + label2
 				}
@@ -508,9 +539,9 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 			rows = append(rows, row)
 		}
 		// "All" filter
-		allLabel := "All markets"
+		allLabel := "🌐 All markets"
 		if currentTag == "" {
-			allLabel = "✓ All markets"
+			allLabel = "✓ 🌐 All markets"
 		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(allLabel, "markets:tag:"),
@@ -549,14 +580,86 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 }
 
 // marketDetailKeyboard builds the market detail view keyboard.
-func marketDetailKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
+// conditionID is used to route YES/NO quick buy callbacks.
+// yesPrice and noPrice are pre-filled price strings (e.g. "0.72"), "" if unavailable.
+func marketDetailKeyboard(conditionID, yesPrice, noPrice string) tgbotapi.InlineKeyboardMarkup {
+	yesLabel := "💚 YES"
+	if yesPrice != "" {
+		yesLabel = "💚 YES " + yesPrice
+	}
+	noLabel := "❤️ NO"
+	if noPrice != "" {
+		noLabel = "❤️ NO " + noPrice
+	}
+	rows := [][]tgbotapi.InlineKeyboardButton{
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(yesLabel, "quickbuy:YES:"+conditionID),
+			tgbotapi.NewInlineKeyboardButtonData(noLabel, "quickbuy:NO:"+conditionID),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📊 Full Order", "order:start"),
 			tgbotapi.NewInlineKeyboardButtonData("🔔 Set Alert", "market:alert"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("← Markets", "cmd:markets"),
 			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		),
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func orderSideKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📈 YES (Buy)", "order:side:YES"),
+			tgbotapi.NewInlineKeyboardButtonData("📉 NO (Sell)", "order:side:NO"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("← Market", "market:back"),
+		),
+	)
+}
+
+func orderTypeKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("GTC (Good Till Cancel)", "order:type:GTC"),
+			tgbotapi.NewInlineKeyboardButtonData("FOK (Fill or Kill)", "order:type:FOK"),
+		),
+	)
+}
+
+func orderWalletKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, w := range wallets {
+		if !w.Enabled {
+			continue
+		}
+		label := w.Label
+		if label == "" {
+			label = w.ID
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👛 "+label, "order:wallet:"+w.ID),
+		))
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func orderConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Confirm", "order:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "market:back"),
+		),
+	)
+}
+
+func quickbuyConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Confirm", "quickbuy:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "market:back"),
 		),
 	)
 }
@@ -692,6 +795,13 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.sendText(chatID, fmt.Sprintf("✏️ Введите новое значение для <code>%s</code>:\n<i>(или /menu для отмены)</i>", key))
 	case data == "cmd:wallets":
 		b.sendWallets(chatID)
+	case data == "wallet:add:start":
+		b.state.SetPending("wallet_add_key", "")
+		b.sendText(chatID, "🔑 Введите <b>private key</b> кошелька (hex, без 0x префикса):\n<i>(или /menu для отмены)</i>")
+	case strings.HasPrefix(data, "wallet:remove:"):
+		id := strings.TrimPrefix(data, "wallet:remove:")
+		b.state.SetPending("wallet_remove_confirm", id)
+		b.sendText(chatID, fmt.Sprintf("⚠️ Удалить кошелёк <code>%s</code>? Введите <b>yes</b> для подтверждения:", id))
 	case strings.HasPrefix(data, "wallet:toggle:"):
 		id := strings.TrimPrefix(data, "wallet:toggle:")
 		b.doToggleWallet(ctx, chatID, id)
@@ -768,6 +878,122 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		}
 		b.state.SetPending("alert_threshold", "below|"+condID)
 		b.sendText(chatID, "📉 Введите цену порога (0.01–0.99), <b>ниже</b> которого придёт алерт:\n<i>(или /menu для отмены)</i>")
+	case data == "order:start":
+		_, condID := b.state.Pending()
+		if condID == "" {
+			b.sendText(chatID, RenderError("Market context lost. Reopen the market."))
+			return
+		}
+		if b.mkts == nil {
+			b.sendText(chatID, RenderError("Markets service unavailable"))
+			return
+		}
+		mkt, ok := b.mkts.GetMarket(condID)
+		tokenID := ""
+		if ok && len(mkt.ClobTokenIDs) > 0 {
+			tokenID = string(mkt.ClobTokenIDs[0])
+		}
+		b.state.SetPending("order_side", condID+"|"+tokenID)
+		b.sendOrEdit(chatID, "📊 <b>Place Order</b>\n\nВыберите сторону:", orderSideKeyboard())
+
+	case strings.HasPrefix(data, "order:side:"):
+		side := strings.TrimPrefix(data, "order:side:")
+		_, orderData := b.state.Pending()
+		parts := strings.SplitN(orderData, "|", 2)
+		condID := parts[0]
+		tokenID := ""
+		if b.mkts != nil {
+			mkt, ok := b.mkts.GetMarket(condID)
+			if ok {
+				if side == "YES" && len(mkt.ClobTokenIDs) > 0 {
+					tokenID = string(mkt.ClobTokenIDs[0])
+				} else if side == "NO" && len(mkt.ClobTokenIDs) > 1 {
+					tokenID = string(mkt.ClobTokenIDs[1])
+				}
+			}
+		}
+		b.state.SetPending("order_price", condID+"|"+tokenID+"|"+side)
+		b.sendText(chatID, fmt.Sprintf(
+			"📊 Side: <b>%s</b>\n\nВведите цену (0.01–0.99):\n<i>(или /menu для отмены)</i>", side,
+		))
+
+	case strings.HasPrefix(data, "order:type:"):
+		orderType := strings.TrimPrefix(data, "order:type:")
+		_, orderData := b.state.Pending()
+		wallets := b.state.Wallets()
+		var enabled []WalletEntry
+		for _, w := range wallets {
+			if w.Enabled {
+				enabled = append(enabled, w)
+			}
+		}
+		if len(enabled) == 0 {
+			b.sendText(chatID, RenderError("Нет активных кошельков."))
+			return
+		}
+		if len(enabled) == 1 {
+			b.state.SetPending("order_confirm", orderData+"|"+orderType+"|"+enabled[0].ID)
+			b.sendOrderConfirm(chatID)
+			return
+		}
+		b.state.SetPending("order_wallet", orderData+"|"+orderType)
+		b.sendOrEdit(chatID, "👛 <b>Выберите кошелёк:</b>", orderWalletKeyboard(enabled))
+
+	case strings.HasPrefix(data, "order:wallet:"):
+		walletID := strings.TrimPrefix(data, "order:wallet:")
+		_, orderData := b.state.Pending()
+		b.state.SetPending("order_confirm", orderData+"|"+walletID)
+		b.sendOrderConfirm(chatID)
+
+	case data == "order:confirm":
+		_, orderData := b.state.Pending()
+		b.state.ClearPending()
+		b.doPlaceOrder(ctx, chatID, orderData)
+
+	// Quick buy — Step 1: user taps YES/NO on market detail
+	case strings.HasPrefix(data, "quickbuy:YES:") || strings.HasPrefix(data, "quickbuy:NO:"):
+		var side, condID string
+		if s, ok := strings.CutPrefix(data, "quickbuy:YES:"); ok {
+			side, condID = "YES", s
+		} else {
+			condID, _ = strings.CutPrefix(data, "quickbuy:NO:")
+			side = "NO"
+		}
+		if b.mkts == nil {
+			b.sendText(chatID, RenderError("Markets service unavailable"))
+			return
+		}
+		mkt, ok := b.mkts.GetMarket(condID)
+		if !ok {
+			b.sendText(chatID, RenderError("Market not found. Please refresh."))
+			return
+		}
+		tokenID := ""
+		price := 0.0
+		if side == "YES" && len(mkt.ClobTokenIDs) > 0 {
+			tokenID = string(mkt.ClobTokenIDs[0])
+		} else if side == "NO" && len(mkt.ClobTokenIDs) > 1 {
+			tokenID = string(mkt.ClobTokenIDs[1])
+		}
+		if side == "YES" && len(mkt.OutcomePrices) > 0 {
+			price, _ = strconv.ParseFloat(mkt.OutcomePrices[0], 64)
+		} else if side == "NO" && len(mkt.OutcomePrices) > 1 {
+			price, _ = strconv.ParseFloat(mkt.OutcomePrices[1], 64)
+		}
+		// pendingData: condID|tokenID|side|price
+		pendingData := fmt.Sprintf("%s|%s|%s|%.4f", condID, tokenID, side, price)
+		b.state.SetPending("market_quickbuy_size", pendingData)
+		b.sendText(chatID, fmt.Sprintf(
+			"💚 <b>Quick Buy %s</b>\n<i>%s</i>\n\nPrice: <b>%.4f</b>\n\nВведите размер ставки в USD:",
+			side, mkt.Question, price,
+		))
+
+	// Quick buy — Step 3: confirm
+	case data == "quickbuy:confirm":
+		_, orderData := b.state.Pending()
+		b.state.ClearPending()
+		b.doPlaceOrder(ctx, chatID, orderData)
+
 	case data == "market:back":
 		b.sendMarkets(chatID, "")
 	}
@@ -803,7 +1029,7 @@ func (b *Bot) sendCopytrading(chatID int64) {
 	copy(traders, b.cfg.Copytrading.Traders)
 	b.cfgMu.RUnlock()
 
-	text := RenderCopytrading(b.state.Traders())
+	text := RenderCopytrading(b.state.Traders(), b.state.CopyTrades())
 	b.sendOrEdit(chatID, text, copytradingKeyboard(traders))
 }
 
@@ -854,10 +1080,23 @@ func (b *Bot) sendMarkets(chatID int64, tagSlug string) {
 }
 
 func (b *Bot) sendMarketDetail(chatID int64, m gamma.Market) {
-	// Store conditionID in pending so alert callbacks can retrieve it.
+	// Store conditionID in pending so alert/quickbuy callbacks can retrieve it.
 	b.state.SetPending("market_view", m.ConditionID)
 	text := RenderMarketDetail(m)
-	b.sendOrEdit(chatID, text, marketDetailKeyboard())
+	yesPrice, noPrice := "", ""
+	if len(m.OutcomePrices) >= 2 {
+		if p, err := strconv.ParseFloat(m.OutcomePrices[0], 64); err == nil {
+			yesPrice = fmt.Sprintf("%.2f", p)
+		}
+		if p, err := strconv.ParseFloat(m.OutcomePrices[1], 64); err == nil {
+			noPrice = fmt.Sprintf("%.2f", p)
+		}
+	} else if len(m.OutcomePrices) == 1 {
+		if p, err := strconv.ParseFloat(m.OutcomePrices[0], 64); err == nil {
+			yesPrice = fmt.Sprintf("%.2f", p)
+		}
+	}
+	b.sendOrEdit(chatID, text, marketDetailKeyboard(m.ConditionID, yesPrice, noPrice))
 }
 
 func (b *Bot) sendLanguagePicker(chatID int64) {
@@ -1170,5 +1409,121 @@ func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, 
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
 		"Trader <code>%s</code> updated.\nlabel: %s | alloc: %.1f%% | max: $%.0f",
 		addr, label, allocPct, maxPos,
+	)))
+}
+
+func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
+	l1, err := auth.NewL1Signer(strings.TrimPrefix(privateKey, "0x"))
+	if err != nil {
+		b.sendText(chatID, RenderError("Invalid private key: "+err.Error()))
+		return
+	}
+	addr := l1.Address()
+	b.cfgMu.Lock()
+	for _, wc := range b.cfg.Wallets {
+		existing, err2 := auth.NewL1Signer(wc.PrivateKey)
+		if err2 == nil && existing.Address() == addr {
+			b.cfgMu.Unlock()
+			b.sendText(chatID, RenderError("Кошелёк уже существует: "+addr))
+			return
+		}
+	}
+	id := fmt.Sprintf("w%d", time.Now().UnixMilli())
+	chainID := int64(137)
+	if len(b.cfg.Wallets) > 0 && b.cfg.Wallets[0].ChainID != 0 {
+		chainID = b.cfg.Wallets[0].ChainID
+	}
+	wCfg := config.WalletConfig{
+		ID:         id,
+		Label:      addr[:8] + "…" + addr[len(addr)-4:],
+		PrivateKey: strings.TrimPrefix(privateKey, "0x"),
+		ChainID:    chainID,
+		Enabled:    true,
+	}
+	cfgCopy := *b.cfg
+	newWallets := make([]config.WalletConfig, len(b.cfg.Wallets)+1)
+	copy(newWallets, b.cfg.Wallets)
+	newWallets[len(b.cfg.Wallets)] = wCfg
+	cfgCopy.Wallets = newWallets
+	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderError("Failed to save: "+err.Error()))
+		return
+	}
+	*b.cfg = cfgCopy
+	b.cfgMu.Unlock()
+	if b.adder != nil {
+		b.adder.AddInactive(wCfg)
+	}
+	b.bus.Send(tui.WalletAddedMsg{ID: id, Label: wCfg.Label, Enabled: true})
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
+		"Кошелёк добавлен.\nAddress: <code>%s</code>\nID: <code>%s</code>", addr, id,
+	)))
+}
+
+func (b *Bot) doRemoveWallet(_ context.Context, chatID int64, id string) {
+	type remover interface{ Remove(id string) error }
+	if r, ok := b.wallets.(remover); ok {
+		if err := r.Remove(id); err != nil {
+			b.sendText(chatID, RenderError(err.Error()))
+			return
+		}
+		b.bus.Send(tui.WalletRemovedMsg{ID: id})
+		b.cfgMu.Lock()
+		cfgCopy := *b.cfg
+		wallets := make([]config.WalletConfig, 0, len(cfgCopy.Wallets))
+		for _, w := range cfgCopy.Wallets {
+			if w.ID != id {
+				wallets = append(wallets, w)
+			}
+		}
+		cfgCopy.Wallets = wallets
+		_ = config.Save(b.cfgPath, &cfgCopy)
+		*b.cfg = cfgCopy
+		b.cfgMu.Unlock()
+		b.sendText(chatID, RenderSuccess(fmt.Sprintf("Кошелёк <code>%s</code> удалён.", id)))
+		return
+	}
+	b.sendText(chatID, RenderError("Remove not supported by wallet manager"))
+}
+
+func (b *Bot) sendOrderConfirm(chatID int64) {
+	_, orderData := b.state.Pending()
+	// format: condID|tokenID|side|price|size|orderType|walletID
+	parts := strings.Split(orderData, "|")
+	if len(parts) < 7 {
+		b.sendText(chatID, RenderError("Потеряны данные ордера. Начните заново."))
+		return
+	}
+	side, price, size, orderType, walletID := parts[2], parts[3], parts[4], parts[5], parts[6]
+	text := fmt.Sprintf(
+		"📊 <b>Подтвердите ордер</b>\n\nСторона: <b>%s</b>\nЦена: <b>%s</b>\nРазмер: <b>$%s</b>\nТип: <b>%s</b>\nКошелёк: <b>%s</b>",
+		side, price, size, orderType, walletID,
+	)
+	b.sendOrEdit(chatID, text, orderConfirmKeyboard())
+}
+
+func (b *Bot) doPlaceOrder(_ context.Context, chatID int64, orderData string) {
+	if b.placer == nil {
+		b.sendText(chatID, RenderError("Order placement unavailable"))
+		return
+	}
+	parts := strings.Split(orderData, "|")
+	if len(parts) < 7 {
+		b.sendText(chatID, RenderError("Данные ордера повреждены."))
+		return
+	}
+	tokenID, side, priceStr, sizeStr, orderType, walletID := parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
+	price, _ := strconv.ParseFloat(priceStr, 64)
+	sizeUSD, _ := strconv.ParseFloat(sizeStr, 64)
+
+	orderID, err := b.placer.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD)
+	if err != nil {
+		b.sendText(chatID, RenderError("Ошибка размещения ордера: "+err.Error()))
+		return
+	}
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
+		"Ордер размещён!\n\nID: <code>%s</code>\nСторона: <b>%s</b> | Цена: <b>%.4f</b> | Размер: <b>$%.2f</b>",
+		orderID, side, price, sizeUSD,
 	)))
 }
