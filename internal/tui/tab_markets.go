@@ -240,6 +240,9 @@ func (m MarketsModel) submitOrder() (MarketsModel, tea.Cmd) {
 	var price, size float64
 	fmt.Sscanf(m.priceInput.Value(), "%f", &price)
 	fmt.Sscanf(m.sizeInput.Value(), "%f", &size)
+	if price <= 0 || size <= 0 {
+		return m, nil
+	}
 
 	cid := m.detail.ConditionID
 	side := m.orderSide

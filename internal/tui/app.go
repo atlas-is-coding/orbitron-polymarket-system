@@ -120,7 +120,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.markets, cmd = m.markets.Update(msg)
 		return m, tea.Batch(cmd, m.bus.WaitForEvent())
 
-	case PlaceOrderMsg:
+	case PlaceOrderMsg, BatchPlaceOrderMsg:
 		// Actual order execution is wired in a later task.
 		return m, m.bus.WaitForEvent()
 
