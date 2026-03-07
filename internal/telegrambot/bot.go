@@ -32,6 +32,12 @@ type WalletMutator interface {
 	WalletEnabled(id string) bool
 }
 
+// WalletAdder allows the Telegram Bot to register a new wallet in the manager.
+// Implemented by *wallet.Manager.
+type WalletAdder interface {
+	AddInactive(cfg config.WalletConfig)
+}
+
 // MarketsProvider allows the bot to query markets data.
 // Implemented by *markets.Service.
 type MarketsProvider interface {
@@ -41,6 +47,12 @@ type MarketsProvider interface {
 	AddAlert(rule markets.AlertRule) string
 }
 
+// OrderPlacer places limit orders on behalf of a wallet.
+// Implemented by *wallet.Manager.
+type OrderPlacer interface {
+	PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error)
+}
+
 // Bot is the interactive Telegram Bot.
 type Bot struct {
 	api      *tgbotapi.BotAPI
@@ -48,7 +60,9 @@ type Bot struct {
 	state    *BotState
 	canceler OrderCanceler  // optional; nil if TradesMonitor not running
 	wallets  WalletMutator  // optional; nil if wallet manager unavailable
+	adder    WalletAdder    // optional; nil if wallet manager unavailable
 	mkts     MarketsProvider // optional; nil if Markets service not running
+	placer   OrderPlacer    // optional; nil if no active wallet with private key
 	log      zerolog.Logger
 
 	cfgMu   sync.RWMutex
@@ -62,7 +76,7 @@ type Bot struct {
 // canceler, wallets, and mkts may be nil.
 // log may be nil (uses nop logger).
 // Returns (nil, nil) if bot_token is empty — caller must check.
-func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, mkts MarketsProvider, log *zerolog.Logger) (*Bot, error) {
+func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, adder WalletAdder, mkts MarketsProvider, placer OrderPlacer, log *zerolog.Logger) (*Bot, error) {
 	var adminID int64
 	if cfg.Telegram.AdminChatID != "" {
 		if id, err := strconv.ParseInt(cfg.Telegram.AdminChatID, 10, 64); err == nil {
@@ -80,7 +94,9 @@ func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCa
 		state:    NewBotState(),
 		canceler: canceler,
 		wallets:  wallets,
+		adder:    adder,
 		mkts:     mkts,
+		placer:   placer,
 		log:      l,
 		cfg:      cfg,
 		cfgPath:  cfgPath,
@@ -175,7 +191,7 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 		}
 
 	case tui.WalletAddedMsg:
-		b.state.UpsertWallet(WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled})
+		b.state.UpsertWallet(WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled, Primary: m.Primary})
 
 	case tui.WalletRemovedMsg:
 		b.state.RemoveWallet(m.ID)
@@ -185,8 +201,12 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 		for _, w := range wallets {
 			if w.ID == m.ID {
 				w.Enabled = m.Enabled
+				w.Primary = m.Primary
 				b.state.UpsertWallet(w)
-				break
+			} else if m.Primary && w.Primary {
+				// Clear primary from all other wallets
+				w.Primary = false
+				b.state.UpsertWallet(w)
 			}
 		}
 
@@ -195,9 +215,13 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 			ID:      m.ID,
 			Label:   m.Label,
 			Enabled: m.Enabled,
+			Primary: m.Primary,
 			Balance: m.BalanceUSD,
 			PnL:     m.PnLUSD,
 		})
+
+	case tui.CopytradingTradeMsg:
+		b.state.AddCopyTrade(m.Line)
 
 	case tui.LanguageChangedMsg:
 		// no-op: Telegram bot uses hardcoded strings; handler present for completeness
@@ -353,6 +377,26 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		b.doAddTrader(ctx, msg.Chat.ID, args)
 		b.sendCopytrading(msg.Chat.ID)
 
+	case "wallet_add_key":
+		if text == "" {
+			b.sendText(msg.Chat.ID, RenderError("Private key не может быть пустым."))
+			return
+		}
+		b.state.ClearPending()
+		b.doAddWallet(ctx, msg.Chat.ID, text)
+		b.sendWallets(msg.Chat.ID)
+
+	case "wallet_remove_confirm":
+		id := data
+		b.state.ClearPending()
+		if strings.ToLower(text) != "yes" {
+			b.sendText(msg.Chat.ID, "Отменено.")
+			b.sendWallets(msg.Chat.ID)
+			return
+		}
+		b.doRemoveWallet(ctx, msg.Chat.ID, id)
+		b.sendWallets(msg.Chat.ID)
+
 	case "edittrader_label":
 		addr := data
 		label := text
@@ -398,6 +442,26 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		b.doEditTrader(ctx, msg.Chat.ID, addr, label, allocPct, maxPos)
 		b.sendCopytrading(msg.Chat.ID)
 
+	case "order_price":
+		price, err := strconv.ParseFloat(text, 64)
+		if err != nil || price <= 0.01 || price >= 0.99 {
+			b.sendText(msg.Chat.ID, RenderError("Введите число от 0.01 до 0.99"))
+			return
+		}
+		b.state.SetPending("order_size", data+"|"+text)
+		b.sendText(msg.Chat.ID, fmt.Sprintf(
+			"📊 Цена: <b>%.4f</b>\n\nВведите размер позиции в USD:", price,
+		))
+
+	case "order_size":
+		size, err := strconv.ParseFloat(text, 64)
+		if err != nil || size <= 0 {
+			b.sendText(msg.Chat.ID, RenderError("Введите положительное число USD"))
+			return
+		}
+		b.state.SetPending("order_type", data+"|"+text)
+		b.sendOrEdit(msg.Chat.ID, "📊 <b>Тип ордера:</b>", orderTypeKeyboard())
+
 	case "alert_threshold":
 		parts := strings.SplitN(data, "|", 2)
 		if len(parts) != 2 {
@@ -431,13 +495,69 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			dirIcon, direction, threshold, alertID,
 		)))
 
+	// Quick buy step 2: user types size → show confirm
+	case "market_quickbuy_size":
+		// data: condID|tokenID|side|price
+		size, err := strconv.ParseFloat(text, 64)
+		if err != nil || size <= 0 {
+			b.sendText(msg.Chat.ID, RenderError("Введите положительное число USD"))
+			return
+		}
+		// Find primary wallet
+		wallets := b.state.Wallets()
+		walletID := ""
+		walletLabel := ""
+		for _, w := range wallets {
+			if w.Enabled && w.Primary {
+				walletID = w.ID
+				walletLabel = w.Label
+				if walletLabel == "" {
+					walletLabel = w.ID
+				}
+				break
+			}
+		}
+		if walletID == "" {
+			for _, w := range wallets {
+				if w.Enabled {
+					walletID = w.ID
+					walletLabel = w.Label
+					if walletLabel == "" {
+						walletLabel = w.ID
+					}
+					break
+				}
+			}
+		}
+		if walletID == "" {
+			b.sendText(msg.Chat.ID, RenderError("Нет активных кошельков."))
+			return
+		}
+		// Parse stored data
+		parts := strings.SplitN(data, "|", 4)
+		if len(parts) < 4 {
+			b.state.ClearPending()
+			b.sendText(msg.Chat.ID, RenderError("Потеряны данные ордера. Начните заново."))
+			return
+		}
+		condID, tokenID, side, priceStr := parts[0], parts[1], parts[2], parts[3]
+		price, _ := strconv.ParseFloat(priceStr, 64)
+		cost := price * size
+		// orderData format reused by doPlaceOrder: condID|tokenID|side|price|size|GTC|walletID
+		orderData := fmt.Sprintf("%s|%s|%s|%s|%.2f|GTC|%s", condID, tokenID, side, priceStr, size, walletID)
+		b.state.SetPending("market_quickbuy_confirm", orderData)
+		confirmText := fmt.Sprintf(
+			"📊 <b>Подтвердите Quick Buy %s</b>\n\nЦена: <b>%.4f</b>\nРазмер: <b>$%.2f</b>\nКошелёк: <b>%s</b>\nСтоимость: <b>$%.2f</b>",
+			side, price, size, walletLabel, cost,
+		)
+		b.sendOrEdit(msg.Chat.ID, confirmText, quickbuyConfirmKeyboard())
+
 	case "market_view":
 		// User typed something while on market detail — ignore silently.
 
 	default:
 		// Generic setting edit: "edit:some.key"
-		if strings.HasPrefix(input, "edit:") {
-			key := strings.TrimPrefix(input, "edit:")
+		if key, ok := strings.CutPrefix(input, "edit:"); ok {
 			b.state.ClearPending()
 			b.doSetSetting(ctx, msg.Chat.ID, key, text)
 		}
