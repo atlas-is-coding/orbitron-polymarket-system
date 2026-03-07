@@ -11,6 +11,9 @@ export const useMarketsStore = defineStore('markets', {
     selectedMarket: null,
     loading: false,
     error: null,
+    // multi-select batch buy
+    selectedMarkets: {},   // conditionId → true
+    batchSide: 'YES',
   }),
   getters: {
     filteredMarkets(state) {
@@ -20,7 +23,13 @@ export const useMarketsStore = defineStore('markets', {
         list = list.filter(m => m.question?.toLowerCase().includes(q))
       }
       return list
-    }
+    },
+    selectedMarketsArray(state) {
+      return state.markets.filter(m => state.selectedMarkets[m.conditionId])
+    },
+    selectedCount(state) {
+      return Object.keys(state.selectedMarkets).length
+    },
   },
   actions: {
     async fetchMarkets() {
@@ -55,6 +64,19 @@ export const useMarketsStore = defineStore('markets', {
     },
     async createAlert(conditionId, tokenId, direction, threshold) {
       await axios.post('/api/v1/alerts', { conditionId, tokenId, direction, threshold })
+    },
+    toggleSelect(market) {
+      const id = market.conditionId
+      if (this.selectedMarkets[id]) {
+        const next = { ...this.selectedMarkets }
+        delete next[id]
+        this.selectedMarkets = next
+      } else {
+        this.selectedMarkets = { ...this.selectedMarkets, [id]: true }
+      }
+    },
+    clearSelection() {
+      this.selectedMarkets = {}
     },
   }
 })
