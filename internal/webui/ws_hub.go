@@ -98,7 +98,7 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 		h.broadcast(WsEvent{Type: "config_reloaded", Data: nil})
 
 	case tui.WalletAddedMsg:
-		e := WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled}
+		e := WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled, Primary: m.Primary}
 		state.UpsertWallet(e)
 		h.broadcast(WsEvent{Type: "wallet_added", Data: e})
 
@@ -107,14 +107,25 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 		h.broadcast(WsEvent{Type: "wallet_removed", Data: map[string]string{"id": m.ID}})
 
 	case tui.WalletChangedMsg:
-		// Partial update: toggle enabled flag in existing entry
+		// Partial update: toggle enabled/primary flags in existing entry
 		wallets := state.Wallets()
 		for _, w := range wallets {
 			if w.ID == m.ID {
 				w.Enabled = m.Enabled
+				w.Primary = m.Primary
 				state.UpsertWallet(w)
-				h.broadcast(WsEvent{Type: "wallet_changed", Data: map[string]any{"id": m.ID, "enabled": m.Enabled}})
+				h.broadcast(WsEvent{Type: "wallet_changed", Data: map[string]any{"id": m.ID, "enabled": m.Enabled, "primary": m.Primary}})
 				break
+			}
+		}
+		// If this wallet is now primary, clear primary from all others
+		if m.Primary {
+			for _, w := range state.Wallets() {
+				if w.ID != m.ID && w.Primary {
+					w.Primary = false
+					state.UpsertWallet(w)
+					h.broadcast(WsEvent{Type: "wallet_changed", Data: map[string]any{"id": w.ID, "enabled": w.Enabled, "primary": false}})
+				}
 			}
 		}
 
@@ -123,6 +134,7 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 			ID:          m.ID,
 			Label:       m.Label,
 			Enabled:     m.Enabled,
+			Primary:     m.Primary,
 			BalanceUSD:  m.BalanceUSD,
 			PnLUSD:      m.PnLUSD,
 			OpenOrders:  m.OpenOrders,
@@ -130,6 +142,13 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 		}
 		state.UpsertWallet(e)
 		h.broadcast(WsEvent{Type: "wallet_stats", Data: e})
+
+	case tui.MarketsUpdatedMsg:
+		h.broadcast(WsEvent{Type: "markets_updated", Data: map[string]int{"count": len(m.Markets)}})
+
+	case tui.HealthSnapshotMsg:
+		state.SetHealth(m.Snapshot)
+		h.broadcast(WsEvent{Type: "health_updated", Data: m.Snapshot})
 
 	case tui.MarketAlertMsg:
 		h.broadcast(WsEvent{Type: "market_alert", Data: map[string]any{

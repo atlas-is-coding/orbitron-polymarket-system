@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/health"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -21,6 +22,7 @@ type WalletEntry struct {
 	ID          string  `json:"id"`
 	Label       string  `json:"label"`
 	Enabled     bool    `json:"enabled"`
+	Primary     bool    `json:"primary"`
 	BalanceUSD  float64 `json:"balance_usd"`
 	PnLUSD      float64 `json:"pnl_usd"`
 	OpenOrders  int     `json:"open_orders"`
@@ -38,6 +40,7 @@ type WebState struct {
 	subsystems map[string]bool
 	wallets    map[string]*WalletEntry
 	cfg        *config.Config
+	health     health.HealthSnapshot
 }
 
 func newWebState() *WebState {
@@ -164,4 +167,16 @@ func (s *WebState) Config() *config.Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.cfg
+}
+
+func (s *WebState) SetHealth(snap health.HealthSnapshot) {
+	s.mu.Lock()
+	s.health = snap
+	s.mu.Unlock()
+}
+
+func (s *WebState) GetHealth() health.HealthSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.health
 }
