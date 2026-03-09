@@ -15,6 +15,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasthttp v1.69.0
+	golang.org/x/net v0.48.0
 	modernc.org/sqlite v1.46.1
 )
 
