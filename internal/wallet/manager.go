@@ -4,7 +4,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
+	"github.com/atlasdev/polytrade-bot/internal/api"
+	"github.com/atlasdev/polytrade-bot/internal/auth"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/copytrading"
+	"github.com/atlasdev/polytrade-bot/internal/health"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -14,11 +20,17 @@ type Manager struct {
 	mu        sync.RWMutex
 	instances []*WalletInstance
 	bus       *tui.EventBus
+	dialFn    api.DialFunc
 }
 
 // NewManager creates a Manager. bus may be nil (e.g., in tests or headless mode).
 func NewManager(bus *tui.EventBus) *Manager {
 	return &Manager{bus: bus}
+}
+
+// SetDialer sets the proxy dialer used for geoblock checks before order placement.
+func (m *Manager) SetDialer(dial api.DialFunc) {
+	m.dialFn = dial
 }
 
 // AddInactive adds a wallet without starting any subsystems.
@@ -38,7 +50,7 @@ func (m *Manager) AddActive(inst *WalletInstance) {
 	defer m.mu.Unlock()
 	m.instances = append(m.instances, inst)
 	if m.bus != nil {
-		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID, Label: inst.Cfg.Label, Enabled: inst.Cfg.Enabled})
+		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID, Label: inst.Cfg.Label, Enabled: inst.Cfg.Enabled, Primary: inst.Cfg.Primary})
 	}
 }
 
@@ -203,9 +215,53 @@ func (m *Manager) SetPrimary(id string) error {
 		w.Cfg.Primary = w.Cfg.ID == id
 	}
 	if m.bus != nil {
-		m.bus.Send(tui.WalletChangedMsg{ID: id, Enabled: true})
+		m.bus.Send(tui.WalletChangedMsg{ID: id, Enabled: true, Primary: true})
 	}
 	return nil
+}
+
+// PlaceOrder places a limit order for the wallet identified by walletID.
+// Requires the wallet to be active (have ClobClient and L2 credentials configured).
+func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error) {
+	geo, geoErr := health.CheckGeoblock(m.dialFn)
+	if geoErr == nil && geo.Blocked {
+		return "", fmt.Errorf("trading blocked in %s (IP: %s) — configure [proxy] in config.toml", geo.Country, geo.IP)
+	}
+
+	m.mu.RLock()
+	var inst *WalletInstance
+	for _, w := range m.instances {
+		if w.Cfg.ID == walletID {
+			inst = w
+			break
+		}
+	}
+	m.mu.RUnlock()
+
+	if inst == nil {
+		return "", fmt.Errorf("wallet %q not found", walletID)
+	}
+	if inst.ClobClient == nil || inst.L2 == nil {
+		return "", fmt.Errorf("wallet %q is not active (no CLOB client)", walletID)
+	}
+	if inst.Cfg.PrivateKey == "" {
+		return "", fmt.Errorf("wallet %q has no private key", walletID)
+	}
+
+	l1, err := auth.NewL1Signer(inst.Cfg.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("wallet %q: derive L1: %w", walletID, err)
+	}
+	signer := auth.NewOrderSigner(l1, inst.Cfg.ChainID, inst.Cfg.NegRisk)
+
+	exec := copytrading.NewOrderExecutor(
+		inst.ClobClient,
+		signer,
+		inst.L2.APIKey,
+		inst.Address,
+		zerolog.Nop(),
+	)
+	return exec.PlaceLimit(tokenID, side, orderType, price, sizeUSD)
 }
 
 // Toggle enables or disables a wallet. Disabling triggers graceful drain (Stop).
