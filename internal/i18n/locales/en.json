@@ -317,5 +317,10 @@
   "tg_success_wallet_toggled": "Wallet <code>%s</code> %s.",
   "tg_success_order_cancelled": "Order <code>%s</code> cancelled.",
   "tg_success_all_cancelled": "All orders cancelled.",
-  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  Config saved."
+  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  Config saved.",
+
+  "tg_health_title": "📡 Polymarket Health",
+  "tg_health_updated": "Updated %ds ago",
+  "tg_health_never": "Checking...",
+  "tg_btn_health_refresh": "🔄 Refresh"
 }

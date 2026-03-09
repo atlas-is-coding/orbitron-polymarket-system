@@ -317,5 +317,10 @@
   "tg_success_wallet_toggled": "ウォレット <code>%s</code> %s。",
   "tg_success_order_cancelled": "注文 <code>%s</code> をキャンセルしました。",
   "tg_success_all_cancelled": "全注文をキャンセルしました。",
-  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  設定を保存しました。"
+  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  設定を保存しました。",
+
+  "tg_health_title": "📡 Polymarketの状態",
+  "tg_health_updated": "%d秒前に更新",
+  "tg_health_never": "確認中...",
+  "tg_btn_health_refresh": "🔄 更新"
 }
