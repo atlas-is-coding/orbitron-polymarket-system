@@ -88,6 +88,7 @@ type Locale struct {
 	SectionDatabase      string `json:"section_database"`
 	SectionLog           string `json:"section_log"`
 	SectionWebUI         string `json:"section_webui"`
+	SectionProxy         string `json:"section_proxy"`
 
 	// Settings field labels
 	FieldLanguage         string `json:"field_language"`
@@ -115,6 +116,13 @@ type Locale struct {
 	FieldLogFormat      string `json:"field_log_format"`
 	FieldLogFile        string `json:"field_log_file"`
 	FieldTrackPositions string `json:"field_track_positions"`
+
+	// Proxy settings field labels
+	SettingsProxyEnabled  string `json:"settings_proxy_enabled"`
+	SettingsProxyType     string `json:"settings_proxy_type"`
+	SettingsProxyAddr     string `json:"settings_proxy_addr"`
+	SettingsProxyUsername string `json:"settings_proxy_username"`
+	SettingsProxyPassword string `json:"settings_proxy_password"`
 
 	// Settings tooltips
 	TooltipLanguage        string `json:"tooltip_language"`

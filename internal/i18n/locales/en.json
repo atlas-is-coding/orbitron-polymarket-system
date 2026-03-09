@@ -68,6 +68,7 @@
   "section_database": "Database",
   "section_log": "Log",
   "section_webui": "Web UI",
+  "section_proxy": "Proxy",
   "field_language": "Language",
   "field_priv_key": "Private Key",
   "field_chain_id": "Chain ID",
@@ -322,5 +323,10 @@
   "tg_health_title": "📡 Polymarket Health",
   "tg_health_updated": "Updated %ds ago",
   "tg_health_never": "Checking...",
-  "tg_btn_health_refresh": "🔄 Refresh"
+  "tg_btn_health_refresh": "🔄 Refresh",
+  "settings_proxy_enabled": "Proxy Enabled",
+  "settings_proxy_type": "Proxy Type",
+  "settings_proxy_addr": "Proxy Address",
+  "settings_proxy_username": "Proxy Username",
+  "settings_proxy_password": "Proxy Password"
 }

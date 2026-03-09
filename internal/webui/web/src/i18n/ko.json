@@ -132,7 +132,13 @@
     "databasePath": "데이터베이스 경로",
     "webUiEnabled": "Web UI 활성화",
     "webUiListen": "리슨 주소",
-    "webUiJwtSecret": "JWT 시크릿"
+    "webUiJwtSecret": "JWT 시크릿",
+    "sectionProxy": "프록시",
+    "proxyEnabled": "활성화",
+    "proxyType": "유형",
+    "proxyAddr": "주소 (호스트:포트)",
+    "proxyUsername": "사용자명",
+    "proxyPassword": "비밀번호"
   },
   "markets": {
     "title": "마켓",

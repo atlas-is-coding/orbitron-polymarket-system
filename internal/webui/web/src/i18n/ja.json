@@ -132,7 +132,13 @@
     "databasePath": "データベースパス",
     "webUiEnabled": "Web UI有効",
     "webUiListen": "リッスンアドレス",
-    "webUiJwtSecret": "JWTシークレット"
+    "webUiJwtSecret": "JWTシークレット",
+    "sectionProxy": "プロキシ",
+    "proxyEnabled": "有効",
+    "proxyType": "タイプ",
+    "proxyAddr": "アドレス (ホスト:ポート)",
+    "proxyUsername": "ユーザー名",
+    "proxyPassword": "パスワード"
   },
   "markets": {
     "title": "マーケット",

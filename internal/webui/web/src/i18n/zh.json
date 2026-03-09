@@ -132,7 +132,13 @@
     "databasePath": "数据库路径",
     "webUiEnabled": "启用Web UI",
     "webUiListen": "监听地址",
-    "webUiJwtSecret": "JWT密钥"
+    "webUiJwtSecret": "JWT密钥",
+    "sectionProxy": "代理",
+    "proxyEnabled": "启用",
+    "proxyType": "类型",
+    "proxyAddr": "地址 (主机:端口)",
+    "proxyUsername": "用户名",
+    "proxyPassword": "密码"
   },
   "markets": {
     "title": "市场",

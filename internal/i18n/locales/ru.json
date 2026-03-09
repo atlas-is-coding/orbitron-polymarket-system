@@ -68,6 +68,7 @@
   "section_database": "Database",
   "section_log": "Log",
   "section_webui": "Web UI",
+  "section_proxy": "Прокси",
   "field_language": "Язык",
   "field_priv_key": "Private Key",
   "field_chain_id": "Chain ID",
@@ -322,5 +323,10 @@
   "tg_health_title": "📡 Состояние Polymarket",
   "tg_health_updated": "Обновлено %d с назад",
   "tg_health_never": "Проверка...",
-  "tg_btn_health_refresh": "🔄 Обновить"
+  "tg_btn_health_refresh": "🔄 Обновить",
+  "settings_proxy_enabled": "Прокси включён",
+  "settings_proxy_type": "Тип прокси",
+  "settings_proxy_addr": "Адрес прокси",
+  "settings_proxy_username": "Пользователь прокси",
+  "settings_proxy_password": "Пароль прокси"
 }

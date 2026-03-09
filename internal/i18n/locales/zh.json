@@ -68,6 +68,7 @@
   "section_database": "数据库",
   "section_log": "日志",
   "section_webui": "Web UI",
+  "section_proxy": "代理",
   "field_language": "语言",
   "field_priv_key": "私钥",
   "field_chain_id": "链ID",
@@ -322,5 +323,10 @@
   "tg_health_title": "📡 Polymarket 状态",
   "tg_health_updated": "%d秒前更新",
   "tg_health_never": "检查中...",
-  "tg_btn_health_refresh": "🔄 刷新"
+  "tg_btn_health_refresh": "🔄 刷新",
+  "settings_proxy_enabled": "启用代理",
+  "settings_proxy_type": "代理类型",
+  "settings_proxy_addr": "代理地址",
+  "settings_proxy_username": "代理用户名",
+  "settings_proxy_password": "代理密码"
 }

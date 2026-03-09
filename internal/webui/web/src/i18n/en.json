@@ -132,7 +132,13 @@
     "databasePath": "Database Path",
     "webUiEnabled": "Web UI Enabled",
     "webUiListen": "Listen Address",
-    "webUiJwtSecret": "JWT Secret"
+    "webUiJwtSecret": "JWT Secret",
+    "sectionProxy": "Proxy",
+    "proxyEnabled": "Enabled",
+    "proxyType": "Type",
+    "proxyAddr": "Address (host:port)",
+    "proxyUsername": "Username",
+    "proxyPassword": "Password"
   },
   "markets": {
     "title": "Markets",
