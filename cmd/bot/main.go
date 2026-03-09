@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -64,8 +66,32 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
+	// --- Proxy dialer (nil when proxy disabled) ---
+	proxyDial, err := api.BuildDialer(cfg.Proxy)
+	if err != nil {
+		return fmt.Errorf("proxy: %w", err)
+	}
+
 	// --- Язык интерфейса ---
 	i18n.SetLanguage(cfg.UI.Language)
+
+	// --- Файловый логгер (если задан log.file) ---
+	var logFileCloser func()
+	var fileWriter io.Writer
+	if cfg.Log.File != "" {
+		lf, ferr := os.OpenFile(cfg.Log.File, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if ferr != nil {
+			fmt.Fprintf(os.Stderr, "warn: cannot open log file %q: %v\n", cfg.Log.File, ferr)
+		} else {
+			fileWriter = lf
+			logFileCloser = func() { lf.Close() }
+		}
+	}
+	defer func() {
+		if logFileCloser != nil {
+			logFileCloser()
+		}
+	}()
 
 	// --- EventBus + LogWriter (TUI режим или WebUI) ---
 	var bus *tui.EventBus
@@ -73,9 +99,20 @@ func run() error {
 	if !*noTUI || cfg.WebUI.Enabled {
 		bus = tui.NewEventBus()
 		lw := tui.NewLogWriter(bus)
-		log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, lw)
+		var w io.Writer = lw
+		if fileWriter != nil {
+			w = io.MultiWriter(lw, fileWriter)
+		}
+		log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, w)
 	} else {
-		log = logger.New(cfg.Log.Level, cfg.Log.Format)
+		if fileWriter != nil {
+			log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, io.MultiWriter(os.Stdout, fileWriter))
+		} else {
+			log = logger.New(cfg.Log.Level, cfg.Log.Format)
+		}
+	}
+	if proxyDial != nil {
+		log.Info().Str("type", cfg.Proxy.Type).Str("addr", cfg.Proxy.Addr).Msg("proxy enabled")
 	}
 	log.Info().Str("config", *cfgPath).Msg(i18n.T().LogBotStarting)
 
@@ -83,9 +120,9 @@ func run() error {
 	wm := wallet.NewManager(bus)
 
 	// --- HTTP клиенты ---
-	clobHTTP := api.NewClient(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
-	gammaHTTP := api.NewClient(cfg.API.GammaURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
-	dataHTTP := api.NewClient(cfg.API.DataURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
+	clobHTTP := api.NewClientWithDialer(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
+	gammaHTTP := api.NewClientWithDialer(cfg.API.GammaURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
+	dataHTTP := api.NewClientWithDialer(cfg.API.DataURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
 
 	// --- API клиенты (shared/public) ---
 	gammaClient := gamma.NewClient(gammaHTTP)
@@ -93,6 +130,11 @@ func run() error {
 
 	// --- WebSocket ---
 	wsClient := ws.NewClient(cfg.API.WSURL, log)
+	if proxyDial != nil {
+		wsClient.WithDialer(func(network, addr string) (net.Conn, error) {
+			return proxyDial(addr)
+		})
+	}
 
 	// --- Notifier ---
 	var notifier notify.Notifier = &notify.NoopNotifier{}
@@ -281,7 +323,7 @@ func run() error {
 				break
 			}
 		}
-		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, marketsService, &log)
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, wm, marketsService, wm, &log)
 		if err != nil {
 			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
 			tgBot = nil
@@ -300,7 +342,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, marketsService, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, marketsService, wm, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 

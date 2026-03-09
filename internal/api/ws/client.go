@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,7 @@ type Client struct {
 	handlers []Handler
 
 	reconnectDelay time.Duration
+	netDial        func(network, addr string) (net.Conn, error)
 }
 
 // NewClient создаёт WebSocket клиент.
@@ -77,6 +79,11 @@ func NewClient(wsURL string, log zerolog.Logger) *Client {
 		logger:         log.With().Str("component", "ws").Logger(),
 		reconnectDelay: 3 * time.Second,
 	}
+}
+
+// WithDialer sets a custom net dialer for WebSocket connections (e.g. SOCKS5/HTTP proxy).
+func (c *Client) WithDialer(dial func(network, addr string) (net.Conn, error)) {
+	c.netDial = dial
 }
 
 // Subscribe добавляет подписку и регистрирует обработчик сообщений.
@@ -118,7 +125,12 @@ func (c *Client) connect(ctx context.Context) error {
 		url = url + "/" + string(subs[0].Type)
 	}
 
-	dialer := websocket.DefaultDialer
+	dialer := &websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	if c.netDial != nil {
+		dialer.NetDial = c.netDial
+	}
 	conn, _, err := dialer.DialContext(ctx, url, nil)
 	if err != nil {
 		return fmt.Errorf("ws: dial: %w", err)
