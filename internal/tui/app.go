@@ -200,6 +200,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overview, _ = m.overview.Update(msg)
 		return m, m.bus.WaitForEvent()
 
+	case HealthSnapshotMsg:
+		m.overview, _ = m.overview.Update(msg)
+		return m, m.bus.WaitForEvent()
+
 	case BotEventMsg:
 		m.logs, _ = m.logs.Update(msg)
 		return m, m.bus.WaitForEvent()

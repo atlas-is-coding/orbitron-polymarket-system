@@ -33,6 +33,13 @@ type Locale struct {
 	OverviewTotalPnL      string `json:"overview_total_pnl"`
 	OverviewActiveWallets string `json:"overview_active_wallets"`
 
+	// Health block in Overview
+	OverviewHealth        string `json:"overview_health"`
+	OverviewHealthUpdated string `json:"overview_health_updated"` // "Updated %ds ago"
+	OverviewHealthNever   string `json:"overview_health_never"`
+	OverviewGeoBlocked    string `json:"overview_geo_blocked"`
+	OverviewGeoAllowed    string `json:"overview_geo_allowed"`
+
 	// Orders tab
 	OrdersColMarket string `json:"orders_col_market"`
 	OrdersColSide   string `json:"orders_col_side"`
@@ -106,6 +113,7 @@ type Locale struct {
 	FieldDBPath         string `json:"field_db_path"`
 	FieldLogLevel       string `json:"field_log_level"`
 	FieldLogFormat      string `json:"field_log_format"`
+	FieldLogFile        string `json:"field_log_file"`
 	FieldTrackPositions string `json:"field_track_positions"`
 
 	// Settings tooltips
@@ -141,6 +149,7 @@ type Locale struct {
 	TooltipDBPath          string `json:"tooltip_db_path"`
 	TooltipLogLevel        string `json:"tooltip_log_level"`
 	TooltipLogFormat       string `json:"tooltip_log_format"`
+	TooltipLogFile         string `json:"tooltip_log_file"`
 
 	// Settings UI strings
 	SettingsOptions  string `json:"settings_options"`
@@ -201,4 +210,157 @@ type Locale struct {
 	TgOrderClosed   string `json:"tg_order_closed"`   // "🔔 Order closed: %s"
 	TgNewOrder      string `json:"tg_new_order"`      // "📋 New order: %s %s @ %s (size: %s)"
 	TgTradeExecuted string `json:"tg_trade_executed"` // "✅ Trade executed: %s %s @ %s (size: %s)"
+
+	// Telegram Bot UI — main menu
+	TgWelcome      string `json:"tg_welcome"`       // welcome text body
+	TgChooseSection string `json:"tg_choose_section"` // "Choose a section:"
+	TgMenuOverview  string `json:"tg_menu_overview"`
+	TgMenuTrading   string `json:"tg_menu_trading"`
+	TgMenuCopy      string `json:"tg_menu_copy"`
+	TgMenuWallets   string `json:"tg_menu_wallets"`
+	TgMenuMarkets   string `json:"tg_menu_markets"`
+	TgMenuLogs      string `json:"tg_menu_logs"`
+	TgMenuSettings  string `json:"tg_menu_settings"`
+
+	// Telegram Bot UI — renderer content
+	TgOverviewTitle     string `json:"tg_overview_title"`     // "📊 Overview"
+	TgOverviewBalance   string `json:"tg_overview_balance"`   // "💰 Balance: %.2f USDC"
+	TgOverviewStats     string `json:"tg_overview_stats"`     // "📋 Orders: %d  |  💼 Positions: %d"
+	TgOverviewSubsystems string `json:"tg_overview_subsystems"` // "Subsystems:"
+	TgStatusActive      string `json:"tg_status_active"`
+	TgStatusInactive    string `json:"tg_status_inactive"`
+	TgStatusEnabled     string `json:"tg_status_enabled"`
+	TgStatusDisabled    string `json:"tg_status_disabled"`
+	TgStatusOn          string `json:"tg_status_on"`  // "🟢 ON"
+	TgStatusOff         string `json:"tg_status_off"` // "🔴 OFF"
+
+	TgOrdersTitle    string `json:"tg_orders_title"`    // "📋 Orders (%d)"
+	TgOrdersEmpty    string `json:"tg_orders_empty"`    // "📋 Orders\n\nNo open orders."
+	TgPositionsTitle string `json:"tg_positions_title"` // "💼 Positions (%d)"
+	TgPositionsEmpty string `json:"tg_positions_empty"` // "💼 Positions\n\nNo open positions."
+
+	TgCopyTitle       string `json:"tg_copy_title"`        // "🔄 Copytrading (%d traders)"
+	TgCopyEmpty       string `json:"tg_copy_empty"`        // "🔄 Copytrading\n\nNo traders configured."
+	TgCopyRecentTrades string `json:"tg_copy_recent_trades"` // "Recent Trades:"
+
+	TgLogsTitle string `json:"tg_logs_title"` // "📝 Logs (last %d)"
+	TgLogsEmpty string `json:"tg_logs_empty"` // "📝 Logs\n\nNo log entries yet."
+
+	TgNotSet string `json:"tg_not_set"` // "not set"
+
+	TgMarketsTitle      string `json:"tg_markets_title"`       // "🏪 Markets"
+	TgMarketsNA         string `json:"tg_markets_na"`          // "🏪 Markets\n\n<i>Markets service not running.</i>"
+	TgMarketsEmpty      string `json:"tg_markets_empty"`       // "<i>No markets available.</i>"
+	TgMarketsFilterHint string `json:"tg_markets_filter_hint"` // hint when tag filter active but no results
+	TgMarketsShowing    string `json:"tg_markets_showing"`     // "Showing %d of %d markets."
+	TgMarketsTapHint    string `json:"tg_markets_tap_hint"`    // "(Tap button below to select market)"
+	TgMarketDetail      string `json:"tg_market_detail"`       // "🏪 Market Detail"
+	TgMarketLiquidity   string `json:"tg_market_liquidity"`    // "💧 Liquidity: $%.0f"
+	TgMarketVolume      string `json:"tg_market_volume"`       // "📊 Volume: $%.0f"
+	TgMarketEnds        string `json:"tg_market_ends"`         // "📅 Ends: %s"
+	TgMarketCategory    string `json:"tg_market_category"`     // "🏷 Category: %s"
+
+	TgWalletsTitle string `json:"tg_wallets_title"` // "<b>👛 Wallets</b>"
+	TgWalletsEmpty string `json:"tg_wallets_empty"` // "<b>👛 Wallets</b>\n\nNo wallets configured."
+	TgWalletTotal  string `json:"tg_wallet_total"`  // "Total: $%.2f  P&L: %s%.2f  Active: %d/%d"
+
+	// Telegram Bot UI — keyboard buttons
+	TgBtnMainMenu     string `json:"tg_btn_main_menu"`
+	TgBtnBackSettings string `json:"tg_btn_back_settings"`
+	TgBtnBackMarkets  string `json:"tg_btn_back_market_list"`
+	TgBtnBackMarket   string `json:"tg_btn_back_market"`
+	TgBtnEnable       string `json:"tg_btn_enable"`
+	TgBtnDisable      string `json:"tg_btn_disable"`
+	TgBtnRemove       string `json:"tg_btn_remove"`
+	TgBtnEdit         string `json:"tg_btn_edit"`
+	TgBtnAddWallet    string `json:"tg_btn_add_wallet"`
+	TgBtnAddTrader    string `json:"tg_btn_add_trader"`
+	TgBtnRefresh      string `json:"tg_btn_refresh"`
+	TgBtnConfirm      string `json:"tg_btn_confirm"`
+	TgBtnCancel       string `json:"tg_btn_cancel"`
+	TgBtnCancelAll    string `json:"tg_btn_cancel_all"`      // "❌ Cancel ALL"
+	TgBtnYesCancelAll string `json:"tg_btn_yes_cancel_all"`  // "✅ Yes, cancel all"
+	TgBtnNoGoBack     string `json:"tg_btn_no_go_back"`      // "🚫 No, go back"
+	TgBtnAllMarkets   string `json:"tg_btn_all_markets"`     // "🌐 All markets"
+	TgBtnSetAlert     string `json:"tg_btn_set_alert"`       // "🔔 Set Alert"
+	TgBtnFullOrder    string `json:"tg_btn_full_order"`      // "📊 Full Order"
+	TgBtnAboveAlert   string `json:"tg_btn_above_alert"`
+	TgBtnBelowAlert   string `json:"tg_btn_below_alert"`
+	TgBtnBuySide      string `json:"tg_btn_buy_side"`  // "📈 YES (Buy)"
+	TgBtnSellSide     string `json:"tg_btn_sell_side"` // "📉 NO (Sell)"
+	TgBtnGTC          string `json:"tg_btn_gtc"`
+	TgBtnFOK          string `json:"tg_btn_fok"`
+	TgBtnOrders       string `json:"tg_btn_orders"`    // "📋 Orders"
+	TgBtnPositions    string `json:"tg_btn_positions"` // "💼 Positions"
+	TgBtnCancelOrder  string `json:"tg_btn_cancel_order"` // "❌ Cancel #%d (%s)"
+
+	// Telegram Bot UI — screen titles / prompts
+	TgTitleSettings      string `json:"tg_title_settings"`
+	TgTitleLanguage      string `json:"tg_title_language"`
+	TgTitleSetAlert      string `json:"tg_title_set_alert"`
+	TgTitleOrderType     string `json:"tg_title_order_type"`
+	TgTitleSelectWallet  string `json:"tg_title_select_wallet"`
+	TgTitlePlaceOrder    string `json:"tg_title_place_order"`
+	TgTitleConfirmOrder  string `json:"tg_title_confirm_order"`  // "📊 Confirm Order\n\nSide: %s\nPrice: %s\nSize: $%s\nType: %s\nWallet: %s"
+	TgTitleConfirmQB     string `json:"tg_title_confirm_qb"`     // "📊 Confirm Quick Buy %s\n\nPrice: %.4f\nSize: $%.2f\nWallet: %s\nCost: $%.2f"
+	TgTitleCancelConfirm string `json:"tg_title_cancel_confirm"` // "⚠️ Cancel ALL open orders?"
+
+	// Telegram Bot UI — input prompts
+	TgInputTraderAddr      string `json:"tg_input_trader_addr"`
+	TgInputTraderLabel     string `json:"tg_input_trader_label"`
+	TgInputTraderAlloc     string `json:"tg_input_trader_alloc"`
+	TgInputEditTraderAlloc string `json:"tg_input_edit_trader_alloc"`
+	TgInputMaxPos          string `json:"tg_input_max_pos"`
+	TgInputEditKey         string `json:"tg_input_edit_key"`      // "✏️ Enter new value for <code>%s</code>:\n<i>(or /menu to cancel)</i>"
+	TgInputPrivKey         string `json:"tg_input_priv_key"`
+	TgInputDeleteWallet    string `json:"tg_input_delete_wallet"` // "⚠️ Delete wallet <code>%s</code>? Type <b>yes</b> to confirm:"
+	TgInputEditTrader      string `json:"tg_input_edit_trader"`   // "✏️ <b>Edit Trader</b> <code>%s</code>\n\nEnter new label (or <code>-</code> to leave empty):"
+	TgInputOrderPrice      string `json:"tg_input_order_price"`   // "📊 Side: <b>%s</b>\n\nEnter price (0.01–0.99):\n<i>(or /menu to cancel)</i>"
+	TgInputOrderSize       string `json:"tg_input_order_size"`    // "📊 Price: <b>%.4f</b>\n\nEnter position size in USD:"
+	TgInputAlertAbove      string `json:"tg_input_alert_above"`
+	TgInputAlertBelow      string `json:"tg_input_alert_below"`
+	TgInputQuickBuySize    string `json:"tg_input_quickbuy_size"` // "💚 <b>Quick Buy %s</b>\n<i>%s</i>\n\nPrice: <b>%.4f</b>\n\nEnter bet size in USD:"
+
+	// Telegram Bot UI — error messages
+	TgErrAddrEmpty       string `json:"tg_err_addr_empty"`
+	TgErrPrivKeyEmpty    string `json:"tg_err_priv_key_empty"`
+	TgErrCancelled       string `json:"tg_err_cancelled"`
+	TgErrPriceRange      string `json:"tg_err_price_range"`
+	TgErrPositiveNum     string `json:"tg_err_positive_num"`
+	TgErrNoWallets       string `json:"tg_err_no_wallets"`
+	TgErrOrderDataLost   string `json:"tg_err_order_data_lost"`
+	TgErrMarketsUnavail  string `json:"tg_err_markets_unavail"`
+	TgErrUnknownCmd      string `json:"tg_err_unknown_cmd"`
+	TgErrMarketNotFound  string `json:"tg_err_market_not_found"`
+	TgErrMarketCtxLost   string `json:"tg_err_market_ctx_lost"`
+	TgErrAlertDataFmt    string `json:"tg_err_alert_data_fmt"`
+	TgErrOrderUnavail    string `json:"tg_err_order_unavail"`
+	TgErrOrderCorrupt    string `json:"tg_err_order_corrupt"`
+	TgErrOrderPlace      string `json:"tg_err_order_place"` // "Order placement error: %s"
+	TgErrTraderExists    string `json:"tg_err_trader_exists"`   // "Trader %q already exists."
+	TgErrTraderNotFound  string `json:"tg_err_trader_not_found"` // "Trader %q not found."
+	TgErrSaveFailed      string `json:"tg_err_save_failed"`     // "Failed to save config: %v"
+	TgErrKeyAdmin        string `json:"tg_err_key_admin"`       // "Key %q requires admin access."
+	TgErrKeyInvalid      string `json:"tg_err_key_invalid"`     // "Invalid value for %q: %v"
+	TgErrKeyUnknown      string `json:"tg_err_key_unknown"`     // "Unknown key: %q"
+	TgErrWalletExists    string `json:"tg_err_wallet_exists"`   // "Wallet already exists: %s"
+	TgErrInvalidPrivKey  string `json:"tg_err_invalid_priv_key"` // "Invalid private key: %s"
+	TgErrWalletManagerNA string `json:"tg_err_wallet_manager_na"`
+	TgErrRemoveNotSupported string `json:"tg_err_remove_not_supported"`
+	TgErrUnknownSection  string `json:"tg_err_unknown_section"` // "Unknown section: %s"
+	TgErrCancelUnavail   string `json:"tg_err_cancel_unavail"`
+
+	// Telegram Bot UI — success messages
+	TgSuccessOrderPlaced   string `json:"tg_success_order_placed"`   // "Order placed!\n\nID: <code>%s</code>\nSide: <b>%s</b> | Price: <b>%.4f</b> | Size: <b>$%.2f</b>"
+	TgSuccessAlertCreated  string `json:"tg_success_alert_created"`  // "Alert created! %s Price %s <b>%.3f</b>\n<code>ID: %s</code>"
+	TgSuccessTraderAdded   string `json:"tg_success_trader_added"`   // "Trader <code>%s</code> added (label: %s, alloc: %.1f%%)."
+	TgSuccessTraderRemoved string `json:"tg_success_trader_removed"` // "Trader <code>%s</code> removed."
+	TgSuccessTraderUpdated string `json:"tg_success_trader_updated"` // "Trader <code>%s</code> updated.\nlabel: %s | alloc: %.1f%% | max: $%.0f"
+	TgSuccessTraderToggled string `json:"tg_success_trader_toggled"` // "Trader <code>%s</code> %s."
+	TgSuccessWalletAdded   string `json:"tg_success_wallet_added"`   // "Wallet added.\nAddress: <code>%s</code>\nID: <code>%s</code>"
+	TgSuccessWalletRemoved string `json:"tg_success_wallet_removed"` // "Wallet <code>%s</code> removed."
+	TgSuccessWalletToggled string `json:"tg_success_wallet_toggled"` // "Wallet <code>%s</code> %s."
+	TgSuccessOrderCancelled string `json:"tg_success_order_cancelled"` // "Order <code>%s</code> cancelled."
+	TgSuccessAllCancelled  string `json:"tg_success_all_cancelled"`
+	TgSuccessConfigSaved   string `json:"tg_success_config_saved"`   // "<code>%s</code> = <code>%s</code>  Config saved."
 }

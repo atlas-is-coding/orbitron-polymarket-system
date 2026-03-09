@@ -3,10 +3,12 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/atlasdev/polytrade-bot/internal/health"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 )
 
@@ -27,29 +29,25 @@ type walletSummaryRow struct {
 
 // OverviewModel is the Overview tab sub-model.
 type OverviewModel struct {
-	subsystems []SubsystemStatus
-	balance    float64
-	openOrders int
-	positions  int
-	pnlToday   float64
-	traders    int
-	wallets    []walletSummaryRow
-	width      int
-	height     int
+	subsystems  []SubsystemStatus
+	balance     float64
+	openOrders  int
+	positions   int
+	pnlToday    float64
+	traders     int
+	wallets     []walletSummaryRow
+	width       int
+	height      int
+	health      health.HealthSnapshot
+	healthLoaded bool
 }
 
 // NewOverviewModel creates a new OverviewModel.
 func NewOverviewModel(width, height int) OverviewModel {
 	return OverviewModel{
-		width:  width,
-		height: height,
-		subsystems: []SubsystemStatus{
-			{Name: "WebSocket"},
-			{Name: "Monitor"},
-			{Name: "Trades Monitor"},
-			{Name: "Trading Engine"},
-			{Name: "Copytrading"},
-		},
+		width:      width,
+		height:     height,
+		subsystems: []SubsystemStatus{},
 	}
 }
 
@@ -58,10 +56,16 @@ func (m OverviewModel) Init() tea.Cmd { return nil }
 func (m OverviewModel) Update(msg tea.Msg) (OverviewModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SubsystemStatusMsg:
+		found := false
 		for i, s := range m.subsystems {
 			if s.Name == msg.Name {
 				m.subsystems[i].Active = msg.Active
+				found = true
+				break
 			}
+		}
+		if !found {
+			m.subsystems = append(m.subsystems, SubsystemStatus{Name: msg.Name, Active: msg.Active})
 		}
 	case BalanceMsg:
 		m.balance = msg.USDC
@@ -116,8 +120,69 @@ func (m OverviewModel) Update(msg tea.Msg) (OverviewModel, tea.Cmd) {
 				pnl:     msg.PnLUSD,
 			})
 		}
+
+	case HealthSnapshotMsg:
+		m.health = msg.Snapshot
+		m.healthLoaded = true
 	}
 	return m, nil
+}
+
+func (m OverviewModel) renderHealthBlock() string {
+	t := i18n.T()
+	var sb strings.Builder
+	sb.WriteString(StyleSectionTitle.Render(t.OverviewHealth) + "\n")
+
+	if !m.healthLoaded {
+		sb.WriteString(" " + StyleMuted.Render(t.OverviewHealthNever) + "\n")
+		return sb.String()
+	}
+
+	statusDot := func(s health.ServiceStatus) string {
+		switch s {
+		case health.StatusOK:
+			return StyleSuccess.Render("●")
+		case health.StatusDegraded:
+			return StyleWarning.Render("◐")
+		default:
+			return StyleError.Render("○")
+		}
+	}
+	latStr := func(ms int64) string {
+		if ms < 1000 {
+			return fmt.Sprintf("%dms", ms)
+		}
+		return fmt.Sprintf("%.1fs", float64(ms)/1000)
+	}
+
+	for _, svc := range m.health.Services {
+		if svc.Name == "Geoblock" {
+			continue
+		}
+		dot := statusDot(svc.Status)
+		lat := StyleFgDim.Render(latStr(svc.LatencyMs))
+		errStr := ""
+		if svc.Error != "" {
+			errStr = " " + StyleError.Render(svc.Error)
+		}
+		fmt.Fprintf(&sb, " %s %-12s %s%s\n", dot, svc.Name, lat, errStr)
+	}
+
+	// Geoblock row
+	if m.health.Geo != nil {
+		geo := m.health.Geo
+		if geo.Blocked {
+			geoStr := StyleError.Render(fmt.Sprintf("⚠ %s %s (%s)", t.OverviewGeoBlocked, geo.Country, geo.IP))
+			fmt.Fprintf(&sb, " %s %-12s %s\n", StyleError.Render("○"), "Geoblock", geoStr)
+		} else {
+			geoStr := StyleSuccess.Render(fmt.Sprintf("%s %s", t.OverviewGeoAllowed, geo.Country))
+			fmt.Fprintf(&sb, " %s %-12s %s\n", StyleSuccess.Render("●"), "Geoblock", geoStr)
+		}
+	}
+
+	age := int(time.Since(m.health.UpdatedAt).Seconds())
+	sb.WriteString(" " + StyleMuted.Render(fmt.Sprintf(t.OverviewHealthUpdated, age)) + "\n")
+	return sb.String()
 }
 
 func (m OverviewModel) View() string {
@@ -162,9 +227,11 @@ func (m OverviewModel) View() string {
 	rightBox := StyleBorder.Width(half - 2).Render(right.String())
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
 
+	healthBox := StyleBorder.Width(m.width - 4).Render(m.renderHealthBlock())
+
 	// Bottom: wallet summary (only when wallets are registered)
 	if len(m.wallets) == 0 {
-		return topRow
+		return lipgloss.JoinVertical(lipgloss.Left, topRow, healthBox)
 	}
 
 	var totalBal, totalPnL float64
@@ -237,5 +304,5 @@ func (m OverviewModel) View() string {
 	}
 
 	walletsBox := StyleBorder.Width(m.width - 4).Render(wb.String())
-	return lipgloss.JoinVertical(lipgloss.Left, topRow, walletsBox)
+	return lipgloss.JoinVertical(lipgloss.Left, topRow, walletsBox, healthBox)
 }
