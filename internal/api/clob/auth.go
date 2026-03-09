@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/atlasdev/polytrade-bot/internal/auth"
 )
@@ -16,22 +15,40 @@ type APIKeyCreds struct {
 	Passphrase string `json:"passphrase"`
 }
 
-// DeriveAPIKey получает существующие L2 credentials через L1 подпись.
-// Вызывает GET /auth/derive-api-key с L1 заголовками (nonce=0).
+// DeriveAPIKey retrieves or creates L2 credentials via L1 signature.
+// First attempts GET /auth/derive-api-key (nonce=0); if the key doesn't exist
+// (HTTP 400), falls back to POST /auth/api-key to create a new one.
 func (c *Client) DeriveAPIKey(l1 *auth.L1Signer) (*auth.L2Credentials, error) {
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	ts, err := c.GetServerTime()
+	if err != nil {
+		return nil, fmt.Errorf("clob: DeriveAPIKey: get server time: %w", err)
+	}
+
 	nonce := "0"
-	headers, err := l1.L1Headers(ts, nonce)
+	headers, err := l1.L1Headers(strconv.FormatInt(ts, 10), nonce)
 	if err != nil {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: sign: %w", err)
 	}
+
+	// Try to derive an existing key first.
 	resp, err := c.http.Get("/auth/derive-api-key", headers)
 	if err != nil {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: %w", err)
 	}
-	if resp.StatusCode >= 400 {
+
+	if resp.StatusCode == 400 {
+		// Key doesn't exist yet — create one.
+		resp, err = c.http.Post("/auth/api-key", nil, headers)
+		if err != nil {
+			return nil, fmt.Errorf("clob: CreateAPIKey: %w", err)
+		}
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("clob: CreateAPIKey: HTTP %d: %s", resp.StatusCode, resp.Body)
+		}
+	} else if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: HTTP %d: %s", resp.StatusCode, resp.Body)
 	}
+
 	var creds APIKeyCreds
 	if err := json.Unmarshal(resp.Body, &creds); err != nil {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: decode: %w", err)
@@ -42,4 +59,22 @@ func (c *Client) DeriveAPIKey(l1 *auth.L1Signer) (*auth.L2Credentials, error) {
 		Passphrase: creds.Passphrase,
 		Address:    l1.Address(),
 	}, nil
+}
+
+func (c * Client) GetServerTime() (int64, error) {
+	resp, err := c.http.Get("/time", nil)
+	if err != nil {
+		return 0, fmt.Errorf("clob: GetServerTime: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return 0, fmt.Errorf("clob: GetServerTime: HTTP %d: %s", resp.StatusCode, resp.Body)	
+	}
+
+	var timestamp int64
+	if err := json.Unmarshal(resp.Body, &timestamp); err != nil {
+		return 0, fmt.Errorf("clob: GetServerTime: decode: %w", err)
+	}
+
+	return timestamp, nil
 }

@@ -50,8 +50,9 @@ func (c *Client) CancelAllOrders() (*CancelOrderResponse, error) {
 }
 
 // GetOrders возвращает список открытых ордеров пользователя с опциональным фильтром.
+// Использует GET /data/orders (GET /orders возвращает 405 — сервер допускает только POST/DELETE).
 func (c *Client) GetOrders(filter ...OrdersFilter) (*OrdersResponse, error) {
-	path := "/orders"
+	path := "/data/orders"
 	if len(filter) > 0 {
 		path += buildOrdersQuery(filter[0])
 	}
@@ -72,8 +73,9 @@ func (c *Client) GetOrder(orderID string) (*Order, error) {
 }
 
 // GetTrades возвращает историю сделок пользователя с опциональным фильтром.
+// Использует GET /data/trades (py-clob-client: TRADES="/data/trades").
 func (c *Client) GetTrades(filter ...TradesFilter) (*TradesResponse, error) {
-	path := "/trades"
+	path := "/data/trades"
 	if len(filter) > 0 {
 		path += buildTradesQuery(filter[0])
 	}

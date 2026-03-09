@@ -24,6 +24,7 @@ type TradesMonitor struct {
 	notifier   notify.Notifier
 	cfg        *config.TradesMonitorConfig
 	logger     zerolog.Logger
+	address    string // wallet EOA address for Data API queries
 
 	mu        sync.RWMutex
 	orders    []clob.Order
@@ -46,6 +47,7 @@ func NewTradesMonitor(
 	notifier notify.Notifier,
 	cfg *config.TradesMonitorConfig,
 	log zerolog.Logger,
+	address string,
 ) *TradesMonitor {
 	return &TradesMonitor{
 		clobClient:   clobClient,
@@ -53,6 +55,7 @@ func NewTradesMonitor(
 		notifier:     notifier,
 		cfg:          cfg,
 		logger:       log.With().Str("component", "trades-monitor").Logger(),
+		address:      address,
 		prevOrderIDs: make(map[string]struct{}),
 		prevTradeIDs: make(map[string]struct{}),
 	}
@@ -95,8 +98,14 @@ func (tm *TradesMonitor) poll(ctx context.Context) {
 }
 
 // pollOrders обновляет список открытых ордеров и генерирует алерты.
+// Использует GET /data/orders (py-clob-client ORDERS="/data/orders"),
+// так как GET /orders поддерживает только POST/DELETE.
 func (tm *TradesMonitor) pollOrders(ctx context.Context) {
-	resp, err := tm.clobClient.GetOrders()
+	resp, err := tm.clobClient.GetDataOrders(clob.OrdersFilter{
+		MakerAddress: tm.address,
+		Status:       "LIVE",
+	})
+
 	if err != nil {
 		tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedFetchOrders)
 		return
@@ -113,8 +122,12 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 		if _, ok := newOrderIDs[id]; !ok {
 			tm.logger.Info().Str("order_id", id).Msg(i18n.T().LogOrderClosed)
 			go func(orderID string) {
+				// Используем независимый контекст с таймаутом, а не родительский ctx.
+				// Родительский ctx отменяется при shutdown до завершения HTTP-запроса к Telegram.
+				notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
 				msg := fmt.Sprintf(i18n.T().TgOrderClosed, orderID)
-				if err := tm.notifier.Send(ctx, msg); err != nil {
+				if err := tm.notifier.Send(notifCtx, msg); err != nil {
 					tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 				}
 			}(id)
@@ -127,8 +140,10 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 			if _, ok := tm.prevOrderIDs[o.ID]; !ok {
 				tm.logger.Info().Str("order_id", o.ID).Str("side", string(o.Side)).Str("price", o.Price).Msg(i18n.T().LogNewOrderDetected)
 				go func(order clob.Order) {
+					notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
 					msg := fmt.Sprintf(i18n.T().TgNewOrder, order.Side, order.AssetID[:8]+"...", order.Price, order.OriginalSize)
-					if err := tm.notifier.Send(ctx, msg); err != nil {
+					if err := tm.notifier.Send(notifCtx, msg); err != nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(o)
@@ -185,9 +200,11 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 					Str("size", t.Size).
 					Msg(i18n.T().LogTradeExecuted)
 				go func(trade clob.Trade) {
+					notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
 					msg := fmt.Sprintf(i18n.T().TgTradeExecuted,
 						trade.Side, trade.AssetID[:8]+"...", trade.Price, trade.Size)
-					if err := tm.notifier.Send(ctx, msg); err != nil {
+					if err := tm.notifier.Send(notifCtx, msg); err != nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(t)
@@ -202,12 +219,36 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 	tm.logger.Debug().Int("count", len(resp.Data)).Msg("trades updated")
 }
 
-// pollPositions обновляет текущие позиции пользователя.
-func (tm *TradesMonitor) pollPositions(ctx context.Context) {
-	positions, err := tm.clobClient.GetPositions()
+// pollPositions fetches current open positions from the Data API (public, by address).
+// CLOB GET /positions returns 404 — Data API is the correct source for position data.
+func (tm *TradesMonitor) pollPositions(_ context.Context) {
+	if tm.address == "" {
+		return
+	}
+	dataPositions, err := tm.dataClient.GetPositions(data.PositionsParams{
+		User:          tm.address,
+		SizeThreshold: 0.01,
+		Limit:         200,
+	})
 	if err != nil {
 		tm.logger.Warn().Err(err).Msg("failed to fetch positions")
 		return
+	}
+
+	// Map data.Position → clob.Position for internal storage.
+	positions := make([]clob.Position, 0, len(dataPositions))
+	for _, p := range dataPositions {
+		positions = append(positions, clob.Position{
+			AssetID:      p.Asset,
+			ConditionID:  p.ConditionID,
+			Outcome:      p.Outcome,
+			Size:         p.Size,
+			AveragePrice: p.AvgPrice,
+			InitialValue: p.InitialValue,
+			CurrentValue: p.CurrentValue,
+			PnL:          p.CashPnl,
+			RealizedPnL:  p.RealizedPnl,
+		})
 	}
 
 	tm.mu.Lock()
