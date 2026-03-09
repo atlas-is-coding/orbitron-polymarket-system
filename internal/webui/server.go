@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -45,6 +46,20 @@ func New(
 	}
 	s.state.SetConfig(cfg)
 	return s
+}
+
+// recoverMiddleware catches handler panics and returns a JSON 500 error instead
+// of resetting the TCP connection (which browsers report as "Network Error").
+func (s *Server) recoverMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				debug.PrintStack()
+				writeError(w, http.StatusInternalServerError, fmt.Sprintf("internal error: %v", err))
+			}
+		}()
+		next(w, r)
+	}
 }
 
 // Run starts the HTTP server and EventBus consumer. Blocks until ctx is done.
@@ -87,13 +102,16 @@ func (s *Server) Run(ctx context.Context) error {
 	// Auth (no JWT required)
 	mux.HandleFunc("/api/v1/login", s.handleLogin)
 
+	// Public: health (no JWT required)
+	mux.HandleFunc("/api/v1/health", s.handleGetHealth)
+
 	// Protected: overview, orders, positions, logs
 	mux.HandleFunc("/api/v1/overview", s.jwtMiddleware(s.handleOverview))
 	mux.HandleFunc("/api/v1/positions", s.jwtMiddleware(s.handlePositions))
 	mux.HandleFunc("/api/v1/logs", s.jwtMiddleware(s.handleLogs))
 
 	// Orders: GET list / POST place / DELETE all — and DELETE single by path suffix
-	mux.HandleFunc("/api/v1/orders", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/orders", s.jwtMiddleware(s.recoverMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			s.handleOrders(w, r)
@@ -104,7 +122,7 @@ func (s *Server) Run(ctx context.Context) error {
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
-	}))
+	})))
 	mux.HandleFunc("/api/v1/orders/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			s.handleCancelOrder(w, r)

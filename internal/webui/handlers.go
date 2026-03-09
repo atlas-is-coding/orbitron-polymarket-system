@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,12 @@ type MarketsProvider interface {
 	AddAlert(rule markets.AlertRule) string
 }
 
+// OrderPlacer places a limit order for a given wallet.
+// Implemented by *wallet.Manager.
+type OrderPlacer interface {
+	PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error)
+}
+
 // Server is the Web UI HTTP server.
 // NOTE: Additional fields (log, embed fs wiring) added in server.go (Task 6).
 type Server struct {
@@ -55,6 +62,7 @@ type Server struct {
 	wallets  WalletMutator // may be nil
 	adder    WalletAdder   // may be nil
 	mkts     MarketsProvider // may be nil
+	placer   OrderPlacer    // may be nil
 	state    *WebState
 	hub      *hub
 }
@@ -106,9 +114,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
+	type subsystemEntry struct {
+		Name   string `json:"name"`
+		Active bool   `json:"active"`
+	}
+	subs := s.state.Subsystems()
+	subsArr := make([]subsystemEntry, 0, len(subs))
+	for name, active := range subs {
+		subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
+	}
+	sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
 	writeJSON(w, http.StatusOK, map[string]any{
 		"balance":    s.state.Balance(),
-		"subsystems": s.state.Subsystems(),
+		"subsystems": subsArr,
 		"orders":     len(s.state.Orders()),
 		"positions":  len(s.state.Positions()),
 	})
@@ -142,13 +160,23 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	s.cfgMu.RLock()
 	cfg := *s.cfg
 	s.cfgMu.RUnlock()
-	// Mask secrets
+	// Mask secrets in auth (deprecated section)
 	cfg.Auth.PrivateKey = maskSecret(cfg.Auth.PrivateKey)
 	cfg.Auth.APIKey = maskSecret(cfg.Auth.APIKey)
 	cfg.Auth.APISecret = maskSecret(cfg.Auth.APISecret)
 	cfg.Auth.Passphrase = maskSecret(cfg.Auth.Passphrase)
 	cfg.Telegram.BotToken = maskSecret(cfg.Telegram.BotToken)
 	cfg.WebUI.JWTSecret = maskSecret(cfg.WebUI.JWTSecret)
+	// Mask wallet secrets (deep copy to avoid mutating the live config)
+	maskedWallets := make([]config.WalletConfig, len(cfg.Wallets))
+	copy(maskedWallets, cfg.Wallets)
+	for i := range maskedWallets {
+		maskedWallets[i].PrivateKey = maskSecret(maskedWallets[i].PrivateKey)
+		maskedWallets[i].APIKey = maskSecret(maskedWallets[i].APIKey)
+		maskedWallets[i].APISecret = maskSecret(maskedWallets[i].APISecret)
+		maskedWallets[i].Passphrase = maskSecret(maskedWallets[i].Passphrase)
+	}
+	cfg.Wallets = maskedWallets
 	writeJSON(w, http.StatusOK, cfg)
 }
 
@@ -222,6 +250,43 @@ func (s *Server) handleCancelAll(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "all cancelled"})
+}
+
+func (s *Server) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TokenID   string  `json:"token_id"`
+		Side      string  `json:"side"`
+		OrderType string  `json:"order_type"`
+		Price     float64 `json:"price"`
+		SizeUSD   float64 `json:"size_usd"`
+		WalletID  string  `json:"wallet_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	if req.Price <= 0 || req.Price >= 1 {
+		writeError(w, http.StatusBadRequest, "price must be between 0.01 and 0.99")
+		return
+	}
+	if req.SizeUSD <= 0 {
+		writeError(w, http.StatusBadRequest, "size_usd must be positive")
+		return
+	}
+	if req.Side != "YES" && req.Side != "NO" {
+		writeError(w, http.StatusBadRequest, "side must be YES or NO")
+		return
+	}
+	if s.placer == nil {
+		writeError(w, http.StatusServiceUnavailable, "order placement unavailable")
+		return
+	}
+	orderID, err := s.placer.PlaceOrder(req.WalletID, req.TokenID, req.Side, req.OrderType, req.Price, req.SizeUSD)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"order_id": orderID})
 }
 
 func (s *Server) handleAddTrader(w http.ResponseWriter, r *http.Request) {
@@ -483,6 +548,38 @@ func (s *Server) handleUpdateWallet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	// Persist label change to config
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+	newWallets := make([]config.WalletConfig, len(cfgCopy.Wallets))
+	copy(newWallets, cfgCopy.Wallets)
+	cfgCopy.Wallets = newWallets
+	for i, wc := range cfgCopy.Wallets {
+		if wc.ID == id {
+			cfgCopy.Wallets[i].Label = req.Label
+			break
+		}
+	}
+	_ = config.Save(s.cfgPath, &cfgCopy)
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	// Sync WebState synchronously and broadcast WS event
+	wallets := s.state.Wallets()
+	for _, we := range wallets {
+		if we.ID == id {
+			we.Label = req.Label
+			s.state.UpsertWallet(we)
+			s.hub.broadcast(WsEvent{Type: "wallet_stats", Data: we})
+			if s.bus != nil {
+				s.bus.Send(tui.WalletStatsMsg{
+					ID: we.ID, Label: we.Label, Enabled: we.Enabled, Primary: we.Primary,
+					BalanceUSD: we.BalanceUSD, PnLUSD: we.PnLUSD,
+					OpenOrders: we.OpenOrders, TotalTrades: we.TotalTrades,
+				})
+			}
+			break
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -507,6 +604,30 @@ func (s *Server) handleToggleWallet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	// Persist toggle to config
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+	newWallets := make([]config.WalletConfig, len(cfgCopy.Wallets))
+	copy(newWallets, cfgCopy.Wallets)
+	cfgCopy.Wallets = newWallets
+	for i, wc := range cfgCopy.Wallets {
+		if wc.ID == id {
+			cfgCopy.Wallets[i].Enabled = req.Enabled
+			break
+		}
+	}
+	_ = config.Save(s.cfgPath, &cfgCopy)
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	// Sync WebState synchronously to avoid race with async EventBus
+	wallets := s.state.Wallets()
+	for _, we := range wallets {
+		if we.ID == id {
+			we.Enabled = req.Enabled
+			s.state.UpsertWallet(we)
+			break
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
 }
 
@@ -522,7 +643,28 @@ func (s *Server) handleDeleteWallet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	// Persist removal to config
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+	filtered := make([]config.WalletConfig, 0, len(cfgCopy.Wallets))
+	for _, wc := range cfgCopy.Wallets {
+		if wc.ID != id {
+			filtered = append(filtered, wc)
+		}
+	}
+	cfgCopy.Wallets = filtered
+	_ = config.Save(s.cfgPath, &cfgCopy)
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	// Sync WebState synchronously (manager.Remove already sends EventBus, but state update is async)
+	s.state.RemoveWallet(id)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
+// handleGetHealth returns the latest health snapshot (public endpoint, no auth).
+func (s *Server) handleGetHealth(w http.ResponseWriter, _ *http.Request) {
+	snap := s.state.GetHealth()
+	writeJSON(w, http.StatusOK, snap)
 }
 
 // ── Markets handlers ──────────────────────────────────────────────────────────
