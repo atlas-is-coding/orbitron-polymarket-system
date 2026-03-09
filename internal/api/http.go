@@ -14,26 +14,29 @@ type Client struct {
 	maxRetries int
 }
 
+// NewClientWithDialer creates an HTTP client that routes through a custom dialer.
+// dial may be nil (falls back to default fasthttp behaviour).
+func NewClientWithDialer(baseURL string, timeoutSec, maxRetries int, dial DialFunc) *Client {
+	timeout := time.Duration(timeoutSec) * time.Second
+	hc := &fasthttp.Client{
+		ReadTimeout:                   timeout,
+		WriteTimeout:                  timeout,
+		MaxIdleConnDuration:           30 * time.Second,
+		MaxConnDuration:               60 * time.Second,
+		MaxConnsPerHost:               256,
+		DisablePathNormalizing:        true,
+		DisableHeaderNamesNormalizing: false,
+		Name:                          "polytrade-bot/1.0",
+	}
+	if dial != nil {
+		hc.Dial = fasthttp.DialFunc(dial)
+	}
+	return &Client{hc: hc, baseURL: baseURL, maxRetries: maxRetries}
+}
+
 // NewClient создаёт новый HTTP клиент с заданными параметрами.
 func NewClient(baseURL string, timeoutSec, maxRetries int) *Client {
-	timeout := time.Duration(timeoutSec) * time.Second
-
-	hc := &fasthttp.Client{
-		ReadTimeout:              timeout,
-		WriteTimeout:             timeout,
-		MaxIdleConnDuration:      30 * time.Second,
-		MaxConnDuration:          60 * time.Second,
-		MaxConnsPerHost:          256,
-		DisablePathNormalizing:   true,
-		DisableHeaderNamesNormalizing: false,
-		Name:                     "polytrade-bot/1.0",
-	}
-
-	return &Client{
-		hc:         hc,
-		baseURL:    baseURL,
-		maxRetries: maxRetries,
-	}
+	return NewClientWithDialer(baseURL, timeoutSec, maxRetries, nil)
 }
 
 // Request описывает HTTP запрос.
