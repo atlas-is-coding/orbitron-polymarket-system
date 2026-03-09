@@ -22,6 +22,7 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/auth"
 	"github.com/atlasdev/polytrade-bot/internal/config"
 	"github.com/atlasdev/polytrade-bot/internal/copytrading"
+	"github.com/atlasdev/polytrade-bot/internal/health"
 	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/logger"
 	"github.com/atlasdev/polytrade-bot/internal/markets"
@@ -35,6 +36,15 @@ import (
 	"github.com/atlasdev/polytrade-bot/internal/wallet"
 	"github.com/atlasdev/polytrade-bot/internal/webui"
 )
+
+// healthPublisher adapts health.Publisher to tui.EventBus.
+type healthPublisher struct{ bus *tui.EventBus }
+
+func (p *healthPublisher) Send(snap health.HealthSnapshot) {
+	if p.bus != nil {
+		p.bus.Send(tui.HealthSnapshotMsg{Snapshot: snap})
+	}
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -255,6 +265,19 @@ func run() error {
 		marketsService = markets.NewService(gammaClient, nil).WithLogger(&log)
 	}
 
+	// --- Health Service ---
+	healthSvc := health.New(
+		health.Endpoints{
+			ClobURL:  cfg.API.ClobURL,
+			GammaURL: cfg.API.GammaURL,
+			DataURL:  cfg.API.DataURL,
+			WSURL:    cfg.API.WSURL,
+		},
+		proxyDial,
+		&healthPublisher{bus: bus},
+		log,
+	)
+
 	// --- Context с graceful shutdown ---
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -283,6 +306,10 @@ func run() error {
 
 	startSubsystem("WebSocket", func() error { return wsClient.Run(ctx) })
 	startSubsystem("Markets", func() error { return marketsService.Run(ctx) })
+	startSubsystem("Health", func() error {
+		healthSvc.Start(ctx)
+		return nil
+	})
 
 	if cfg.Monitor.Enabled {
 		startSubsystem("Monitor", func() error { return mon.Run(ctx) })

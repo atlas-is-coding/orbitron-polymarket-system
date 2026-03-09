@@ -7,6 +7,7 @@ import (
 
 	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/health"
 )
 
 // ConfigReloadedMsg is sent when config.toml changes on disk.
@@ -183,4 +184,9 @@ type BatchPlaceOrderMsg struct {
 	Side         string  // "YES" / "NO"
 	Size         float64 // USD per market
 	WalletID     string
+}
+
+// HealthSnapshotMsg is published by health.Service every 60s with latest service statuses.
+type HealthSnapshotMsg struct {
+	Snapshot health.HealthSnapshot
 }
