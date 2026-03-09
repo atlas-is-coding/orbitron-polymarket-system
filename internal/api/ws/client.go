@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,8 +41,10 @@ type Message struct {
 type SubscribeRequest struct {
 	Auth    *AuthPayload `json:"auth,omitempty"`
 	Type    ChannelType  `json:"type"`
-	Markets []string     `json:"markets,omitempty"`
-	Assets  []string     `json:"assets,omitempty"`
+	// Markets/Assets use pointer-to-slice so that an empty slice serializes as []
+	// (not omitted). Polymarket WS rejects subscriptions without the markets field.
+	Markets *[]string `json:"markets,omitempty"`
+	Assets  *[]string `json:"assets,omitempty"`
 }
 
 // AuthPayload — данные аутентификации для user channel.
@@ -59,10 +62,10 @@ type Client struct {
 	url    string
 	logger zerolog.Logger
 
-	mu      sync.RWMutex
-	conn    *websocket.Conn
-	subs    []SubscribeRequest
-	handler Handler
+	mu       sync.RWMutex
+	conn     *websocket.Conn
+	subs     []SubscribeRequest
+	handlers []Handler
 
 	reconnectDelay time.Duration
 }
@@ -77,11 +80,12 @@ func NewClient(wsURL string, log zerolog.Logger) *Client {
 }
 
 // Subscribe добавляет подписку и регистрирует обработчик сообщений.
+// Все зарегистрированные обработчики вызываются для каждого входящего сообщения.
 func (c *Client) Subscribe(req SubscribeRequest, handler Handler) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.subs = append(c.subs, req)
-	c.handler = handler
+	c.handlers = append(c.handlers, handler)
 }
 
 // Run запускает WebSocket клиент с авто-переподключением.
@@ -103,8 +107,19 @@ func (c *Client) Run(ctx context.Context) error {
 }
 
 func (c *Client) connect(ctx context.Context) error {
+	c.mu.RLock()
+	subs := c.subs
+	c.mu.RUnlock()
+
+	// Each Polymarket WS channel has its own URL path (/ws/market, /ws/user).
+	// Derive it from the first subscription's type; fall back to the base URL.
+	url := strings.TrimRight(c.url, "/")
+	if len(subs) > 0 {
+		url = url + "/" + string(subs[0].Type)
+	}
+
 	dialer := websocket.DefaultDialer
-	conn, _, err := dialer.DialContext(ctx, c.url, nil)
+	conn, _, err := dialer.DialContext(ctx, url, nil)
 	if err != nil {
 		return fmt.Errorf("ws: dial: %w", err)
 	}
@@ -112,12 +127,11 @@ func (c *Client) connect(ctx context.Context) error {
 
 	c.mu.Lock()
 	c.conn = conn
-	subs := c.subs
 	c.mu.Unlock()
 
-	c.logger.Info().Str("url", c.url).Msg("ws connected")
+	c.logger.Info().Str("url", url).Msg("ws connected")
 
-	// Отправляем подписки
+	// Send subscriptions.
 	for _, sub := range subs {
 		data, err := json.Marshal(sub)
 		if err != nil {
@@ -128,9 +142,9 @@ func (c *Client) connect(ctx context.Context) error {
 		}
 	}
 
-	// Пинг-горутина для поддержания соединения
+	// Heartbeat: server expects text "PING" every 10 seconds, replies "PONG".
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -138,7 +152,7 @@ func (c *Client) connect(ctx context.Context) error {
 				return
 			case <-ticker.C:
 				c.mu.RLock()
-				_ = conn.WriteMessage(websocket.PingMessage, nil)
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("PING"))
 				c.mu.RUnlock()
 			}
 		}
@@ -154,6 +168,12 @@ func (c *Client) connect(ctx context.Context) error {
 			return fmt.Errorf("ws: read: %w", err)
 		}
 
+		// Skip non-JSON control messages (PONG, INVALID OPERATION, etc.)
+		if len(data) == 0 || data[0] != '{' {
+			c.logger.Debug().Str("raw", string(data)).Msg("ws: control message")
+			continue
+		}
+
 		var msg Message
 		if err := json.Unmarshal(data, &msg); err != nil {
 			c.logger.Warn().Err(err).Str("raw", string(data)).Msg("ws: decode message")
@@ -161,11 +181,13 @@ func (c *Client) connect(ctx context.Context) error {
 		}
 
 		c.mu.RLock()
-		handler := c.handler
+		handlers := c.handlers
 		c.mu.RUnlock()
 
-		if handler != nil {
-			handler(&msg)
+		for _, h := range handlers {
+			if h != nil {
+				h(&msg)
+			}
 		}
 	}
 }

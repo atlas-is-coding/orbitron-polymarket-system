@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/atlasdev/polytrade-bot/internal/api/clob"
 	"github.com/atlasdev/polytrade-bot/internal/api/data"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
@@ -56,9 +57,13 @@ func (m *Manager) pollWalletStats(inst *WalletInstance, dc dataClient) {
 	if inst.TradesMon != nil {
 		openOrders = len(inst.TradesMon.GetOrders())
 		totalTrades = len(inst.TradesMon.GetTrades())
-	} else if inst.ClobClient != nil {
-		// Fallback: direct CLOB call
-		if orders, err := inst.ClobClient.GetOrders(); err == nil {
+	} else if inst.ClobClient != nil && inst.Address != "" {
+		// Fallback: direct CLOB call when TradesMonitor is disabled.
+		// Filter by maker address and LIVE status to get only open orders.
+		if orders, err := inst.ClobClient.GetDataOrders(clob.OrdersFilter{
+			MakerAddress: inst.Address,
+			Status:       "LIVE",
+		}); err == nil {
 			openOrders = len(orders.Data)
 		}
 	}
@@ -83,6 +88,7 @@ func (m *Manager) pollWalletStats(inst *WalletInstance, dc dataClient) {
 			ID:          inst.Cfg.ID,
 			Label:       inst.Cfg.Label,
 			Enabled:     inst.Cfg.Enabled,
+			Primary:     inst.Cfg.Primary,
 			BalanceUSD:  totalBalance,
 			PnLUSD:      totalPnL,
 			OpenOrders:  openOrders,

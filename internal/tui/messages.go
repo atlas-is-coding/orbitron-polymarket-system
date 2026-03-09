@@ -76,12 +76,26 @@ func (b *EventBus) Send(msg tea.Msg) {
 
 // Tap creates a new subscriber channel that receives a copy of every future Send() call.
 // The caller is responsible for draining the channel to prevent blocking.
+// Call Untap() when the subscriber shuts down.
 func (b *EventBus) Tap() <-chan tea.Msg {
 	ch := make(chan tea.Msg, 512)
 	b.mu.Lock()
 	b.taps = append(b.taps, ch)
 	b.mu.Unlock()
 	return ch
+}
+
+// Untap removes a previously registered subscriber channel created by Tap().
+// Should be called when the subscriber is shutting down to release resources.
+func (b *EventBus) Untap(ch <-chan tea.Msg) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i, tap := range b.taps {
+		if tap == ch {
+			b.taps = append(b.taps[:i], b.taps[i+1:]...)
+			return
+		}
+	}
 }
 
 // WaitForEvent returns a tea.Cmd that blocks until the next EventBus message.
