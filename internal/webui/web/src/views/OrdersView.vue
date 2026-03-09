@@ -3,7 +3,7 @@
     <div class="view-header anim-in">
       <div class="header-left">
         <h2 class="view-title">{{ $t('nav.orders') }}</h2>
-        <span class="counter mono">{{ countLabel }}</span>
+        <span class="counter">{{ countLabel }}</span>
       </div>
       <div class="header-right">
         <div class="filter-tabs">
@@ -17,7 +17,7 @@
         </div>
         <button
           v-if="orders.length"
-          class="btn-danger"
+          class="btn btn-danger"
           :disabled="canceling"
           @click="confirmCancelAll = true"
         >
@@ -26,8 +26,8 @@
       </div>
     </div>
 
-    <div class="table-wrap anim-in">
-      <!-- Skeleton rows while loading -->
+    <div class="panel anim-in">
+      <!-- Skeleton -->
       <div v-if="loading" class="skeleton-wrap">
         <div v-for="i in 5" :key="i" class="skeleton skeleton-row" />
       </div>
@@ -38,7 +38,7 @@
             <tr>
               <th>{{ $t('orders.id') }}</th>
               <th>{{ $t('orders.market') }}</th>
-              <th>{{ $t('orders.side') }}</th>
+              <th>SIDE</th>
               <th>{{ $t('orders.price') }}</th>
               <th>{{ $t('orders.size') }}</th>
               <th>{{ $t('orders.status') }}</th>
@@ -47,15 +47,21 @@
           </thead>
           <tbody>
             <tr v-for="o in filtered" :key="o.id">
-              <td class="mono muted">{{ o.id?.slice(0, 8) }}…</td>
+              <td class="mono muted id-cell">{{ o.id?.slice(0, 8) }}…</td>
               <td class="market-cell">{{ o.market }}</td>
-              <td :class="o.side === 'BUY' ? 'text-success' : 'text-danger'" class="fw6">{{ o.side }}</td>
-              <td class="mono">{{ o.price }}</td>
-              <td class="mono">{{ o.size }}</td>
-              <td><span class="badge-status" :class="statusClass(o.status)">{{ o.status }}</span></td>
               <td>
+                <span class="side-badge" :class="o.side === 'BUY' ? 'side--buy' : 'side--sell'">
+                  {{ o.side }}
+                </span>
+              </td>
+              <td class="mono price-cell">{{ o.price }}</td>
+              <td class="mono">{{ o.size }}</td>
+              <td>
+                <span class="status-badge" :class="statusClass(o.status)">{{ o.status }}</span>
+              </td>
+              <td class="action-cell">
                 <button
-                  class="btn-xs-danger"
+                  class="btn-cancel"
                   :disabled="cancelingId === o.id"
                   @click="doCancel(o.id)"
                 >
@@ -65,17 +71,18 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="!filtered.length" class="empty">{{ $t('orders.noOrders') }}</div>
+        <div v-if="!filtered.length" class="empty-state">{{ $t('orders.noOrders') }}</div>
       </template>
     </div>
 
-    <!-- Confirm Cancel All -->
+    <!-- Confirm Cancel All dialog -->
     <div v-if="confirmCancelAll" class="overlay" @click.self="confirmCancelAll = false">
       <div class="dialog">
-        <p>{{ $t('orders.cancelAll') }}?</p>
+        <div class="dialog-title">CANCEL ALL ORDERS</div>
+        <p class="dialog-body">Cancel all {{ orders.length }} open orders? This action cannot be undone.</p>
         <div class="dialog-actions">
-          <button class="btn-ghost" @click="confirmCancelAll = false">{{ $t('common.cancel') }}</button>
-          <button class="btn-danger-solid" @click="doCancelAll">{{ $t('common.yes') }}</button>
+          <button class="btn btn-ghost" @click="confirmCancelAll = false">{{ $t('common.cancel') }}</button>
+          <button class="btn btn-danger-solid" @click="doCancelAll">{{ $t('common.yes') }}</button>
         </div>
       </div>
     </div>
@@ -106,15 +113,15 @@ const filtered = computed(() =>
 const countLabel = computed(() => {
   const b = orders.value.filter(o => o.side === 'BUY').length
   const s = orders.value.filter(o => o.side === 'SELL').length
-  return `${orders.value.length} · ${b} BUY · ${s} SELL`
+  return `${orders.value.length} total · ${b} buy · ${s} sell`
 })
 
 function statusClass(s) {
   if (!s) return ''
   const u = s.toUpperCase()
-  if (u === 'OPEN' || u === 'LIVE') return 'badge--accent'
-  if (u === 'FILLED' || u === 'MATCHED') return 'badge--ok'
-  return 'badge--off'
+  if (u === 'OPEN' || u === 'LIVE') return 'st--accent'
+  if (u === 'FILLED' || u === 'MATCHED') return 'st--ok'
+  return 'st--off'
 }
 
 onMounted(async () => {
@@ -136,54 +143,129 @@ async function doCancelAll() {
 </script>
 
 <style scoped>
-.view { display: flex; flex-direction: column; gap: 1rem; }
+.view { display: flex; flex-direction: column; gap: 0.9rem; }
+
+/* Header */
 .view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
 .header-left { display: flex; align-items: baseline; gap: 0.75rem; }
 .header-right { display: flex; align-items: center; gap: 0.5rem; }
-.view-title { font-size: 1.1rem; font-weight: 700; }
-.counter { font-size: 0.7rem; color: var(--text-muted); }
+.view-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright); }
+.counter { font-size: 0.92rem; color: var(--text-secondary); font-family: var(--font-mono); }
 
-.filter-tabs { display: flex; gap: 2px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; }
-.filter-tab { padding: 0.18rem 0.6rem; border-radius: calc(var(--radius) - 2px); border: none; background: none; color: var(--text-secondary); font-size: 0.72rem; cursor: pointer; font-family: var(--font-mono); transition: all var(--transition); }
-.filter-tab--active { background: var(--accent); color: white; }
+/* Filter tabs */
+.filter-tabs {
+  display: flex; gap: 1px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+.filter-tab {
+  padding: 0.2rem 0.7rem;
+  border-radius: calc(var(--radius) - 1px);
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  letter-spacing: 0.04em;
+}
+.filter-tab:hover { color: var(--text-primary); }
+.filter-tab--active { background: var(--bg-card); color: var(--accent); }
 
-.table-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
-.skeleton-wrap { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.skeleton-row { height: 38px; }
-
-.data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
-.data-table th { padding: 0.5rem 1rem; text-align: left; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); border-bottom: 1px solid var(--border); white-space: nowrap; }
-.data-table td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-subtle); }
-.data-table tr:last-child td { border-bottom: none; }
-.data-table tr:hover td { background: var(--bg-hover); }
-
-.mono { font-family: var(--font-mono); font-size: 0.78rem; }
-.muted { color: var(--text-secondary); }
-.market-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.text-success { color: var(--success); }
-.text-danger  { color: var(--danger); }
-.fw6 { font-weight: 600; }
-
-.badge-status { font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px; }
-.badge--accent { background: var(--accent-dim);   color: var(--accent-bright); }
-.badge--ok     { background: var(--success-dim);  color: var(--success); }
-.badge--off    { background: var(--badge-bg);      color: var(--text-muted); }
-
-.btn-xs-danger { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); padding: 0.18rem 0.5rem; font-size: 0.7rem; cursor: pointer; transition: background var(--transition); font-family: var(--font-mono); }
-.btn-xs-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
-.btn-xs-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-danger { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; font-family: var(--font-mono); }
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.38rem 0.90rem;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.btn-danger { background: var(--danger-dim); color: var(--danger); border-color: var(--danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
-.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.empty { padding: 2rem; text-align: center; color: var(--text-muted); }
-
-.overlay { position: fixed; inset: 0; background: var(--bg-overlay); display: flex; align-items: center; justify-content: center; z-index: 200; }
-.dialog { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; min-width: 280px; box-shadow: var(--shadow); }
-.dialog p { margin-bottom: 1.25rem; font-size: 0.9rem; }
-.dialog-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
-.btn-ghost { background: none; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
+.btn-ghost { background: none; border-color: var(--border); color: var(--text-secondary); }
 .btn-ghost:hover { background: var(--bg-hover); }
-.btn-danger-solid { background: var(--danger); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
+.btn-danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Panel */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 1px solid var(--accent);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+/* Skeleton */
+.skeleton-wrap { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.skeleton-row { height: 36px; }
+
+/* Table */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.96rem; }
+.data-table th {
+  padding: 0.6rem 1.2rem; text-align: left; font-size: 1.00rem;
+  text-transform: uppercase; letter-spacing: 0.10em;
+  color: var(--text-secondary); border-bottom: 1px solid var(--border);
+  background: rgba(0, 200, 255, 0.03); white-space: nowrap;
+}
+.data-table td { padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.data-table tr:nth-child(even) td { background: rgba(0,200,255,0.018); }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bg-hover) !important; }
+
+.mono { font-family: var(--font-mono); font-size: 0.92rem; }
+.muted { color: var(--text-secondary); }
+.id-cell { font-size: 0.94rem; }
+.market-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-cell { color: var(--price-bright); }
+.action-cell { text-align: right; }
+
+/* Side badge */
+.side-badge {
+  display: inline-block;
+  font-size: 0.90rem;
+  font-weight: 700;
+  padding: 0.20rem 0.55rem;
+  border-radius: 1px;
+  letter-spacing: 0.06em;
+}
+.side--buy  { background: rgba(16,217,148,0.12); color: var(--success); border: 1px solid rgba(16,217,148,0.25); }
+.side--sell { background: rgba(255,77,106,0.12);  color: var(--danger);  border: 1px solid rgba(255,77,106,0.25); }
+
+/* Status badge */
+.status-badge {
+  font-size: 1.00rem; font-weight: 600;
+  padding: 0.20rem 0.55rem; border-radius: 1px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.st--accent { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,200,255,0.20); }
+.st--ok     { background: var(--success-dim); color: var(--success); border: 1px solid rgba(16,217,148,0.20); }
+.st--off    { background: var(--badge-bg); color: var(--text-muted); border: 1px solid var(--badge-border); }
+
+/* Cancel button */
+.btn-cancel {
+  background: none; border: 1px solid rgba(255,77,106,0.30); color: var(--danger);
+  border-radius: var(--radius); padding: 0.25rem 0.65rem; font-size: 0.94rem;
+  cursor: pointer; font-family: var(--font-mono); transition: all var(--transition);
+}
+.btn-cancel:hover:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-cancel:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.empty-state { padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 0.96rem; }
+
+/* Dialog */
+.overlay { position: fixed; inset: 0; background: var(--bg-overlay); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); }
+.dialog { background: var(--bg-card); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: var(--radius); padding: 1.5rem; min-width: 300px; box-shadow: var(--shadow-lg); }
+.dialog-title { font-size: 0.94rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; }
+.dialog-body { color: var(--text-secondary); font-size: 0.96rem; margin-bottom: 1.25rem; line-height: 1.6; }
+.dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 </style>

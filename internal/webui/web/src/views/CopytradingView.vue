@@ -14,14 +14,17 @@
     <div v-if="ct.traders?.length" class="traders-grid">
       <div v-for="t in ct.traders" :key="t.address" class="trader-card anim-in">
         <div class="card-top">
-          <span class="card-status-dot" :class="t.enabled ? 'dot--on' : 'dot--off'" />
+          <span class="status-dot" :class="t.enabled ? 'status-dot--on' : 'status-dot--off'" />
           <span class="card-label">{{ t.label || 'Unnamed' }}</span>
-          <span class="card-alloc">{{ t.allocation_pct }}%</span>
+          <div class="card-badges">
+            <span class="alloc-badge">{{ t.allocation_pct }}%</span>
+            <span v-if="t.max_position_usd" class="max-badge">${{ t.max_position_usd }}</span>
+          </div>
         </div>
-        <div class="card-addr mono">{{ t.address?.slice(0, 10) }}…{{ t.address?.slice(-4) }}</div>
+        <div class="card-addr">{{ t.address?.slice(0, 12) }}…{{ t.address?.slice(-5) }}</div>
         <div class="card-actions">
           <button
-            class="btn-xs"
+            class="card-btn"
             :disabled="togglingAddr === t.address"
             @click="doToggle(t.address)"
           >
@@ -29,24 +32,39 @@
               {{ togglingAddr === t.address ? '⟳' : $t('copytrading.toggle') }}
             </span>
           </button>
-          <button class="btn-xs" @click="startEdit(t)">✏️ {{ $t('copytrading.edit') }}</button>
-          <button class="btn-xs-danger" @click="removeTarget = t">{{ $t('copytrading.remove') }}</button>
+          <button class="card-btn" @click="startEdit(t)">{{ $t('copytrading.edit') }}</button>
+          <button class="card-btn card-btn--danger" @click="removeTarget = t">{{ $t('copytrading.remove') }}</button>
         </div>
       </div>
     </div>
-    <div v-else class="empty anim-in">{{ $t('copytrading.noTraders') }}</div>
+    <div v-else class="empty-state anim-in">{{ $t('copytrading.noTraders') }}</div>
 
-    <!-- Recent Copy Trades -->
-    <div class="section-header anim-in">Recent Trades</div>
-    <div class="trades-feed anim-in">
-      <div v-if="!copyTrades.length" class="empty">No recent copy trades.</div>
-      <div v-for="(line, i) in copyTrades" :key="i" class="trade-line mono">{{ line }}</div>
+    <!-- Recent trades feed -->
+    <div class="section-header anim-in">Recent Copy Trades</div>
+    <div class="trades-panel anim-in">
+      <div class="term-chrome">
+        <div class="chrome-dots">
+          <span class="cdot cdot--r" /><span class="cdot cdot--y" /><span class="cdot cdot--g" />
+        </div>
+        <span class="term-label">TRADE FEED</span>
+        <span class="term-count">{{ copyTrades.length }} recent</span>
+      </div>
+      <div class="trades-body">
+        <div v-if="!copyTrades.length" class="feed-empty">
+          <span class="prompt-glyph">$ </span>no recent copy trades
+        </div>
+        <div v-for="(line, i) in copyTrades" :key="i" class="trade-line">
+          <span class="trade-idx">{{ String(i+1).padStart(2, '0') }}</span>
+          <span class="trade-sep">│</span>
+          <span class="trade-text">{{ line }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- Add trader dialog -->
     <div v-if="showAdd" class="overlay" @click.self="showAdd = false">
       <div class="dialog">
-        <h3 class="dialog-title">{{ $t('copytrading.addTrader') }}</h3>
+        <div class="dialog-title">ADD TRADER</div>
         <div class="form-fields">
           <div class="field">
             <label class="field-label">{{ $t('copytrading.address') }}</label>
@@ -73,7 +91,7 @@
     <!-- Edit trader dialog -->
     <div v-if="editTarget" class="overlay" @click.self="editTarget = null">
       <div class="dialog">
-        <h3 class="dialog-title">{{ $t('copytrading.edit') }} Trader</h3>
+        <div class="dialog-title">EDIT TRADER</div>
         <div class="form-fields">
           <div class="field">
             <label class="field-label">{{ $t('copytrading.label') }}</label>
@@ -100,11 +118,11 @@
     <!-- Confirm remove dialog -->
     <div v-if="removeTarget" class="overlay" @click.self="removeTarget = null">
       <div class="dialog">
-        <h3 class="dialog-title">{{ $t('copytrading.remove') }}</h3>
-        <p class="dialog-body">Remove trader <span class="mono">{{ removeTarget.label || removeTarget.address?.slice(0, 10) }}…</span>?</p>
+        <div class="dialog-title">REMOVE TRADER</div>
+        <p class="dialog-body">Remove <span class="mono">{{ removeTarget.label || removeTarget.address?.slice(0, 14) }}…</span>?</p>
         <div class="dialog-actions">
           <button class="btn-ghost" @click="removeTarget = null">{{ $t('common.cancel') }}</button>
-          <button class="btn-danger-solid" :disabled="removingAddr === removeTarget?.address" @click="doRemove">
+          <button class="btn-danger" :disabled="removingAddr === removeTarget?.address" @click="doRemove">
             <span :class="{ spin: removingAddr === removeTarget?.address }">
               {{ removingAddr === removeTarget?.address ? '⟳' : $t('common.confirm') }}
             </span>
@@ -116,7 +134,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, reactive, computed } from 'vue'
+import { onMounted, ref, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
@@ -131,7 +149,6 @@ const adding = ref(false)
 const togglingAddr = ref(null)
 const removingAddr = ref(null)
 const removeTarget = ref(null)
-
 const editTarget = ref(null)
 const editForm = reactive({ label: '', allocPct: 5, maxPositionUsd: 50 })
 const editing = ref(false)
@@ -170,10 +187,7 @@ async function doRemove() {
   if (!removeTarget.value) return
   const addr = removeTarget.value.address
   removingAddr.value = addr
-  try {
-    await api.removeTrader(addr)
-    app.copytrading = await api.getCopytrading()
-  } catch {}
+  try { await api.removeTrader(addr); app.copytrading = await api.getCopytrading() } catch {}
   removingAddr.value = null
   removeTarget.value = null
 }
@@ -192,76 +206,174 @@ async function doAdd() {
 
 <style scoped>
 .view { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Header */
 .view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
-.header-left { display: flex; align-items: center; gap: 0.75rem; }
-.view-title { font-size: 1.1rem; font-weight: 700; }
+.header-left { display: flex; align-items: center; gap: 0.65rem; }
+.view-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright); }
 
-.status-badge { font-size: 0.65rem; font-weight: 600; padding: 0.18rem 0.5rem; border-radius: 999px; }
-.badge--ok  { background: var(--success-dim); color: var(--success); }
-.badge--off { background: var(--badge-bg);    color: var(--text-muted); }
+/* Status badge */
+.status-badge {
+  font-size: 0.86rem; font-weight: 700; padding: 0.20rem 0.55rem;
+  border-radius: 1px; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.badge--ok  { background: var(--success-dim); color: var(--success); border: 1px solid rgba(16,217,148,0.22); }
+.badge--off { background: var(--badge-bg); color: var(--text-muted); border: 1px solid var(--badge-border); }
 
-.btn-add { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 0.3rem 0.85rem; font-size: 0.78rem; cursor: pointer; font-family: var(--font-mono); transition: background var(--transition); }
-.btn-add:hover { background: var(--accent-hover); }
+/* Add button */
+.btn-add {
+  background: transparent; border: 1px solid var(--accent); color: var(--accent);
+  border-radius: var(--radius); padding: 0.38rem 1.00rem; font-size: 0.86rem; font-weight: 600;
+  cursor: pointer; font-family: var(--font-mono); letter-spacing: 0.04em;
+  transition: all var(--transition);
+}
+.btn-add:hover { background: var(--accent); color: #000; box-shadow: var(--accent-glow); }
 
-/* Trader cards grid */
-.traders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+/* Trader grid */
+.traders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 0.75rem; }
 
 .trader-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1rem;
-  display: flex; flex-direction: column; gap: 0.6rem;
-  transition: border-color var(--transition);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 2px solid rgba(0, 200, 255, 0.30);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.65rem;
+  transition: border-top-color var(--transition);
 }
-.trader-card:hover { border-color: var(--accent); }
+.trader-card:hover { border-top-color: var(--accent); }
 
 .card-top { display: flex; align-items: center; gap: 0.5rem; }
-.card-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.dot--on  { background: var(--success); box-shadow: 0 0 5px var(--success); animation: pulse-dot 2.5s ease infinite; }
-.dot--off { background: var(--text-muted); }
-.card-label { flex: 1; font-size: 0.85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-alloc { font-size: 0.72rem; color: var(--accent-bright); font-family: var(--font-mono); font-weight: 600; }
+.status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.status-dot--on  { background: var(--success); box-shadow: 0 0 6px var(--success); animation: pulse-dot 2.5s ease infinite; }
+.status-dot--off { background: var(--text-muted); }
+.card-label { flex: 1; font-size: 0.96rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.card-addr { font-size: 0.72rem; color: var(--text-secondary); }
+.card-badges { display: flex; align-items: center; gap: 0.3rem; }
+.alloc-badge {
+  font-size: 1.00rem; font-weight: 700; padding: 0.10rem 0.35rem; border-radius: 1px;
+  background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,200,255,0.20);
+}
+.max-badge {
+  font-size: 1.00rem; font-weight: 700; padding: 0.10rem 0.35rem; border-radius: 1px;
+  background: var(--price-dim); color: var(--price); border: 1px solid rgba(245,158,11,0.20);
+}
 
-.card-actions { display: flex; gap: 0.4rem; }
+.card-addr {
+  font-family: var(--font-mono); font-size: 0.86rem; color: var(--text-secondary);
+  background: var(--bg-hover); padding: 0.2rem 0.5rem; border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
 
-.btn-xs { background: var(--bg-hover); border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 0.2rem 0.55rem; font-size: 0.72rem; cursor: pointer; font-family: var(--font-mono); transition: all var(--transition); }
-.btn-xs:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent); }
-.btn-xs:disabled { opacity: 0.5; cursor: not-allowed; }
+.card-actions { display: flex; gap: 0.35rem; }
+.card-btn {
+  background: var(--bg-hover); border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: var(--radius); padding: 0.30rem 0.70rem; font-size: 0.94rem;
+  cursor: pointer; font-family: var(--font-mono); transition: all var(--transition);
+}
+.card-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.card-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.card-btn--danger { color: var(--danger); border-color: rgba(255,77,106,0.30); }
+.card-btn--danger:hover:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
 
-.btn-xs-danger { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); padding: 0.2rem 0.55rem; font-size: 0.72rem; cursor: pointer; font-family: var(--font-mono); }
-.btn-xs-danger:hover { background: var(--danger); color: #fff; }
+/* Section header */
+.section-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 1.00rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--accent); font-weight: 600;
+}
+.section-header::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+}
 
-.empty { padding: 2rem; text-align: center; color: var(--text-muted); }
+/* Trades panel */
+.trades-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 1px solid var(--accent);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-height: 260px;
+  display: flex; flex-direction: column;
+}
 
-.mono { font-family: var(--font-mono); }
+.term-chrome {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.4rem 1rem;
+  background: rgba(0, 200, 255, 0.04);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.chrome-dots { display: flex; gap: 0.25rem; }
+.cdot { width: 8px; height: 8px; border-radius: 50%; }
+.cdot--r { background: #ff5f57; } .cdot--y { background: #ffbd2e; } .cdot--g { background: #28ca41; }
+.term-label { font-size: 0.86rem; letter-spacing: 0.10em; color: var(--text-secondary); flex: 1; text-transform: uppercase; }
+.term-count  { font-size: 0.86rem; color: var(--text-muted); }
 
-.overlay { position: fixed; inset: 0; background: var(--bg-overlay); display: flex; align-items: center; justify-content: center; z-index: 200; }
-.dialog { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; min-width: 320px; box-shadow: var(--shadow); }
-.dialog-title { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
-.dialog-body { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem; }
+.trades-body { flex: 1; overflow-y: auto; }
+.feed-empty { padding: 1rem; font-size: 0.90rem; color: var(--text-muted); font-family: var(--font-mono); }
+.prompt-glyph { color: var(--accent); }
+
+.trade-line {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  padding: 0.22rem 1rem; border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono); font-size: 0.86rem;
+  transition: background var(--transition);
+}
+.trade-line:last-child { border-bottom: none; }
+.trade-line:hover { background: rgba(0, 200, 255, 0.03); }
+.trade-idx { color: var(--text-muted); font-size: 0.94rem; flex-shrink: 0; width: 1.5rem; text-align: right; }
+.trade-sep { color: var(--border); user-select: none; }
+.trade-text { color: var(--text-secondary); }
+
+/* Dialogs */
+.overlay {
+  position: fixed; inset: 0; background: var(--bg-overlay);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; backdrop-filter: blur(4px);
+}
+.dialog {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-top: 2px solid var(--accent); border-radius: var(--radius);
+  padding: 1.5rem; min-width: 320px; box-shadow: var(--shadow-lg);
+  animation: fadeSlideUp 0.18s ease both;
+}
+.dialog-title { font-size: 0.92rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.25rem; }
+.dialog-body { color: var(--text-secondary); font-size: 0.96rem; margin-bottom: 1.25rem; }
+.mono { font-family: var(--font-mono); color: var(--text-primary); }
 
 .form-fields { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; }
-.field-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
-.field-input { padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-primary); font-size: 0.85rem; font-family: var(--font-mono); outline: none; }
-.field-input:focus { border-color: var(--accent); }
-
-.dialog-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
-.btn-ghost { background: none; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
-.btn-ghost:hover { background: var(--bg-hover); }
-.btn-primary { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; font-family: var(--font-mono); }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-danger-solid { background: var(--danger); color: #fff; border: none; border-radius: var(--radius); padding: 0.28rem 0.75rem; font-size: 0.78rem; cursor: pointer; }
-.btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.section-header { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
-.trades-feed {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 0.5rem 1rem;
-  max-height: 220px; overflow-y: auto;
+.field-label { font-size: 1.00rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
+.field-input {
+  padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text-primary); font-family: var(--font-mono);
+  font-size: 0.96rem; outline: none; transition: border-color var(--transition);
 }
-.trade-line { font-size: 0.78rem; padding: 0.2rem 0; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); }
-.trade-line:last-child { border-bottom: none; }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.15); }
+
+.dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.btn-ghost {
+  background: none; border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: var(--radius); padding: 0.38rem 0.90rem; font-size: 0.90rem;
+  cursor: pointer; font-family: var(--font-mono); transition: all var(--transition);
+}
+.btn-ghost:hover { background: var(--bg-hover); }
+.btn-primary {
+  background: var(--accent); color: #000; border: none; border-radius: var(--radius);
+  padding: 0.38rem 1.00rem; font-size: 0.90rem; font-weight: 700;
+  cursor: pointer; font-family: var(--font-mono); transition: all var(--transition);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-danger {
+  background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger);
+  border-radius: var(--radius); padding: 0.38rem 1.00rem; font-size: 0.90rem;
+  cursor: pointer; font-family: var(--font-mono); transition: all var(--transition);
+}
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.empty-state { padding: 2.5rem; text-align: center; color: var(--text-muted); font-size: 0.96rem; }
 </style>

@@ -48,11 +48,26 @@ export function useApi() {
     return (await axios.post('/api/v1/wallets', { private_key: privateKey })).data
   }
 
+  async function placeOrder(tokenId, side, orderType, price, sizeUsd, walletId) {
+    return (await axios.post('/api/v1/orders', {
+      token_id: tokenId, side, order_type: orderType,
+      price, size_usd: sizeUsd, wallet_id: walletId
+    })).data
+  }
+
+  async function getMarkets(tag) {
+    const params = tag ? { tag } : {}
+    return (await axios.get('/api/v1/markets', { params })).data
+  }
+  async function getMarketTags() {
+    return (await axios.get('/api/v1/markets/tags')).data
+  }
+
   return {
     getOverview, getOrders, getPositions, getLogs,
     getCopytrading, getSettings, cancelOrder, cancelAll,
     postSettings, addTrader, removeTrader, toggleTrader,
     getWallets, toggleWallet, renameWallet, removeWallet, addWallet,
-    editTrader
+    editTrader, placeOrder, getMarkets, getMarketTags
   }
 }
