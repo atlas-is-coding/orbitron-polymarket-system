@@ -202,6 +202,28 @@ var settingsMap = map[string]settingEntry{
 		get:    func(c *config.Config) string { return c.Telegram.AdminChatID },
 		set:    func(c *config.Config, v string) error { c.Telegram.AdminChatID = v; return nil },
 	},
+	// Proxy
+	"proxy.enabled": {
+		get: func(c *config.Config) string { return boolStr(c.Proxy.Enabled) },
+		set: func(c *config.Config, v string) error { c.Proxy.Enabled = parseBool(v); return nil },
+	},
+	"proxy.type": {
+		get: func(c *config.Config) string { return c.Proxy.Type },
+		set: func(c *config.Config, v string) error { c.Proxy.Type = v; return nil },
+	},
+	"proxy.addr": {
+		get: func(c *config.Config) string { return c.Proxy.Addr },
+		set: func(c *config.Config, v string) error { c.Proxy.Addr = v; return nil },
+	},
+	"proxy.username": {
+		get: func(c *config.Config) string { return c.Proxy.Username },
+		set: func(c *config.Config, v string) error { c.Proxy.Username = v; return nil },
+	},
+	"proxy.password": {
+		secret: true,
+		get:    func(c *config.Config) string { return c.Proxy.Password },
+		set:    func(c *config.Config, v string) error { c.Proxy.Password = v; return nil },
+	},
 }
 
 // GetSetting returns the current value for a dot-notation key.
@@ -353,6 +375,7 @@ func settingsSectionsKeyboard() tgbotapi.InlineKeyboardMarkup {
 		{"Database", l.SectionDatabase},
 		{"Log", l.SectionLog},
 		{"Auth", l.SectionAuth},
+		{"Proxy", l.SectionProxy},
 	}
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for i := 0; i < len(sections); i += 2 {
@@ -1165,6 +1188,7 @@ var sectionKeys = map[string][]string{
 	"Telegram":       {"telegram.enabled", "telegram.bot_token", "telegram.admin_chat_id"},
 	"Database":       {"database.enabled", "database.path"},
 	"Log":            {"log.level", "log.format"},
+	"Proxy":          {"proxy.enabled", "proxy.type", "proxy.addr", "proxy.username", "proxy.password"},
 }
 
 func (b *Bot) sendSettingsSection(chatID int64, sectionName string) {

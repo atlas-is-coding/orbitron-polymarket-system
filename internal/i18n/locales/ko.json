@@ -68,6 +68,7 @@
   "section_database": "데이터베이스",
   "section_log": "로그",
   "section_webui": "Web UI",
+  "section_proxy": "프록시",
   "field_language": "언어",
   "field_priv_key": "개인 키",
   "field_chain_id": "체인 ID",
@@ -322,5 +323,10 @@
   "tg_health_title": "📡 Polymarket 상태",
   "tg_health_updated": "%d초 전 업데이트",
   "tg_health_never": "확인 중...",
-  "tg_btn_health_refresh": "🔄 새로고침"
+  "tg_btn_health_refresh": "🔄 새로고침",
+  "settings_proxy_enabled": "프록시 활성화",
+  "settings_proxy_type": "프록시 유형",
+  "settings_proxy_addr": "프록시 주소",
+  "settings_proxy_username": "프록시 사용자명",
+  "settings_proxy_password": "프록시 비밀번호"
 }

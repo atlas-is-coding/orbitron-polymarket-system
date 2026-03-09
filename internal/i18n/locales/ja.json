@@ -68,6 +68,7 @@
   "section_database": "データベース",
   "section_log": "ログ",
   "section_webui": "Web UI",
+  "section_proxy": "プロキシ",
   "field_language": "言語",
   "field_priv_key": "秘密鍵",
   "field_chain_id": "チェーンID",
@@ -322,5 +323,10 @@
   "tg_health_title": "📡 Polymarketの状態",
   "tg_health_updated": "%d秒前に更新",
   "tg_health_never": "確認中...",
-  "tg_btn_health_refresh": "🔄 更新"
+  "tg_btn_health_refresh": "🔄 更新",
+  "settings_proxy_enabled": "プロキシ有効",
+  "settings_proxy_type": "プロキシタイプ",
+  "settings_proxy_addr": "プロキシアドレス",
+  "settings_proxy_username": "プロキシユーザー名",
+  "settings_proxy_password": "プロキシパスワード"
 }

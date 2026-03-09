@@ -345,6 +345,14 @@ var allFields = []FieldDef{
 		Get:     func(c *config.Config) string { return c.Log.Format },
 		Set:     func(c *config.Config, v string) error { c.Log.Format = v; return nil },
 	},
+	{
+		Section: func() string { return i18n.T().SectionLog },
+		Label:   func() string { return i18n.T().FieldLogFile },
+		Tooltip: func() string { return i18n.T().TooltipLogFile },
+		Kind:    KindString,
+		Get:     func(c *config.Config) string { return c.Log.File },
+		Set:     func(c *config.Config, v string) error { c.Log.File = v; return nil },
+	},
 	// ── Web UI ───────────────────────────────────────────────────────────────
 	{
 		Section: func() string { return i18n.T().SectionWebUI },
@@ -369,6 +377,48 @@ var allFields = []FieldDef{
 		Kind:    KindPassword,
 		Get:     func(c *config.Config) string { return c.WebUI.JWTSecret },
 		Set:     func(c *config.Config, v string) error { c.WebUI.JWTSecret = v; return nil },
+	},
+	// ── Proxy ─────────────────────────────────────────────────────────────
+	{
+		Section: func() string { return i18n.T().SectionProxy },
+		Label:   func() string { return i18n.T().SettingsProxyEnabled },
+		Tooltip: func() string { return i18n.T().SettingsProxyEnabled },
+		Kind:    KindBool,
+		Get:     func(c *config.Config) string { return boolStr(c.Proxy.Enabled) },
+		Set:     func(c *config.Config, v string) error { c.Proxy.Enabled = parseBool(v); return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionProxy },
+		Label:   func() string { return i18n.T().SettingsProxyType },
+		Tooltip: func() string { return i18n.T().SettingsProxyType },
+		Kind:    KindEnum,
+		Options: []string{"socks5", "http"},
+		Get:     func(c *config.Config) string { return c.Proxy.Type },
+		Set:     func(c *config.Config, v string) error { c.Proxy.Type = v; return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionProxy },
+		Label:   func() string { return i18n.T().SettingsProxyAddr },
+		Tooltip: func() string { return i18n.T().SettingsProxyAddr },
+		Kind:    KindString,
+		Get:     func(c *config.Config) string { return c.Proxy.Addr },
+		Set:     func(c *config.Config, v string) error { c.Proxy.Addr = v; return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionProxy },
+		Label:   func() string { return i18n.T().SettingsProxyUsername },
+		Tooltip: func() string { return i18n.T().SettingsProxyUsername },
+		Kind:    KindString,
+		Get:     func(c *config.Config) string { return c.Proxy.Username },
+		Set:     func(c *config.Config, v string) error { c.Proxy.Username = v; return nil },
+	},
+	{
+		Section: func() string { return i18n.T().SectionProxy },
+		Label:   func() string { return i18n.T().SettingsProxyPassword },
+		Tooltip: func() string { return i18n.T().SettingsProxyPassword },
+		Kind:    KindPassword,
+		Get:     func(c *config.Config) string { return c.Proxy.Password },
+		Set:     func(c *config.Config, v string) error { c.Proxy.Password = v; return nil },
 	},
 }
 

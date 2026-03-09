@@ -293,6 +293,47 @@
       </div>
     </section>
 
+    <!-- Proxy -->
+    <section class="settings-section anim-in">
+      <div class="section-header"><span>{{ $t('settings.sectionProxy') }}</span></div>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <label class="setting-label">{{ $t('settings.proxyEnabled') }}</label>
+          <label class="toggle">
+            <input type="checkbox" v-model="form.proxyEnabled" @change="save('proxy.enabled', form.proxyEnabled)" />
+            <span class="toggle-track"><span class="toggle-thumb" /></span>
+          </label>
+        </div>
+        <div class="setting-card">
+          <label class="setting-label">{{ $t('settings.proxyType') }}</label>
+          <select class="setting-input" v-model="form.proxyType" @change="save('proxy.type', form.proxyType)">
+            <option v-for="t in proxyTypes" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </div>
+        <div class="setting-card">
+          <label class="setting-label">{{ $t('settings.proxyAddr') }}</label>
+          <div class="input-row">
+            <input type="text" class="setting-input" v-model="form.proxyAddr" placeholder="host:port" />
+            <button class="btn-save" @click="save('proxy.addr', form.proxyAddr)">{{ $t('settings.save') }}</button>
+          </div>
+        </div>
+        <div class="setting-card">
+          <label class="setting-label">{{ $t('settings.proxyUsername') }}</label>
+          <div class="input-row">
+            <input type="text" class="setting-input" v-model="form.proxyUsername" />
+            <button class="btn-save" @click="save('proxy.username', form.proxyUsername)">{{ $t('settings.save') }}</button>
+          </div>
+        </div>
+        <div class="setting-card">
+          <label class="setting-label">{{ $t('settings.proxyPassword') }}</label>
+          <div class="input-row">
+            <input type="password" class="setting-input" v-model="form.proxyPassword" />
+            <button class="btn-save" @click="save('proxy.password', form.proxyPassword)">{{ $t('settings.save') }}</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Saved toast -->
     <Transition name="fade">
       <div v-if="savedMsg" class="saved-toast">{{ $t('settings.saved') }} ✓</div>
@@ -322,6 +363,7 @@ const logLevels = ['trace', 'debug', 'info', 'warn', 'error']
 const logFormats = ['pretty', 'json']
 const orderTypes = ['GTC', 'GTD', 'FOK', 'FAK']
 const sizeModes = ['proportional', 'fixed_pct']
+const proxyTypes = ['socks5', 'http']
 
 const form = reactive({
   language: 'en', logLevel: 'info', logFormat: 'pretty', logFile: '',
@@ -334,6 +376,7 @@ const form = reactive({
   telegramEnabled: false, telegramToken: '', telegramAdminChatId: '',
   databaseEnabled: false, databasePath: 'bot.db',
   webUiEnabled: true, webUiListen: '127.0.0.1:8080', webUiJwtSecret: '',
+  proxyEnabled: false, proxyType: 'socks5', proxyAddr: '', proxyUsername: '', proxyPassword: '',
 })
 
 onMounted(async () => {
@@ -373,6 +416,11 @@ function applySettings(s) {
   if (s.webui?.listen)                          form.webUiListen = s.webui.listen
   // Don't populate password fields with masked "***" value — leave blank so user must re-enter to change
   if (s.webui?.jwt_secret && s.webui.jwt_secret !== '***') form.webUiJwtSecret = s.webui.jwt_secret
+  form.proxyEnabled = !!s.proxy?.enabled
+  if (s.proxy?.type)     form.proxyType = s.proxy.type
+  if (s.proxy?.addr)     form.proxyAddr = s.proxy.addr
+  if (s.proxy?.username) form.proxyUsername = s.proxy.username
+  if (s.proxy?.password && s.proxy.password !== '***') form.proxyPassword = s.proxy.password
 }
 
 async function save(key, value) {

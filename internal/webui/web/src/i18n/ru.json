@@ -132,7 +132,13 @@
     "databasePath": "Путь к базе данных",
     "webUiEnabled": "Web UI включён",
     "webUiListen": "Адрес прослушивания",
-    "webUiJwtSecret": "JWT-секрет"
+    "webUiJwtSecret": "JWT-секрет",
+    "sectionProxy": "Прокси",
+    "proxyEnabled": "Включён",
+    "proxyType": "Тип",
+    "proxyAddr": "Адрес (хост:порт)",
+    "proxyUsername": "Пользователь",
+    "proxyPassword": "Пароль"
   },
   "markets": {
     "title": "Маркеты",
