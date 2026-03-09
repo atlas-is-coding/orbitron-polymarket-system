@@ -317,5 +317,10 @@
   "tg_success_wallet_toggled": "钱包 <code>%s</code> %s。",
   "tg_success_order_cancelled": "订单 <code>%s</code> 已取消。",
   "tg_success_all_cancelled": "所有订单已取消。",
-  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  配置已保存。"
+  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  配置已保存。",
+
+  "tg_health_title": "📡 Polymarket 状态",
+  "tg_health_updated": "%d秒前更新",
+  "tg_health_never": "检查中...",
+  "tg_btn_health_refresh": "🔄 刷新"
 }

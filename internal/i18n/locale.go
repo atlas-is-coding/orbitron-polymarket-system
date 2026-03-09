@@ -363,4 +363,10 @@ type Locale struct {
 	TgSuccessOrderCancelled string `json:"tg_success_order_cancelled"` // "Order <code>%s</code> cancelled."
 	TgSuccessAllCancelled  string `json:"tg_success_all_cancelled"`
 	TgSuccessConfigSaved   string `json:"tg_success_config_saved"`   // "<code>%s</code> = <code>%s</code>  Config saved."
+
+	// Telegram health section in Overview
+	TgHealthTitle      string `json:"tg_health_title"`
+	TgHealthUpdated    string `json:"tg_health_updated"`    // "Updated %ds ago"
+	TgHealthNever      string `json:"tg_health_never"`
+	TgBtnHealthRefresh string `json:"tg_btn_health_refresh"`
 }

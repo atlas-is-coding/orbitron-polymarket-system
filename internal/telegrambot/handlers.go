@@ -231,71 +231,76 @@ func IsSecretKey(key string) bool {
 // --- Inline keyboards ---
 
 func mainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Overview", "cmd:overview"),
-			tgbotapi.NewInlineKeyboardButtonData("📈 Trading", "cmd:trading"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuOverview, "cmd:overview"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuTrading, "cmd:trading"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔄 Copytrading", "cmd:copytrading"),
-			tgbotapi.NewInlineKeyboardButtonData("👛 Wallets", "cmd:wallets"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuCopy, "cmd:copytrading"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuWallets, "cmd:wallets"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏪 Markets", "cmd:markets"),
-			tgbotapi.NewInlineKeyboardButtonData("📝 Logs", "cmd:logs"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuMarkets, "cmd:markets"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuLogs, "cmd:logs"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⚙️ Settings", "cmd:settings"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgMenuSettings, "cmd:settings"),
 		),
 	)
 }
 
 func walletsKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, w := range wallets {
 		label := w.Label
 		if label == "" {
 			label = w.ID
 		}
-		toggleIcon := "▶ Enable"
+		toggleIcon := l.TgBtnEnable
 		if w.Enabled {
-			toggleIcon = "⏸ Disable"
+			toggleIcon = l.TgBtnDisable
 		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				fmt.Sprintf("👛 %s  %s", label, toggleIcon),
 				"wallet:toggle:"+w.ID,
 			),
-			tgbotapi.NewInlineKeyboardButtonData("🗑 Remove", "wallet:remove:"+w.ID),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnRemove, "wallet:remove:"+w.ID),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("➕ Add Wallet", "wallet:add:start"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnAddWallet, "wallet:add:start"),
 	))
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func cancelAllConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ Yes, cancel all", "cancelall:do"),
-			tgbotapi.NewInlineKeyboardButtonData("🚫 No, go back", "cmd:orders"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnYesCancelAll, "cancelall:do"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnNoGoBack, "cmd:orders"),
 		),
 	)
 }
 
 func backKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 		),
 	)
 }
 
 func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, t := range traders {
 		addr := t.Address
@@ -307,46 +312,63 @@ func copytradingKeyboard(traders []config.TraderConfig) tgbotapi.InlineKeyboardM
 		if label == "" {
 			label = short
 		}
-		toggleIcon := "▶ Enable"
+		toggleIcon := l.TgBtnEnable
 		if t.Enabled {
-			toggleIcon = "⏸ Disable"
+			toggleIcon = l.TgBtnDisable
 		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				fmt.Sprintf("%s  %s", label, toggleIcon),
 				"trader:toggle:"+addr,
 			),
-			tgbotapi.NewInlineKeyboardButtonData("✏️ Edit", "trader:edit:"+addr),
-			tgbotapi.NewInlineKeyboardButtonData("🗑 Remove", "trader:remove:"+addr),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnEdit, "trader:edit:"+addr),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnRemove, "trader:remove:"+addr),
 		))
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("➕ Add Trader", "addtrader:start"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnAddTrader, "addtrader:start"),
 	))
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 // settingsSectionsKeyboard returns buttons for each settings section.
+// Callback data uses internal English section keys; button labels are localized.
 func settingsSectionsKeyboard() tgbotapi.InlineKeyboardMarkup {
-	sections := []string{"UI", "Monitor", "Trades Monitor", "Trading", "Copytrading", "Telegram", "Database", "Log", "Auth"}
+	l := i18n.T()
+	// internal key → localized display label
+	type sectionDef struct {
+		key   string
+		label string
+	}
+	sections := []sectionDef{
+		{"UI", l.SectionUI},
+		{"Monitor", l.SectionMonitor},
+		{"Trades Monitor", l.SectionTradesMonitor},
+		{"Trading", l.SectionTrading},
+		{"Copytrading", l.SectionCopytrading},
+		{"Telegram", l.SectionTelegram},
+		{"Database", l.SectionDatabase},
+		{"Log", l.SectionLog},
+		{"Auth", l.SectionAuth},
+	}
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for i := 0; i < len(sections); i += 2 {
 		if i+1 < len(sections) {
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i], "settings:section:"+sections[i]),
-				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i+1], "settings:section:"+sections[i+1]),
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i].label, "settings:section:"+sections[i].key),
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i+1].label, "settings:section:"+sections[i+1].key),
 			))
 		} else {
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i], "settings:section:"+sections[i]),
+				tgbotapi.NewInlineKeyboardButtonData("⚙️ "+sections[i].label, "settings:section:"+sections[i].key),
 			))
 		}
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -392,8 +414,8 @@ func langPickerKeyboard(currentLang string) tgbotapi.InlineKeyboardMarkup {
 		}
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Settings", "cmd:settings"),
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T().TgBtnBackSettings, "cmd:settings"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T().TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -443,19 +465,20 @@ func sectionFieldsKeyboard(_ string, keys []string, cfg *config.Config, isAdmin 
 		}
 	}
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Settings", "cmd:settings"),
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T().TgBtnBackSettings, "cmd:settings"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T().TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboardMarkup {
-	ordersLabel := "📋 Orders"
-	posLabel := "💼 Positions"
+	l := i18n.T()
+	ordersLabel := l.TgBtnOrders
+	posLabel := l.TgBtnPositions
 	if subTab == "orders" {
-		ordersLabel = "📋 Orders ✓"
+		ordersLabel = l.TgBtnOrders + " ✓"
 	} else {
-		posLabel = "💼 Positions ✓"
+		posLabel = l.TgBtnPositions + " ✓"
 	}
 
 	var rows [][]tgbotapi.InlineKeyboardButton
@@ -466,20 +489,20 @@ func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboa
 
 	if subTab == "orders" {
 		for i, o := range orders {
-			label := fmt.Sprintf("❌ Cancel #%d (%s)", i+1, o.Side)
+			label := fmt.Sprintf(l.TgBtnCancelOrder, i+1, o.Side)
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(label, "cancel:"+o.ID),
 			))
 		}
 		if len(orders) > 0 {
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("❌ Cancel ALL", "cancelall:confirm"),
+				tgbotapi.NewInlineKeyboardButtonData(l.TgBtnCancelAll, "cancelall:confirm"),
 			))
 		}
 	}
 
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -539,9 +562,9 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 			rows = append(rows, row)
 		}
 		// "All" filter
-		allLabel := "🌐 All markets"
+		allLabel := i18n.T().TgBtnAllMarkets
 		if currentTag == "" {
-			allLabel = "✓ 🌐 All markets"
+			allLabel = "✓ " + allLabel
 		}
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(allLabel, "markets:tag:"),
@@ -574,7 +597,7 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 	}
 
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+		tgbotapi.NewInlineKeyboardButtonData(i18n.T().TgBtnMainMenu, "cmd:menu"),
 	))
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -583,6 +606,7 @@ func marketsListKeyboard(mkts []gamma.Market, tags []gamma.Tag, currentTag strin
 // conditionID is used to route YES/NO quick buy callbacks.
 // yesPrice and noPrice are pre-filled price strings (e.g. "0.72"), "" if unavailable.
 func marketDetailKeyboard(conditionID, yesPrice, noPrice string) tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	yesLabel := "💚 YES"
 	if yesPrice != "" {
 		yesLabel = "💚 YES " + yesPrice
@@ -597,34 +621,36 @@ func marketDetailKeyboard(conditionID, yesPrice, noPrice string) tgbotapi.Inline
 			tgbotapi.NewInlineKeyboardButtonData(noLabel, "quickbuy:NO:"+conditionID),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 Full Order", "order:start"),
-			tgbotapi.NewInlineKeyboardButtonData("🔔 Set Alert", "market:alert"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnFullOrder, "order:start"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnSetAlert, "market:alert"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("← Markets", "cmd:markets"),
-			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnBackMarkets, "cmd:markets"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 		),
 	}
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func orderSideKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📈 YES (Buy)", "order:side:YES"),
-			tgbotapi.NewInlineKeyboardButtonData("📉 NO (Sell)", "order:side:NO"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnBuySide, "order:side:YES"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnSellSide, "order:side:NO"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("← Market", "market:back"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnBackMarket, "market:back"),
 		),
 	)
 }
 
 func orderTypeKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("GTC (Good Till Cancel)", "order:type:GTC"),
-			tgbotapi.NewInlineKeyboardButtonData("FOK (Fill or Kill)", "order:type:FOK"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnGTC, "order:type:GTC"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnFOK, "order:type:FOK"),
 		),
 	)
 }
@@ -647,33 +673,36 @@ func orderWalletKeyboard(wallets []WalletEntry) tgbotapi.InlineKeyboardMarkup {
 }
 
 func orderConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ Confirm", "order:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "market:back"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnConfirm, "order:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnCancel, "market:back"),
 		),
 	)
 }
 
 func quickbuyConfirmKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ Confirm", "quickbuy:confirm"),
-			tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "market:back"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnConfirm, "quickbuy:confirm"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnCancel, "market:back"),
 		),
 	)
 }
 
 // alertDirectionKeyboard builds the alert direction picker keyboard.
 func alertDirectionKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📈 Above (price rises above)", "alert:above"),
-			tgbotapi.NewInlineKeyboardButtonData("📉 Below (price falls below)", "alert:below"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnAboveAlert, "alert:above"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnBelowAlert, "alert:below"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("← Market", "market:back"),
-			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnBackMarket, "market:back"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 		),
 	)
 }
@@ -699,7 +728,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		}
 		b.doCancelOrder(ctx, msg.Chat.ID, id)
 	case "cancelall":
-		b.sendWithKeyboard(msg.Chat.ID, "⚠️ Cancel ALL open orders?", cancelAllConfirmKeyboard())
+		b.sendWithKeyboard(msg.Chat.ID, i18n.T().TgTitleCancelConfirm, cancelAllConfirmKeyboard())
 	case "positions":
 		b.sendTrading(msg.Chat.ID, "positions")
 	case "wallets":
@@ -748,7 +777,7 @@ func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 		}
 		b.doSetSetting(ctx, msg.Chat.ID, args[0], strings.Join(args[1:], " "))
 	default:
-		b.sendText(msg.Chat.ID, "❓ Неизвестная команда.\n\nИспользуйте /start для главного меню.")
+		b.sendText(msg.Chat.ID, i18n.T().TgErrUnknownCmd)
 	}
 }
 
@@ -792,22 +821,22 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(data, "edit:"):
 		key := strings.TrimPrefix(data, "edit:")
 		b.state.SetPending("edit:"+key, "")
-		b.sendText(chatID, fmt.Sprintf("✏️ Введите новое значение для <code>%s</code>:\n<i>(или /menu для отмены)</i>", key))
+		b.sendText(chatID, fmt.Sprintf(i18n.T().TgInputEditKey, key))
 	case data == "cmd:wallets":
 		b.sendWallets(chatID)
 	case data == "wallet:add:start":
 		b.state.SetPending("wallet_add_key", "")
-		b.sendText(chatID, "🔑 Введите <b>private key</b> кошелька (hex, без 0x префикса):\n<i>(или /menu для отмены)</i>")
+		b.sendText(chatID, i18n.T().TgInputPrivKey)
 	case strings.HasPrefix(data, "wallet:remove:"):
 		id := strings.TrimPrefix(data, "wallet:remove:")
 		b.state.SetPending("wallet_remove_confirm", id)
-		b.sendText(chatID, fmt.Sprintf("⚠️ Удалить кошелёк <code>%s</code>? Введите <b>yes</b> для подтверждения:", id))
+		b.sendText(chatID, fmt.Sprintf(i18n.T().TgInputDeleteWallet, id))
 	case strings.HasPrefix(data, "wallet:toggle:"):
 		id := strings.TrimPrefix(data, "wallet:toggle:")
 		b.doToggleWallet(ctx, chatID, id)
 		b.sendWallets(chatID)
 	case data == "cancelall:confirm":
-		b.sendWithKeyboard(chatID, "⚠️ Are you sure you want to cancel ALL orders?", cancelAllConfirmKeyboard())
+		b.sendWithKeyboard(chatID, i18n.T().TgTitleCancelConfirm, cancelAllConfirmKeyboard())
 	case data == "cancelall:do":
 		b.doCancelAll(ctx, chatID)
 	case strings.HasPrefix(data, "cancel:"):
@@ -816,7 +845,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(data, "trader:edit:"):
 		addr := strings.TrimPrefix(data, "trader:edit:")
 		b.state.SetPending("edittrader_label", addr)
-		b.sendText(chatID, fmt.Sprintf("✏️ <b>Edit Trader</b> <code>%s</code>\n\nВведите новый label (или <code>-</code> чтобы оставить пустым):", addr))
+		b.sendText(chatID, fmt.Sprintf(i18n.T().TgInputEditTrader, addr))
 	case strings.HasPrefix(data, "trader:toggle:"):
 		addr := strings.TrimPrefix(data, "trader:toggle:")
 		b.doToggleTrader(ctx, chatID, addr)
@@ -827,7 +856,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.sendCopytrading(chatID)
 	case data == "addtrader:start":
 		b.state.SetPending("addtrader_addr", "")
-		b.sendText(chatID, "📝 Введите адрес кошелька трейдера:\n<i>(или /menu для отмены)</i>")
+		b.sendText(chatID, i18n.T().TgInputTraderAddr)
 	case data == "cmd:trading":
 		b.sendTrading(chatID, "orders")
 	case data == "trading:orders":
@@ -845,12 +874,12 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		idxStr := strings.TrimPrefix(data, "market:detail:")
 		idx, err := strconv.Atoi(idxStr)
 		if err != nil {
-			b.sendText(chatID, RenderError("Invalid market index"))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketNotFound))
 			return
 		}
 		m, ok := b.state.ViewMarket(idx)
 		if !ok {
-			b.sendText(chatID, RenderError("Market not found. Please refresh the market list."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketNotFound))
 			return
 		}
 		b.sendMarketDetail(chatID, m)
@@ -858,34 +887,34 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		// Ask for direction; conditionID is in pendingData
 		_, condID := b.state.Pending()
 		if condID == "" {
-			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketCtxLost))
 			return
 		}
-		b.sendOrEdit(chatID, "🔔 <b>Set Alert</b>\n\nВыберите направление:", alertDirectionKeyboard())
+		b.sendOrEdit(chatID, i18n.T().TgTitleSetAlert, alertDirectionKeyboard())
 	case data == "alert:above":
 		_, condID := b.state.Pending()
 		if condID == "" {
-			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketCtxLost))
 			return
 		}
 		b.state.SetPending("alert_threshold", "above|"+condID)
-		b.sendText(chatID, "📈 Введите цену порога (0.01–0.99), <b>выше</b> которого придёт алерт:\n<i>(или /menu для отмены)</i>")
+		b.sendText(chatID, i18n.T().TgInputAlertAbove)
 	case data == "alert:below":
 		_, condID := b.state.Pending()
 		if condID == "" {
-			b.sendText(chatID, RenderError("Market context lost. Please reopen the market."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketCtxLost))
 			return
 		}
 		b.state.SetPending("alert_threshold", "below|"+condID)
-		b.sendText(chatID, "📉 Введите цену порога (0.01–0.99), <b>ниже</b> которого придёт алерт:\n<i>(или /menu для отмены)</i>")
+		b.sendText(chatID, i18n.T().TgInputAlertBelow)
 	case data == "order:start":
 		_, condID := b.state.Pending()
 		if condID == "" {
-			b.sendText(chatID, RenderError("Market context lost. Reopen the market."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketCtxLost))
 			return
 		}
 		if b.mkts == nil {
-			b.sendText(chatID, RenderError("Markets service unavailable"))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketsUnavail))
 			return
 		}
 		mkt, ok := b.mkts.GetMarket(condID)
@@ -894,7 +923,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 			tokenID = string(mkt.ClobTokenIDs[0])
 		}
 		b.state.SetPending("order_side", condID+"|"+tokenID)
-		b.sendOrEdit(chatID, "📊 <b>Place Order</b>\n\nВыберите сторону:", orderSideKeyboard())
+		b.sendOrEdit(chatID, i18n.T().TgTitlePlaceOrder, orderSideKeyboard())
 
 	case strings.HasPrefix(data, "order:side:"):
 		side := strings.TrimPrefix(data, "order:side:")
@@ -913,9 +942,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 			}
 		}
 		b.state.SetPending("order_price", condID+"|"+tokenID+"|"+side)
-		b.sendText(chatID, fmt.Sprintf(
-			"📊 Side: <b>%s</b>\n\nВведите цену (0.01–0.99):\n<i>(или /menu для отмены)</i>", side,
-		))
+		b.sendText(chatID, fmt.Sprintf(i18n.T().TgInputOrderPrice, side))
 
 	case strings.HasPrefix(data, "order:type:"):
 		orderType := strings.TrimPrefix(data, "order:type:")
@@ -928,7 +955,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 			}
 		}
 		if len(enabled) == 0 {
-			b.sendText(chatID, RenderError("Нет активных кошельков."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrNoWallets))
 			return
 		}
 		if len(enabled) == 1 {
@@ -937,7 +964,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 			return
 		}
 		b.state.SetPending("order_wallet", orderData+"|"+orderType)
-		b.sendOrEdit(chatID, "👛 <b>Выберите кошелёк:</b>", orderWalletKeyboard(enabled))
+		b.sendOrEdit(chatID, i18n.T().TgTitleSelectWallet, orderWalletKeyboard(enabled))
 
 	case strings.HasPrefix(data, "order:wallet:"):
 		walletID := strings.TrimPrefix(data, "order:wallet:")
@@ -965,7 +992,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		}
 		mkt, ok := b.mkts.GetMarket(condID)
 		if !ok {
-			b.sendText(chatID, RenderError("Market not found. Please refresh."))
+			b.sendText(chatID, RenderError(i18n.T().TgErrMarketNotFound))
 			return
 		}
 		tokenID := ""
@@ -983,10 +1010,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		// pendingData: condID|tokenID|side|price
 		pendingData := fmt.Sprintf("%s|%s|%s|%.4f", condID, tokenID, side, price)
 		b.state.SetPending("market_quickbuy_size", pendingData)
-		b.sendText(chatID, fmt.Sprintf(
-			"💚 <b>Quick Buy %s</b>\n<i>%s</i>\n\nPrice: <b>%.4f</b>\n\nВведите размер ставки в USD:",
-			side, mkt.Question, price,
-		))
+		b.sendText(chatID, fmt.Sprintf(i18n.T().TgInputQuickBuySize, side, mkt.Question, price))
 
 	// Quick buy — Step 3: confirm
 	case data == "quickbuy:confirm":
@@ -1012,8 +1036,22 @@ func (b *Bot) sendOverview(chatID int64) {
 	subsystems := b.state.Subsystems()
 	orders := b.state.Orders()
 	positions := b.state.Positions()
+	snap, loaded := b.state.Health()
 	text := RenderOverview(b.state.Balance(), subsystems, len(orders), len(positions))
-	b.sendOrEdit(chatID, text, backKeyboard())
+	text += RenderHealth(snap, loaded)
+	b.sendOrEdit(chatID, text, overviewKeyboard())
+}
+
+func overviewKeyboard() tgbotapi.InlineKeyboardMarkup {
+	l := i18n.T()
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnHealthRefresh, "cmd:overview"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
+		),
+	)
 }
 
 func (b *Bot) sendTrading(chatID int64, subTab string) {
@@ -1040,8 +1078,9 @@ func (b *Bot) sendWallets(chatID int64) {
 }
 
 func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
+	l := i18n.T()
 	if b.wallets == nil {
-		b.sendText(chatID, RenderError("Wallet manager unavailable"))
+		b.sendText(chatID, RenderError(l.TgErrWalletManagerNA))
 		return
 	}
 	enabled := b.wallets.WalletEnabled(id)
@@ -1049,18 +1088,19 @@ func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
 		b.sendText(chatID, RenderError(err.Error()))
 		return
 	}
-	status := "disabled"
+	status := l.TgStatusDisabled
 	if !enabled {
-		status = "enabled"
+		status = l.TgStatusEnabled
 	}
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Wallet <code>%s</code> %s.", id, status)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessWalletToggled, id, status)))
 }
 
 func (b *Bot) sendLogs(chatID int64) {
+	l := i18n.T()
 	logsKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", "cmd:logs"),
-			tgbotapi.NewInlineKeyboardButtonData("← Главное меню", "cmd:menu"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnRefresh, "cmd:logs"),
+			tgbotapi.NewInlineKeyboardButtonData(l.TgBtnMainMenu, "cmd:menu"),
 		),
 	)
 	b.sendOrEdit(chatID, RenderLogs(b.state.Logs()), logsKeyboard)
@@ -1069,7 +1109,7 @@ func (b *Bot) sendLogs(chatID int64) {
 
 func (b *Bot) sendMarkets(chatID int64, tagSlug string) {
 	if b.mkts == nil {
-		b.sendOrEdit(chatID, "🏪 <b>Markets</b>\n\n<i>Markets service not running.</i>", backKeyboard())
+		b.sendOrEdit(chatID, i18n.T().TgMarketsNA, backKeyboard())
 		return
 	}
 	mkts := b.mkts.GetByTag(tagSlug)
@@ -1107,13 +1147,11 @@ func (b *Bot) sendLanguagePicker(chatID int64) {
 	if currentLang == "" {
 		currentLang = "en"
 	}
-	text := "🌐 <b>Язык интерфейса</b>\n\nВыберите язык:"
-	b.sendOrEdit(chatID, text, langPickerKeyboard(currentLang))
+	b.sendOrEdit(chatID, i18n.T().TgTitleLanguage, langPickerKeyboard(currentLang))
 }
 
 func (b *Bot) sendSettings(chatID int64) {
-	text := "⚙️ <b>Settings</b>\n\nВыберите раздел для просмотра и редактирования:"
-	b.sendOrEdit(chatID, text, settingsSectionsKeyboard())
+	b.sendOrEdit(chatID, i18n.T().TgTitleSettings, settingsSectionsKeyboard())
 }
 
 // sectionKeys maps display section names to their dot-notation config keys.
@@ -1132,7 +1170,7 @@ var sectionKeys = map[string][]string{
 func (b *Bot) sendSettingsSection(chatID int64, sectionName string) {
 	keys, ok := sectionKeys[sectionName]
 	if !ok {
-		b.sendText(chatID, RenderError("Unknown section: "+sectionName))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrUnknownSection, sectionName)))
 		return
 	}
 	isAdmin := b.isAdmin(chatID)
@@ -1163,32 +1201,35 @@ func (b *Bot) sendSettingsSection(chatID int64, sectionName string) {
 // --- Action helpers ---
 
 func (b *Bot) doCancelOrder(_ context.Context, chatID int64, orderID string) {
+	l := i18n.T()
 	if b.canceler == nil {
-		b.sendText(chatID, RenderError("Order cancellation unavailable (TradesMonitor not enabled)"))
+		b.sendText(chatID, RenderError(l.TgErrCancelUnavail))
 		return
 	}
 	if err := b.canceler.CancelOrder(orderID); err != nil {
 		b.sendText(chatID, RenderError(err.Error()))
 		return
 	}
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Order <code>%s</code> cancelled.", orderID)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessOrderCancelled, orderID)))
 }
 
 func (b *Bot) doCancelAll(_ context.Context, chatID int64) {
+	l := i18n.T()
 	if b.canceler == nil {
-		b.sendText(chatID, RenderError("Order cancellation unavailable (TradesMonitor not enabled)"))
+		b.sendText(chatID, RenderError(l.TgErrCancelUnavail))
 		return
 	}
 	if err := b.canceler.CancelAllOrders(); err != nil {
 		b.sendText(chatID, RenderError(err.Error()))
 		return
 	}
-	b.sendText(chatID, RenderSuccess("All orders cancelled."))
+	b.sendText(chatID, RenderSuccess(l.TgSuccessAllCancelled))
 }
 
 func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
+	l := i18n.T()
 	if IsSecretKey(key) && !b.isAdmin(chatID) {
-		b.sendText(chatID, RenderError(fmt.Sprintf("Key %q requires admin access.", key)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyAdmin, key)))
 		return
 	}
 
@@ -1196,7 +1237,7 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 	cfgCopy := *b.cfg
 	if err := SetSetting(&cfgCopy, key, value); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Invalid value for %q: %v", key, err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyInvalid, key, err)))
 		return
 	}
 
@@ -1207,7 +1248,7 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
@@ -1216,12 +1257,13 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 	// Notify TUI of config change via EventBus
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
 
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("<code>%s</code> = <code>%s</code>\nConfig saved. TUI updated.", key, value)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessConfigSaved, key, value)))
 }
 
 func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
+	l := i18n.T()
 	if IsSecretKey(key) && !b.isAdmin(chatID) {
-		b.sendText(chatID, RenderError(fmt.Sprintf("Key %q requires admin access.", key)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyAdmin, key)))
 		return
 	}
 	b.cfgMu.Lock()
@@ -1229,7 +1271,7 @@ func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
 	cur, ok := GetSetting(&cfgCopy, key)
 	if !ok {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Unknown key: %q", key)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyUnknown, key)))
 		return
 	}
 	newVal := "true"
@@ -1246,14 +1288,14 @@ func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
 	}
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
 
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("<code>%s</code> = <code>%s</code>  Config saved.", key, newVal)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessConfigSaved, key, newVal)))
 }
 
 func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
@@ -1278,7 +1320,7 @@ func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
 	for _, t := range cfgCopy.Copytrading.Traders {
 		if t.Address == addr {
 			b.cfgMu.Unlock()
-			b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q already exists.", addr)))
+			b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrTraderExists, addr)))
 			return
 		}
 	}
@@ -1294,14 +1336,14 @@ func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
 
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
 
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> added (label: %s, alloc: %.1f%%).", addr, label, allocPct)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderAdded, addr, label, allocPct)))
 }
 
 func (b *Bot) doRemoveTrader(_ context.Context, chatID int64, addr string) {
@@ -1321,23 +1363,24 @@ func (b *Bot) doRemoveTrader(_ context.Context, chatID int64, addr string) {
 	}
 	if !found {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrTraderNotFound, addr)))
 		return
 	}
 
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
 
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> removed.", addr)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderRemoved, addr)))
 }
 
 func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
+	l := i18n.T()
 	b.cfgMu.Lock()
 	cfgCopy := *b.cfg
 	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
@@ -1356,24 +1399,24 @@ func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
 	}
 	if !found {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrTraderNotFound, addr)))
 		return
 	}
 
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save config: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
 
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
-	state := "disabled"
+	state := l.TgStatusDisabled
 	if newState {
-		state = "enabled"
+		state = l.TgStatusEnabled
 	}
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf("Trader <code>%s</code> %s.", addr, state)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessTraderToggled, addr, state)))
 }
 
 func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, allocPct, maxPos float64) {
@@ -1395,27 +1438,25 @@ func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, 
 	}
 	if !found {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Trader %q not found.", addr)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrTraderNotFound, addr)))
 		return
 	}
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError(fmt.Sprintf("Failed to save: %v", err)))
+		b.sendText(chatID, RenderError(fmt.Sprintf(i18n.T().TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
 	b.bus.Send(tui.ConfigReloadedMsg{Config: b.cfg})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
-		"Trader <code>%s</code> updated.\nlabel: %s | alloc: %.1f%% | max: $%.0f",
-		addr, label, allocPct, maxPos,
-	)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderUpdated, addr, label, allocPct, maxPos)))
 }
 
 func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
+	l := i18n.T()
 	l1, err := auth.NewL1Signer(strings.TrimPrefix(privateKey, "0x"))
 	if err != nil {
-		b.sendText(chatID, RenderError("Invalid private key: "+err.Error()))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrInvalidPrivKey, err.Error())))
 		return
 	}
 	addr := l1.Address()
@@ -1424,7 +1465,7 @@ func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
 		existing, err2 := auth.NewL1Signer(wc.PrivateKey)
 		if err2 == nil && existing.Address() == addr {
 			b.cfgMu.Unlock()
-			b.sendText(chatID, RenderError("Кошелёк уже существует: "+addr))
+			b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrWalletExists, addr)))
 			return
 		}
 	}
@@ -1447,7 +1488,7 @@ func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
 	cfgCopy.Wallets = newWallets
 	if err := config.Save(b.cfgPath, &cfgCopy); err != nil {
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderError("Failed to save: "+err.Error()))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrSaveFailed, err)))
 		return
 	}
 	*b.cfg = cfgCopy
@@ -1456,12 +1497,11 @@ func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
 		b.adder.AddInactive(wCfg)
 	}
 	b.bus.Send(tui.WalletAddedMsg{ID: id, Label: wCfg.Label, Enabled: true})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
-		"Кошелёк добавлен.\nAddress: <code>%s</code>\nID: <code>%s</code>", addr, id,
-	)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessWalletAdded, addr, id)))
 }
 
 func (b *Bot) doRemoveWallet(_ context.Context, chatID int64, id string) {
+	l := i18n.T()
 	type remover interface{ Remove(id string) error }
 	if r, ok := b.wallets.(remover); ok {
 		if err := r.Remove(id); err != nil {
@@ -1481,36 +1521,35 @@ func (b *Bot) doRemoveWallet(_ context.Context, chatID int64, id string) {
 		_ = config.Save(b.cfgPath, &cfgCopy)
 		*b.cfg = cfgCopy
 		b.cfgMu.Unlock()
-		b.sendText(chatID, RenderSuccess(fmt.Sprintf("Кошелёк <code>%s</code> удалён.", id)))
+		b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessWalletRemoved, id)))
 		return
 	}
-	b.sendText(chatID, RenderError("Remove not supported by wallet manager"))
+	b.sendText(chatID, RenderError(l.TgErrRemoveNotSupported))
 }
 
 func (b *Bot) sendOrderConfirm(chatID int64) {
+	l := i18n.T()
 	_, orderData := b.state.Pending()
 	// format: condID|tokenID|side|price|size|orderType|walletID
 	parts := strings.Split(orderData, "|")
 	if len(parts) < 7 {
-		b.sendText(chatID, RenderError("Потеряны данные ордера. Начните заново."))
+		b.sendText(chatID, RenderError(l.TgErrOrderDataLost))
 		return
 	}
 	side, price, size, orderType, walletID := parts[2], parts[3], parts[4], parts[5], parts[6]
-	text := fmt.Sprintf(
-		"📊 <b>Подтвердите ордер</b>\n\nСторона: <b>%s</b>\nЦена: <b>%s</b>\nРазмер: <b>$%s</b>\nТип: <b>%s</b>\nКошелёк: <b>%s</b>",
-		side, price, size, orderType, walletID,
-	)
+	text := fmt.Sprintf(l.TgTitleConfirmOrder, side, price, size, orderType, walletID)
 	b.sendOrEdit(chatID, text, orderConfirmKeyboard())
 }
 
 func (b *Bot) doPlaceOrder(_ context.Context, chatID int64, orderData string) {
+	l := i18n.T()
 	if b.placer == nil {
-		b.sendText(chatID, RenderError("Order placement unavailable"))
+		b.sendText(chatID, RenderError(l.TgErrOrderUnavail))
 		return
 	}
 	parts := strings.Split(orderData, "|")
 	if len(parts) < 7 {
-		b.sendText(chatID, RenderError("Данные ордера повреждены."))
+		b.sendText(chatID, RenderError(l.TgErrOrderCorrupt))
 		return
 	}
 	tokenID, side, priceStr, sizeStr, orderType, walletID := parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
@@ -1519,11 +1558,8 @@ func (b *Bot) doPlaceOrder(_ context.Context, chatID int64, orderData string) {
 
 	orderID, err := b.placer.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD)
 	if err != nil {
-		b.sendText(chatID, RenderError("Ошибка размещения ордера: "+err.Error()))
+		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrOrderPlace, err.Error())))
 		return
 	}
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf(
-		"Ордер размещён!\n\nID: <code>%s</code>\nСторона: <b>%s</b> | Цена: <b>%.4f</b> | Размер: <b>$%.2f</b>",
-		orderID, side, price, sizeUSD,
-	)))
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessOrderPlaced, orderID, side, price, sizeUSD)))
 }

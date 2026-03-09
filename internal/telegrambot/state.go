@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
+	"github.com/atlasdev/polytrade-bot/internal/health"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
 
@@ -37,6 +38,10 @@ type BotState struct {
 
 	// Recent copy trades feed (capped at 10).
 	copyTrades []string
+
+	// Health: latest snapshot from health.Service.
+	healthSnap   health.HealthSnapshot
+	healthLoaded bool
 
 	// Markets: snapshot of the currently displayed market list (for index-based navigation).
 	viewMarkets []gamma.Market
@@ -225,6 +230,21 @@ func (s *BotState) CopyTrades() []string {
 }
 
 // --- Markets navigation state ---
+
+// --- Health state ---
+
+func (s *BotState) SetHealth(snap health.HealthSnapshot) {
+	s.mu.Lock()
+	s.healthSnap = snap
+	s.healthLoaded = true
+	s.mu.Unlock()
+}
+
+func (s *BotState) Health() (health.HealthSnapshot, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.healthSnap, s.healthLoaded
+}
 
 // SetViewMarkets stores the current market list snapshot (for index-based callbacks).
 func (s *BotState) SetViewMarkets(markets []gamma.Market) {

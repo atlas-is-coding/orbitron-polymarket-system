@@ -15,6 +15,7 @@ import (
 
 	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
 	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/polytrade-bot/internal/i18n"
 	"github.com/atlasdev/polytrade-bot/internal/markets"
 	"github.com/atlasdev/polytrade-bot/internal/tui"
 )
@@ -223,8 +224,11 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 	case tui.CopytradingTradeMsg:
 		b.state.AddCopyTrade(m.Line)
 
+	case tui.HealthSnapshotMsg:
+		b.state.SetHealth(m.Snapshot)
+
 	case tui.LanguageChangedMsg:
-		// no-op: Telegram bot uses hardcoded strings; handler present for completeness
+		// no-op: all strings are fetched via i18n.T() at call time, so they update automatically
 
 	case tui.MarketAlertMsg:
 		// Forward triggered market price alert as a notification message.
@@ -344,11 +348,11 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 	switch input {
 	case "addtrader_addr":
 		if text == "" {
-			b.sendText(msg.Chat.ID, RenderError("Адрес не может быть пустым."))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrAddrEmpty))
 			return
 		}
 		b.state.SetPending("addtrader_label", text)
-		b.sendText(msg.Chat.ID, "🏷 Введите label (отображаемое имя) или <code>-</code> для пропуска:")
+		b.sendText(msg.Chat.ID, i18n.T().TgInputTraderLabel)
 
 	case "addtrader_label":
 		addr := data
@@ -357,7 +361,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			label = ""
 		}
 		b.state.SetPending("addtrader_alloc", addr+"|"+label)
-		b.sendText(msg.Chat.ID, "📊 Введите allocation % (например <code>5</code>) или <code>-</code> для значения по умолчанию (5%):")
+		b.sendText(msg.Chat.ID, i18n.T().TgInputTraderAlloc)
 
 	case "addtrader_alloc":
 		parts := strings.SplitN(data, "|", 2)
@@ -379,7 +383,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 
 	case "wallet_add_key":
 		if text == "" {
-			b.sendText(msg.Chat.ID, RenderError("Private key не может быть пустым."))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrPrivKeyEmpty))
 			return
 		}
 		b.state.ClearPending()
@@ -390,7 +394,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		id := data
 		b.state.ClearPending()
 		if strings.ToLower(text) != "yes" {
-			b.sendText(msg.Chat.ID, "Отменено.")
+			b.sendText(msg.Chat.ID, i18n.T().TgErrCancelled)
 			b.sendWallets(msg.Chat.ID)
 			return
 		}
@@ -404,7 +408,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			label = ""
 		}
 		b.state.SetPending("edittrader_alloc", addr+"|"+label)
-		b.sendText(msg.Chat.ID, "📊 Введите allocation % (например <code>5</code>) или <code>-</code> для значения по умолчанию:")
+		b.sendText(msg.Chat.ID, i18n.T().TgInputEditTraderAlloc)
 
 	case "edittrader_alloc":
 		parts := strings.SplitN(data, "|", 2)
@@ -417,7 +421,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			allocPct = text
 		}
 		b.state.SetPending("edittrader_maxpos", addr+"|"+label+"|"+allocPct)
-		b.sendText(msg.Chat.ID, "💰 Введите max position USD (например <code>50</code>) или <code>-</code> для значения по умолчанию:")
+		b.sendText(msg.Chat.ID, i18n.T().TgInputMaxPos)
 
 	case "edittrader_maxpos":
 		parts := strings.SplitN(data, "|", 3)
@@ -445,40 +449,38 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 	case "order_price":
 		price, err := strconv.ParseFloat(text, 64)
 		if err != nil || price <= 0.01 || price >= 0.99 {
-			b.sendText(msg.Chat.ID, RenderError("Введите число от 0.01 до 0.99"))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrPriceRange))
 			return
 		}
 		b.state.SetPending("order_size", data+"|"+text)
-		b.sendText(msg.Chat.ID, fmt.Sprintf(
-			"📊 Цена: <b>%.4f</b>\n\nВведите размер позиции в USD:", price,
-		))
+		b.sendText(msg.Chat.ID, fmt.Sprintf(i18n.T().TgInputOrderSize, price))
 
 	case "order_size":
 		size, err := strconv.ParseFloat(text, 64)
 		if err != nil || size <= 0 {
-			b.sendText(msg.Chat.ID, RenderError("Введите положительное число USD"))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrPositiveNum))
 			return
 		}
 		b.state.SetPending("order_type", data+"|"+text)
-		b.sendOrEdit(msg.Chat.ID, "📊 <b>Тип ордера:</b>", orderTypeKeyboard())
+		b.sendOrEdit(msg.Chat.ID, i18n.T().TgTitleOrderType, orderTypeKeyboard())
 
 	case "alert_threshold":
 		parts := strings.SplitN(data, "|", 2)
 		if len(parts) != 2 {
 			b.state.ClearPending()
-			b.sendText(msg.Chat.ID, RenderError("Внутренняя ошибка: неверный формат данных алерта."))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrAlertDataFmt))
 			return
 		}
 		direction := parts[0]
 		condID := parts[1]
 		threshold, err := strconv.ParseFloat(text, 64)
 		if err != nil || threshold <= 0 || threshold >= 1 {
-			b.sendText(msg.Chat.ID, RenderError("Введите число от 0.01 до 0.99"))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrPriceRange))
 			return
 		}
 		b.state.ClearPending()
 		if b.mkts == nil {
-			b.sendText(msg.Chat.ID, RenderError("Markets service unavailable"))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrMarketsUnavail))
 			return
 		}
 		alertID := b.mkts.AddAlert(markets.AlertRule{
@@ -491,7 +493,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			dirIcon = "📉"
 		}
 		b.sendText(msg.Chat.ID, RenderSuccess(fmt.Sprintf(
-			"Алерт создан! %s Price %s <b>%.3f</b>\n<code>ID: %s</code>",
+			i18n.T().TgSuccessAlertCreated,
 			dirIcon, direction, threshold, alertID,
 		)))
 
@@ -500,7 +502,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		// data: condID|tokenID|side|price
 		size, err := strconv.ParseFloat(text, 64)
 		if err != nil || size <= 0 {
-			b.sendText(msg.Chat.ID, RenderError("Введите положительное число USD"))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrPositiveNum))
 			return
 		}
 		// Find primary wallet
@@ -530,14 +532,14 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 			}
 		}
 		if walletID == "" {
-			b.sendText(msg.Chat.ID, RenderError("Нет активных кошельков."))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrNoWallets))
 			return
 		}
 		// Parse stored data
 		parts := strings.SplitN(data, "|", 4)
 		if len(parts) < 4 {
 			b.state.ClearPending()
-			b.sendText(msg.Chat.ID, RenderError("Потеряны данные ордера. Начните заново."))
+			b.sendText(msg.Chat.ID, RenderError(i18n.T().TgErrOrderDataLost))
 			return
 		}
 		condID, tokenID, side, priceStr := parts[0], parts[1], parts[2], parts[3]
@@ -546,10 +548,7 @@ func (b *Bot) handlePendingInput(ctx context.Context, msg *tgbotapi.Message) {
 		// orderData format reused by doPlaceOrder: condID|tokenID|side|price|size|GTC|walletID
 		orderData := fmt.Sprintf("%s|%s|%s|%s|%.2f|GTC|%s", condID, tokenID, side, priceStr, size, walletID)
 		b.state.SetPending("market_quickbuy_confirm", orderData)
-		confirmText := fmt.Sprintf(
-			"📊 <b>Подтвердите Quick Buy %s</b>\n\nЦена: <b>%.4f</b>\nРазмер: <b>$%.2f</b>\nКошелёк: <b>%s</b>\nСтоимость: <b>$%.2f</b>",
-			side, price, size, walletLabel, cost,
-		)
+		confirmText := fmt.Sprintf(i18n.T().TgTitleConfirmQB, side, price, size, walletLabel, cost)
 		b.sendOrEdit(msg.Chat.ID, confirmText, quickbuyConfirmKeyboard())
 
 	case "market_view":

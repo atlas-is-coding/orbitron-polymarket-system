@@ -317,5 +317,10 @@
   "tg_success_wallet_toggled": "지갑 <code>%s</code> %s.",
   "tg_success_order_cancelled": "주문 <code>%s</code> 취소됨.",
   "tg_success_all_cancelled": "모든 주문이 취소되었습니다.",
-  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  설정이 저장되었습니다."
+  "tg_success_config_saved": "<code>%s</code> = <code>%s</code>  설정이 저장되었습니다.",
+
+  "tg_health_title": "📡 Polymarket 상태",
+  "tg_health_updated": "%d초 전 업데이트",
+  "tg_health_never": "확인 중...",
+  "tg_btn_health_refresh": "🔄 새로고침"
 }
