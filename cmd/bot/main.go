@@ -124,10 +124,25 @@ func run() error {
 	if proxyDial != nil {
 		log.Info().Str("type", cfg.Proxy.Type).Str("addr", cfg.Proxy.Addr).Msg("proxy enabled")
 	}
+
+	// --- Geoblock check ---
+	if geo, geoErr := health.CheckGeoblock(proxyDial); geoErr != nil {
+		log.Warn().Err(geoErr).Msg("geoblock check failed (continuing)")
+	} else if geo.Blocked {
+		log.Warn().
+			Str("country", geo.Country).
+			Str("region", geo.Region).
+			Str("ip", geo.IP).
+			Msg("⚠ trading blocked in your region — configure [proxy] in config.toml to bypass")
+	} else {
+		log.Info().Str("country", geo.Country).Str("ip", geo.IP).Msg("geoblock check passed")
+	}
+
 	log.Info().Str("config", *cfgPath).Msg(i18n.T().LogBotStarting)
 
 	// --- Wallet Manager ---
 	wm := wallet.NewManager(bus)
+	wm.SetDialer(proxyDial)
 
 	// --- HTTP клиенты ---
 	clobHTTP := api.NewClientWithDialer(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
