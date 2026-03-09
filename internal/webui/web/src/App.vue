@@ -23,8 +23,11 @@ import ToastContainer from '@/components/ToastContainer.vue'
 const auth = useAuthStore()
 const { connect } = useWebSocket()
 
+// Restore token synchronously so child onMounted hooks (e.g. MarketsView.fetchMarkets)
+// already have the JWT header set before their first API call.
+auth.restore()
+
 onMounted(() => {
-  auth.restore()
   if (auth.isAuthenticated) connect()
 })
 </script>
@@ -51,5 +54,6 @@ html, body { height: 100%; }
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
+  background: var(--bg-primary);
 }
 </style>
