@@ -1,11 +1,11 @@
 package api
 
 import (
-	"context"
+	"bufio"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 
 	"golang.org/x/net/proxy"
 
@@ -22,6 +22,9 @@ func BuildDialer(cfg config.ProxyConfig) (DialFunc, error) {
 	if !cfg.Enabled {
 		return nil, nil
 	}
+	if cfg.Addr == "" {
+		return nil, fmt.Errorf("proxy: addr must not be empty when proxy is enabled")
+	}
 	switch cfg.Type {
 	case "socks5":
 		var auth *proxy.Auth
@@ -36,16 +39,34 @@ func BuildDialer(cfg config.ProxyConfig) (DialFunc, error) {
 			return dialer.Dial("tcp", addr)
 		}, nil
 	case "http":
-		proxyURL, err := url.Parse("http://" + cfg.Addr)
-		if err != nil {
-			return nil, fmt.Errorf("proxy: parse HTTP proxy addr %q: %w", cfg.Addr, err)
-		}
+		proxyAddr := cfg.Addr
+		var proxyAuth string
 		if cfg.Username != "" {
-			proxyURL.User = url.UserPassword(cfg.Username, cfg.Password)
+			creds := base64.StdEncoding.EncodeToString([]byte(cfg.Username + ":" + cfg.Password))
+			proxyAuth = "Proxy-Authorization: Basic " + creds + "\r\n"
 		}
-		transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
 		return func(addr string) (net.Conn, error) {
-			return transport.DialContext(context.Background(), "tcp", addr)
+			conn, err := net.Dial("tcp", proxyAddr)
+			if err != nil {
+				return nil, fmt.Errorf("proxy: connect to HTTP proxy %s: %w", proxyAddr, err)
+			}
+			_, err = fmt.Fprintf(conn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n%s\r\n", addr, addr, proxyAuth)
+			if err != nil {
+				conn.Close()
+				return nil, fmt.Errorf("proxy: send CONNECT to %s: %w", proxyAddr, err)
+			}
+			br := bufio.NewReader(conn)
+			resp, err := http.ReadResponse(br, nil)
+			if err != nil {
+				conn.Close()
+				return nil, fmt.Errorf("proxy: read CONNECT response from %s: %w", proxyAddr, err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				conn.Close()
+				return nil, fmt.Errorf("proxy: CONNECT to %s via %s failed: %s", addr, proxyAddr, resp.Status)
+			}
+			return conn, nil
 		}, nil
 	default:
 		return nil, fmt.Errorf("proxy: unknown type %q (use socks5 or http)", cfg.Type)
