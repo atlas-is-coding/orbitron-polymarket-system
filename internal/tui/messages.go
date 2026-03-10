@@ -45,6 +45,25 @@ type PositionsUpdateMsg struct {
 	Rows []PositionRow
 }
 
+// StrategyAlertMsg is published when a trading strategy detects a signal.
+type StrategyAlertMsg struct {
+	Strategy string  // "arbitrage", "market_making", "positive_ev", "riskless_rate", "fade_chaos", "cross_market"
+	Market   string  // condition_id
+	Question string  // human-readable market question
+	Signal   string  // "BUY_YES", "BUY_NO", "SELL", "MARKET_MAKE"
+	Price    float64 // token price at signal time
+	EdgePct  float64 // estimated edge in %
+	Reason   string  // human-readable explanation
+	Executed bool    // true if an order was placed
+	OrderID  string  // order ID if executed
+}
+
+// CircuitBreakerMsg is published when the RiskManager halts all trading.
+type CircuitBreakerMsg struct {
+	DailyLossUSD float64
+	Reason       string
+}
+
 // EventBus bridges bot goroutines to the Bubble Tea loop.
 // Supports multiple subscribers via Tap(); the primary channel is
 // used by the TUI via WaitForEvent().
