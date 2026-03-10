@@ -55,11 +55,13 @@ type AuthConfig struct {
 }
 
 type TradingConfig struct {
-	Enabled          bool    `toml:"enabled"            json:"enabled"`
-	MaxPositionUSD   float64 `toml:"max_position_usd"   json:"max_position_usd"`
-	SlippagePct      float64 `toml:"slippage_pct"       json:"slippage_pct"`
-	DefaultOrderType string  `toml:"default_order_type" json:"default_order_type"`
-	NegRisk          bool    `toml:"neg_risk"           json:"neg_risk"`
+	Enabled          bool             `toml:"enabled"            json:"enabled"`
+	MaxPositionUSD   float64          `toml:"max_position_usd"   json:"max_position_usd"`
+	SlippagePct      float64          `toml:"slippage_pct"       json:"slippage_pct"`
+	DefaultOrderType string           `toml:"default_order_type" json:"default_order_type"`
+	NegRisk          bool             `toml:"neg_risk"           json:"neg_risk"`
+	Strategies       StrategiesConfig `toml:"strategies"         json:"strategies"`
+	Risk             RiskConfig       `toml:"risk"               json:"risk"`
 }
 
 type MonitorConfig struct {
@@ -115,8 +117,8 @@ type WebUIConfig struct {
 // ProxyConfig — optional outbound proxy for all Polymarket API calls.
 type ProxyConfig struct {
 	Enabled  bool   `toml:"enabled"  json:"enabled"`
-	Type     string `toml:"type"     json:"type"`     // "socks5" | "http"
-	Addr     string `toml:"addr"     json:"addr"`     // "host:port"
+	Type     string `toml:"type"     json:"type"` // "socks5" | "http"
+	Addr     string `toml:"addr"     json:"addr"` // "host:port"
 	Username string `toml:"username" json:"username"`
 	Password string `toml:"password" json:"password"`
 }
@@ -147,6 +149,75 @@ type TraderConfig struct {
 	MaxPositionUSD float64 `toml:"max_position_usd" json:"max_position_usd"`
 	// SizeMode — переопределяет глобальный (если не пустая строка)
 	SizeMode string `toml:"size_mode" json:"size_mode"`
+}
+
+// StrategiesConfig — конфигурация всех торговых стратегий.
+type StrategiesConfig struct {
+	Arbitrage    ArbitrageConfig    `toml:"arbitrage"     json:"arbitrage"`
+	MarketMaking MarketMakingConfig `toml:"market_making" json:"market_making"`
+	PositiveEV   PositiveEVConfig   `toml:"positive_ev"   json:"positive_ev"`
+	RisklessRate RisklessRateConfig `toml:"riskless_rate" json:"riskless_rate"`
+	FadeChaos    FadeChaosConfig    `toml:"fade_chaos"    json:"fade_chaos"`
+	CrossMarket  CrossMarketConfig  `toml:"cross_market"  json:"cross_market"`
+}
+
+// RiskConfig — глобальные параметры риск-менеджмента.
+type RiskConfig struct {
+	StopLossPct     float64 `toml:"stop_loss_pct"      json:"stop_loss_pct"`
+	TakeProfitPct   float64 `toml:"take_profit_pct"    json:"take_profit_pct"`
+	MaxDailyLossUSD float64 `toml:"max_daily_loss_usd" json:"max_daily_loss_usd"`
+}
+
+type ArbitrageConfig struct {
+	Enabled        bool    `toml:"enabled"          json:"enabled"`
+	MinProfitUSD   float64 `toml:"min_profit_usd"   json:"min_profit_usd"`
+	MaxPositionUSD float64 `toml:"max_position_usd" json:"max_position_usd"`
+	PollIntervalMs int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
+	ExecuteOrders  bool    `toml:"execute_orders"   json:"execute_orders"`
+}
+
+type MarketMakingConfig struct {
+	Enabled              bool    `toml:"enabled"                json:"enabled"`
+	SpreadPct            float64 `toml:"spread_pct"             json:"spread_pct"`
+	MaxPositionUSD       float64 `toml:"max_position_usd"       json:"max_position_usd"`
+	RebalanceIntervalSec int     `toml:"rebalance_interval_sec" json:"rebalance_interval_sec"`
+	MinLiquidityUSD      float64 `toml:"min_liquidity_usd"      json:"min_liquidity_usd"`
+	ExecuteOrders        bool    `toml:"execute_orders"         json:"execute_orders"`
+}
+
+type PositiveEVConfig struct {
+	Enabled         bool    `toml:"enabled"          json:"enabled"`
+	MinEdgePct      float64 `toml:"min_edge_pct"     json:"min_edge_pct"`
+	MinLiquidityUSD float64 `toml:"min_liquidity_usd" json:"min_liquidity_usd"`
+	MaxPositionUSD  float64 `toml:"max_position_usd" json:"max_position_usd"`
+	PollIntervalMs  int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
+	ExecuteOrders   bool    `toml:"execute_orders"   json:"execute_orders"`
+}
+
+type RisklessRateConfig struct {
+	Enabled         bool    `toml:"enabled"          json:"enabled"`
+	MinDurationDays int     `toml:"min_duration_days" json:"min_duration_days"`
+	MaxNOPrice      float64 `toml:"max_no_price"     json:"max_no_price"`
+	MaxPositionUSD  float64 `toml:"max_position_usd" json:"max_position_usd"`
+	PollIntervalMs  int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
+	ExecuteOrders   bool    `toml:"execute_orders"   json:"execute_orders"`
+}
+
+type FadeChaosConfig struct {
+	Enabled           bool    `toml:"enabled"              json:"enabled"`
+	SpikeThresholdPct float64 `toml:"spike_threshold_pct"  json:"spike_threshold_pct"`
+	CooldownSec       int     `toml:"cooldown_sec"         json:"cooldown_sec"`
+	MaxPositionUSD    float64 `toml:"max_position_usd"     json:"max_position_usd"`
+	PollIntervalMs    int     `toml:"poll_interval_ms"     json:"poll_interval_ms"`
+	ExecuteOrders     bool    `toml:"execute_orders"       json:"execute_orders"`
+}
+
+type CrossMarketConfig struct {
+	Enabled          bool    `toml:"enabled"            json:"enabled"`
+	MinDivergencePct float64 `toml:"min_divergence_pct" json:"min_divergence_pct"`
+	MaxPositionUSD   float64 `toml:"max_position_usd"   json:"max_position_usd"`
+	PollIntervalMs   int     `toml:"poll_interval_ms"   json:"poll_interval_ms"`
+	ExecuteOrders    bool    `toml:"execute_orders"     json:"execute_orders"`
 }
 
 // Save сериализует cfg в TOML и записывает в файл path (создаёт или перезаписывает).
@@ -207,6 +278,86 @@ func (c *Config) validate() error {
 	}
 	if c.Copytrading.SizeMode == "" {
 		c.Copytrading.SizeMode = "proportional"
+	}
+	if c.Trading.Risk.StopLossPct <= 0 {
+		c.Trading.Risk.StopLossPct = 20.0
+	}
+	if c.Trading.Risk.TakeProfitPct <= 0 {
+		c.Trading.Risk.TakeProfitPct = 50.0
+	}
+	if c.Trading.Risk.MaxDailyLossUSD <= 0 {
+		c.Trading.Risk.MaxDailyLossUSD = 100.0
+	}
+	if c.Trading.Strategies.Arbitrage.PollIntervalMs <= 0 {
+		c.Trading.Strategies.Arbitrage.PollIntervalMs = 5000
+	}
+	if c.Trading.Strategies.Arbitrage.MinProfitUSD <= 0 {
+		c.Trading.Strategies.Arbitrage.MinProfitUSD = 0.50
+	}
+	if c.Trading.Strategies.Arbitrage.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.Arbitrage.MaxPositionUSD = 100.0
+	}
+	if c.Trading.Strategies.MarketMaking.SpreadPct <= 0 {
+		c.Trading.Strategies.MarketMaking.SpreadPct = 2.0
+	}
+	if c.Trading.Strategies.MarketMaking.RebalanceIntervalSec <= 0 {
+		c.Trading.Strategies.MarketMaking.RebalanceIntervalSec = 30
+	}
+	if c.Trading.Strategies.MarketMaking.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.MarketMaking.MaxPositionUSD = 200.0
+	}
+	if c.Trading.Strategies.MarketMaking.MinLiquidityUSD <= 0 {
+		c.Trading.Strategies.MarketMaking.MinLiquidityUSD = 10000.0
+	}
+	if c.Trading.Strategies.PositiveEV.MinEdgePct <= 0 {
+		c.Trading.Strategies.PositiveEV.MinEdgePct = 5.0
+	}
+	if c.Trading.Strategies.PositiveEV.MinLiquidityUSD <= 0 {
+		c.Trading.Strategies.PositiveEV.MinLiquidityUSD = 5000.0
+	}
+	if c.Trading.Strategies.PositiveEV.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.PositiveEV.MaxPositionUSD = 50.0
+	}
+	if c.Trading.Strategies.PositiveEV.PollIntervalMs <= 0 {
+		c.Trading.Strategies.PositiveEV.PollIntervalMs = 30000
+	}
+	if c.Trading.Strategies.RisklessRate.MinDurationDays <= 0 {
+		c.Trading.Strategies.RisklessRate.MinDurationDays = 30
+	}
+	if c.Trading.Strategies.RisklessRate.MaxNOPrice <= 0 {
+		c.Trading.Strategies.RisklessRate.MaxNOPrice = 0.05
+	}
+	if c.Trading.Strategies.RisklessRate.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.RisklessRate.MaxPositionUSD = 50.0
+	}
+	if c.Trading.Strategies.RisklessRate.PollIntervalMs <= 0 {
+		c.Trading.Strategies.RisklessRate.PollIntervalMs = 60000
+	}
+	if c.Trading.Strategies.FadeChaos.SpikeThresholdPct <= 0 {
+		c.Trading.Strategies.FadeChaos.SpikeThresholdPct = 10.0
+	}
+	if c.Trading.Strategies.FadeChaos.CooldownSec <= 0 {
+		c.Trading.Strategies.FadeChaos.CooldownSec = 300
+	}
+	if c.Trading.Strategies.FadeChaos.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.FadeChaos.MaxPositionUSD = 50.0
+	}
+	if c.Trading.Strategies.FadeChaos.PollIntervalMs <= 0 {
+		c.Trading.Strategies.FadeChaos.PollIntervalMs = 10000
+	}
+	if c.Trading.Strategies.CrossMarket.MinDivergencePct <= 0 {
+		c.Trading.Strategies.CrossMarket.MinDivergencePct = 5.0
+	}
+	if c.Trading.Strategies.CrossMarket.MaxPositionUSD <= 0 {
+		c.Trading.Strategies.CrossMarket.MaxPositionUSD = 75.0
+	}
+	if c.Trading.Strategies.CrossMarket.PollIntervalMs <= 0 {
+		c.Trading.Strategies.CrossMarket.PollIntervalMs = 30000
+	}
+	for i := range c.Wallets {
+		if c.Wallets[i].ChainID == 0 {
+			c.Wallets[i].ChainID = 137 // default: Polygon mainnet
+		}
 	}
 	for i := range c.Copytrading.Traders {
 		if c.Copytrading.Traders[i].SizeMode == "" {
