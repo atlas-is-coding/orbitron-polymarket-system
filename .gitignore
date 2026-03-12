@@ -1,8 +1,31 @@
+# AI / Notes
 __NOTES.md
 POLYMARKET_DOCS.md
 CLAUDE.md
-docs/*
+GEMINI.md
 .claude/
-data/*
+.gemini/
+,gemini/
+
+# Build artifacts
+bot
+*.exe
+tmp/
+
+# Data & Logs
+data/
+*.log
+
+# Tests
 *_test.go
+
+# Docs
+docs/
+
+# Frontend
 internal/webui/web/node_modules/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
