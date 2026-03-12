@@ -29,3 +29,4 @@ internal/webui/web/node_modules/
 .vscode/
 .idea/
 .DS_Store
+.worktrees/
