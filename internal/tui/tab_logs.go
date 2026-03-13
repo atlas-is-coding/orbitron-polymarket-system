@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 const maxLogLines = 500
@@ -61,7 +61,7 @@ type LogsModel struct {
 
 // NewLogsModel creates a new LogsModel.
 func NewLogsModel(width, height int) LogsModel {
-	vp := viewport.New(width, max(height-4, 1))
+	vp := viewport.New(width-4, max(height-6, 1))
 	return LogsModel{viewport: vp, width: width, height: height}
 }
 
@@ -82,7 +82,7 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "f", "F":
+		case "ctrl+f":
 			m.freeze = !m.freeze
 			return m, nil
 		case "t", "T":
@@ -126,6 +126,7 @@ func (m LogsModel) renderLines() string {
 		if m.filter != "" && l.Level != m.filter {
 			continue
 		}
+		sb.WriteString(" ")
 		sb.WriteString(colorLogLine(l))
 		sb.WriteString("\n")
 	}
@@ -138,6 +139,8 @@ func colorLogLine(l BotEventMsg) string {
 		return StyleError.Render(l.Message)
 	case "warn":
 		return StyleWarning.Render(l.Message)
+	case "info":
+		return StyleAccent.Render(l.Message)
 	case "debug", "trace":
 		return StyleMuted.Render(l.Message)
 	default:
@@ -146,14 +149,17 @@ func colorLogLine(l BotEventMsg) string {
 }
 
 func (m LogsModel) View() string {
+	t := i18n.T()
 	freeze := ""
 	if m.freeze {
-		freeze = StyleWarning.Render(i18n.T().LogsFrozen)
+		freeze = StyleWarning.Render(t.LogsFrozen)
 	}
 	filter := ""
 	if m.filter != "" {
-		filter = fmt.Sprintf("%s%s", i18n.T().LogsFilter, m.filter)
+		filter = fmt.Sprintf("  %s%s", t.LogsFilter, m.filter)
 	}
-	help := StyleHelpBar.Render(i18n.T().LogsHelp + freeze + filter)
-	return lipgloss.JoinVertical(lipgloss.Left, m.viewport.View(), help)
+
+	logsPanel := renderPanel("Logs", m.viewport.View(), m.width, true)
+	helpPanel := renderHelpPanel("ctrl+f freeze   t/d/i/w/e filter   ↑↓ scroll"+freeze+filter, m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", logsPanel, " ", helpPanel)
 }
