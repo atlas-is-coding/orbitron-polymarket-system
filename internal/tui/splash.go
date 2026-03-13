@@ -26,13 +26,13 @@ type SplashModel struct {
 // NewSplashModel creates the splash screen.
 func NewSplashModel(width, height int) SplashModel {
 	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(ColorAccent)
+	s.Spinner = spinner.MiniDot
+	s.Style = lipgloss.NewStyle().Foreground(ColorGlow)
 	return SplashModel{
 		spinner: s,
 		width:   width,
 		height:  height,
-		version: "v0.1",
+		version: "v0.1.0",
 	}
 }
 
@@ -58,18 +58,19 @@ func (m SplashModel) Update(msg tea.Msg) (SplashModel, tea.Cmd) {
 }
 
 func (m SplashModel) View() string {
+	// Block-letter logo using box-drawing chars — rendered in ColorAccent
 	logo := StyleSplashLogo.Render(strings.Join([]string{
-		`  ██████╗  ██████╗ ██╗  ██╗`,
-		`  ██╔══██╗██╔═══██╗╚██╗██╔╝`,
-		`  ██████╔╝██║   ██║ ╚███╔╝ `,
-		`  ██╔═══╝ ██║   ██║ ██╔██╗ `,
-		`  ██║     ╚██████╔╝██╔╝ ██╗`,
-		`  ╚═╝      ╚═════╝ ╚═╝  ╚═╝`,
+		` ██████╗ ██████╗ ██████╗ ██╗████████╗██████╗  ██████╗ ███╗  `,
+		`██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝██╔══██╗██╔═══██╗████╗ `,
+		`██║   ██║██████╔╝██████╔╝██║   ██║   ██████╔╝██║   ██║╚═══╝ `,
+		`██║   ██║██╔══██╗██╔══██╗██║   ██║   ██╔══██╗██║   ██║      `,
+		`╚██████╔╝██║  ██║██████╔╝██║   ██║   ██║  ██║╚██████╔╝      `,
+		` ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝       `,
 	}, "\n"))
 
-	subtitle := StyleSplashSubtitle.Render("  Polymarket Trading Bot  " + m.version)
-	divider := StyleMuted.Render("  ─────────────────────────────")
-	loading := fmt.Sprintf("  %s Connecting to Polymarket...", m.spinner.View())
+	subtitle := StyleSplashSubtitle.Render("            NEXUS TERMINAL  " + m.version)
+	divider := StyleMuted.Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	loading := fmt.Sprintf("  %s INITIALIZING SUBSYSTEMS...", m.spinner.View())
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		"",
@@ -82,13 +83,11 @@ func (m SplashModel) View() string {
 		"",
 	)
 
-	boxW := 38
+	boxW := 64
 	if m.width > 0 && m.width-8 > boxW {
-		boxW = min(50, m.width-8)
+		boxW = min(72, m.width-8)
 	}
 	box := StyleSplashBox.Width(boxW).Render(body)
 
-	// Center horizontally and vertically
-	centered := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
-	return centered
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
