@@ -7,8 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 const toastDuration = 3 * time.Second
@@ -20,11 +19,20 @@ type toastEntry struct {
 	created time.Time
 }
 
+// TradingProvider combines wallet and strategy management.
+type TradingProvider interface {
+	WalletProvider
+	StrategyProvider
+	CancelOrder(id string) error
+	CancelAllOrders() error
+}
+
 // AppModel is the root Bubble Tea model for the TUI dashboard.
 type AppModel struct {
 	activeTab  TabID
 	overview   OverviewModel
 	trading    TradingModel
+	strategies StrategiesModel
 	wallets    WalletsModel
 	copytrader CopytradingModel
 	markets    MarketsModel
@@ -35,7 +43,6 @@ type AppModel struct {
 	cfg     *config.Config
 	cfgPath string
 	onSave  func(string)
-	wallet  string
 	width   int
 	height  int
 
@@ -46,6 +53,16 @@ type AppModel struct {
 	toast *toastEntry
 }
 
+// contentWidth returns the usable width for tab content (terminal - sidebar - border).
+func (m AppModel) contentWidth() int {
+	return max(m.width-sidebarWidth-1, 20)
+}
+
+// contentHeight returns the usable height for tab content (terminal - status bar).
+func (m AppModel) contentHeight() int {
+	return max(m.height-1, 10)
+}
+
 // NewAppModel creates the root app model.
 func NewAppModel(
 	cfg *config.Config,
@@ -53,7 +70,7 @@ func NewAppModel(
 	bus *EventBus,
 	width, height int,
 	onSave func(string),
-	wm WalletProvider,
+	tp TradingProvider,
 ) AppModel {
 	if width == 0 {
 		width = 120
@@ -61,7 +78,8 @@ func NewAppModel(
 	if height == 0 {
 		height = 40
 	}
-	cw := max(height-6, 10)
+	cw := max(width-sidebarWidth-1, 20)
+	ch := max(height-1, 10)
 
 	return AppModel{
 		cfg:        cfg,
@@ -71,20 +89,19 @@ func NewAppModel(
 		width:      width,
 		height:     height,
 		now:        time.Now(),
-		overview:   NewOverviewModel(width, cw),
-		trading:    NewTradingModel(width, cw),
-		wallets:    NewWalletsModel(wm, cfgPath, width, cw),
-		copytrader: NewCopytradingModel(cfg, cfgPath, width, cw),
+		overview:   NewOverviewModel(cw, ch),
+		trading:    NewTradingModel(cw, ch),
+		strategies: NewStrategiesModel(cw, ch, tp),
+		wallets:    NewWalletsModel(tp, cfgPath, cw, ch),
+		copytrader: NewCopytradingModel(cfg, cfgPath, cw, ch),
 		markets:    NewMarketsModel(nil, ""),
-		logs:       NewLogsModel(width, cw),
-		settings:   NewSettingsModel(cfg, cfgPath, width, cw, onSave),
+		logs:       NewLogsModel(cw, ch),
+		settings:   NewSettingsModel(cfg, cfgPath, cw, ch, onSave),
 	}
 }
 
-// SetWallet sets the wallet address shown in the header.
-func (m *AppModel) SetWallet(addr string) {
-	m.wallet = addr
-}
+// SetWallet is kept for API compatibility but no longer displays in the UI.
+func (m *AppModel) SetWallet(_ string) {}
 
 func clockTick() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return clockTickMsg{} })
@@ -110,8 +127,20 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		cw := max(m.height-6, 10)
-		m.logs = NewLogsModel(m.width, cw)
+		cw := m.contentWidth()
+		ch := m.contentHeight()
+		// Update dimensions on all tab models (same package — unexported fields accessible)
+		m.overview.width = cw
+		m.overview.height = ch
+		m.trading.width = cw
+		m.trading.height = ch
+		m.strategies.width = cw
+		m.strategies.height = ch
+		m.wallets.width = cw
+		m.wallets.height = ch
+		m.copytrader.width = cw
+		m.copytrader.height = ch
+		m.logs = NewLogsModel(cw, ch)
 		m.markets, _ = m.markets.Update(msg)
 		return m, m.bus.WaitForEvent()
 
@@ -120,16 +149,43 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.markets, cmd = m.markets.Update(msg)
 		return m, tea.Batch(cmd, m.bus.WaitForEvent())
 
+	case CancelOrderMsg:
+		if tp, ok := m.strategies.provider.(TradingProvider); ok {
+			if err := tp.CancelOrder(msg.ID); err != nil {
+				return m, func() tea.Msg { return ToastMsg{Text: "Cancel failed: " + err.Error(), Kind: "error"} }
+			}
+			return m, func() tea.Msg { return ToastMsg{Text: "Order cancelled", Kind: "success"} }
+		}
+		return m, m.bus.WaitForEvent()
+
+	case CancelAllOrdersMsg:
+		if tp, ok := m.strategies.provider.(TradingProvider); ok {
+			if err := tp.CancelAllOrders(); err != nil {
+				return m, func() tea.Msg { return ToastMsg{Text: "Cancel all failed: " + err.Error(), Kind: "error"} }
+			}
+			return m, func() tea.Msg { return ToastMsg{Text: "All orders cancelled", Kind: "success"} }
+		}
+		return m, m.bus.WaitForEvent()
+
 	case PlaceOrderMsg, BatchPlaceOrderMsg:
-		// Actual order execution is wired in a later task.
 		return m, m.bus.WaitForEvent()
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
+		case "ctrl+c", "q":
+			// Suppress q when a text field is being edited
+			if m.activeTab == TabSettings && m.settings.IsEditing() {
+				break
+			}
+			if m.activeTab == TabCopytrading && m.copytrader.IsEditing() {
+				break
+			}
+			if m.activeTab == TabWallets && m.wallets.IsEditing() {
+				break
+			}
 			return m, tea.Quit
+
 		case "tab":
-			// Don't switch tabs when a text field is being edited
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
@@ -141,6 +197,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.activeTab = (m.activeTab + 1) % tabCount
 			return m, m.bus.WaitForEvent()
+
 		case "shift+tab":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
@@ -157,7 +214,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab--
 			}
 			return m, m.bus.WaitForEvent()
-		case "1", "2", "3", "4", "5", "6", "7":
+
+		case "1", "2", "3", "4", "5", "6", "7", "8":
 			if m.activeTab == TabSettings && m.settings.IsEditing() {
 				break
 			}
@@ -173,17 +231,55 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "2":
 				m.activeTab = TabTrading
 			case "3":
-				m.activeTab = TabWallets
+				m.activeTab = TabStrategies
 			case "4":
-				m.activeTab = TabCopytrading
+				m.activeTab = TabWallets
 			case "5":
-				m.activeTab = TabMarkets
+				m.activeTab = TabCopytrading
 			case "6":
-				m.activeTab = TabLogs
+				m.activeTab = TabMarkets
 			case "7":
+				m.activeTab = TabLogs
+			case "8":
 				m.activeTab = TabSettings
 			}
 		}
+
+	case StartStrategyMsg:
+		if err := m.strategies.provider.StartStrategy(msg.Name); err != nil {
+			return m, func() tea.Msg { return ToastMsg{Text: err.Error(), Kind: "error"} }
+		}
+		return m, m.bus.WaitForEvent()
+
+	case StopStrategyMsg:
+		if err := m.strategies.provider.StopStrategy(msg.Name); err != nil {
+			return m, func() tea.Msg { return ToastMsg{Text: err.Error(), Kind: "error"} }
+		}
+		return m, m.bus.WaitForEvent()
+
+	case CycleStrategyWalletMsg:
+		wallets := m.strategies.provider.AvailableWallets()
+		if len(wallets) == 0 {
+			return m, func() tea.Msg { return ToastMsg{Text: "No wallets available", Kind: "error"} }
+		}
+		var current string
+		for _, r := range m.strategies.rows {
+			if r.Name == msg.Name {
+				current = r.WalletID
+				break
+			}
+		}
+		next := wallets[0]
+		for i, w := range wallets {
+			if w == current {
+				next = wallets[(i+1)%len(wallets)]
+				break
+			}
+		}
+		if err := m.strategies.provider.SetStrategyWallets(msg.Name, []string{next}); err != nil {
+			return m, func() tea.Msg { return ToastMsg{Text: err.Error(), Kind: "error"} }
+		}
+		return m, m.bus.WaitForEvent()
 
 	case ConfigReloadedMsg:
 		m.cfg = msg.Config
@@ -221,17 +317,20 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trading.SetPositionRows(msg.Rows)
 		return m, m.bus.WaitForEvent()
 
+	case StrategiesUpdateMsg:
+		m.trading.SetStrategyRows(msg.Rows)
+		m.strategies.SetRows(msg.Rows)
+		return m, m.bus.WaitForEvent()
+
 	case CopytradingTradeMsg:
 		m.copytrader.AddTrade(msg.Line)
 		return m, m.bus.WaitForEvent()
 
 	case LanguageChangedMsg:
-		cw := max(m.height-6, 10)
-		m.trading = NewTradingModel(m.width, cw)
-		m.copytrader = NewCopytradingModel(m.cfg, m.cfgPath, m.width, cw)
-		// settings NOT rebuilt — FieldDef labels/tooltips use func() string closures,
-		// sectionNames() is computed dynamically, and optionIdx is already updated.
-		// Rebuilding from m.cfg would reset the Language field to the unsaved (old) value.
+		cw := m.contentWidth()
+		ch := m.contentHeight()
+		m.trading = NewTradingModel(cw, ch)
+		m.copytrader = NewCopytradingModel(m.cfg, m.cfgPath, cw, ch)
 		return m, m.bus.WaitForEvent()
 	}
 
@@ -242,6 +341,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overview, cmd = m.overview.Update(msg)
 	case TabTrading:
 		m.trading, cmd = m.trading.Update(msg)
+	case TabStrategies:
+		m.strategies, cmd = m.strategies.Update(msg)
 	case TabWallets:
 		m.wallets, cmd = m.wallets.Update(msg)
 	case TabCopytrading:
@@ -258,8 +359,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) View() string {
-	header := m.renderHeader()
-	tabBar := RenderTabBar(m.activeTab, m.width)
+	cw := m.contentWidth()
 
 	var content string
 	switch m.activeTab {
@@ -267,6 +367,8 @@ func (m AppModel) View() string {
 		content = m.overview.View()
 	case TabTrading:
 		content = m.trading.View()
+	case TabStrategies:
+		content = m.strategies.View()
 	case TabWallets:
 		content = m.wallets.View()
 	case TabCopytrading:
@@ -279,36 +381,29 @@ func (m AppModel) View() string {
 		content = m.settings.View()
 	}
 
-	helpBar := StyleHelpBar.Width(m.width).Render(
-		"  " + i18n.T().HelpGlobal + "  ",
-	)
+	sidebar := RenderSidebar(m.activeTab, m.height, m.overview.subsystems)
 
-	base := lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, helpBar)
+	// Content area fills remaining width, height-1 rows
+	contentArea := lipgloss.NewStyle().
+		Width(cw).
+		Height(m.contentHeight()).
+		Render(content)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, contentArea)
+	statusBar := m.renderStatusBar()
+	full := lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 
 	if m.toast != nil {
-		return m.overlayToast(base)
+		return m.overlayToast(full)
 	}
-	return base
+	return full
 }
 
-func (m AppModel) renderHeader() string {
-	walletShort := m.wallet
-	if len(walletShort) > 12 {
-		walletShort = walletShort[:6] + "..." + walletShort[len(walletShort)-4:]
-	}
-
-	dot := StyleHeaderDot.Render("●")
-	live := StyleHeaderDot.Render("LIVE")
-	logo := StyleHeaderGlow.Render("◈ POLYTRADE")
-	clock := StyleHeaderMuted.Render(m.now.UTC().Format("15:04:05 UTC"))
-
-	walletPart := ""
-	if walletShort != "" {
-		walletPart = StyleHeaderMuted.Render("  │  " + i18n.T().AppWallet + ": " + walletShort)
-	}
-
-	content := fmt.Sprintf(" %s  %s %s%s  %s  Chain:Polygon ", logo, dot, live, walletPart, clock)
-	return StyleHeader.Width(m.width).Render(content)
+func (m AppModel) renderStatusBar() string {
+	clock := m.now.UTC().Format("15:04:05 UTC")
+	live := StyleSuccess.Render("● LIVE")
+	content := fmt.Sprintf("  %s   %s  ", clock, live)
+	return StyleStatusBar.Width(m.width).Render(content)
 }
 
 func (m AppModel) overlayToast(base string) string {
