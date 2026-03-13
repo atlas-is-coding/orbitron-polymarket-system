@@ -13,15 +13,15 @@ type GlobalKeyMap struct {
 var GlobalKeys = GlobalKeyMap{
 	NextTab: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "следующая вкладка"),
+		key.WithHelp("tab", "next tab"),
 	),
 	PrevTab: key.NewBinding(
 		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "предыдущая вкладка"),
+		key.WithHelp("shift+tab", "previous tab"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("ctrl+c", "q"),
-		key.WithHelp("q", "выход"),
+		key.WithHelp("ctrl+c/q", "quit"),
 	),
 }
 
