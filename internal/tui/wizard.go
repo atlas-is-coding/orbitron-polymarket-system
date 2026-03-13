@@ -10,7 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 // wizardStep describes one wizard input step.
@@ -52,6 +52,8 @@ func NewWizardModel(width, height int, outPath string) WizardModel {
 		ti := textinput.New()
 		ti.Placeholder = s.Label
 		ti.CharLimit = 256
+		ti.PromptStyle = StyleAccent
+		ti.Cursor.Style = StyleAccent
 		if s.IsPass {
 			ti.EchoMode = textinput.EchoPassword
 		}
@@ -157,7 +159,7 @@ func (m WizardModel) View() string {
 	s := m.steps[m.step]
 	t := i18n.T()
 
-	// Progress dots: ● filled = done/current, ○ = future
+	// Progress dots
 	var progressDots strings.Builder
 	for i := range m.steps {
 		if i < m.step {
@@ -176,12 +178,14 @@ func (m WizardModel) View() string {
 		errLine = "\n" + StyleError.Render("  ✗ "+m.errMsg)
 	}
 
+	sep := StyleMuted.Render("  " + strings.Repeat("─", 36))
+
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		"",
-		StyleGlow.Render("  ◈ POLYTRADE BOT"),
-		StyleFgDim.Render("  Polymarket Trading Bot"),
+		" "+StyleGlow.Bold(true).Render("◈ ORBITRON")+"  "+StyleMuted.Render("—  First Run Setup"),
+		" "+StyleFgDim.Render("Polymarket Trading Terminal"),
 		"",
-		StyleMuted.Render("  ────────────────────────────"),
+		sep,
 		"",
 		"  "+progressDots.String(),
 		"  "+stepLabel,
@@ -196,8 +200,8 @@ func (m WizardModel) View() string {
 	)
 
 	w := m.width - 8
-	if w < 44 {
-		w = 44
+	if w < 52 {
+		w = 52
 	}
 	box := StyleSplashBox.Width(w).Render(body)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
