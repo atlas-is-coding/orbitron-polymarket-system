@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/health"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/health"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 // SubsystemStatus holds the name and active state of a bot subsystem.
@@ -131,10 +131,9 @@ func (m OverviewModel) Update(msg tea.Msg) (OverviewModel, tea.Cmd) {
 func (m OverviewModel) renderHealthBlock() string {
 	t := i18n.T()
 	var sb strings.Builder
-	sb.WriteString(StyleSectionTitle.Render(t.OverviewHealth) + "\n")
 
 	if !m.healthLoaded {
-		sb.WriteString(" " + StyleMuted.Render(t.OverviewHealthNever) + "\n")
+		sb.WriteString("   " + StyleMuted.Render(t.OverviewHealthNever) + "\n")
 		return sb.String()
 	}
 
@@ -165,54 +164,47 @@ func (m OverviewModel) renderHealthBlock() string {
 		if svc.Error != "" {
 			errStr = " " + StyleError.Render(svc.Error)
 		}
-		fmt.Fprintf(&sb, " %s %-12s %s%s\n", dot, svc.Name, lat, errStr)
+		fmt.Fprintf(&sb, "  %s %-14s %s%s\n", dot, svc.Name, lat, errStr)
 	}
 
-	// Geoblock row
 	if m.health.Geo != nil {
 		geo := m.health.Geo
 		if geo.Blocked {
 			geoStr := StyleError.Render(fmt.Sprintf("⚠ %s %s (%s)", t.OverviewGeoBlocked, geo.Country, geo.IP))
-			fmt.Fprintf(&sb, " %s %-12s %s\n", StyleError.Render("○"), "Geoblock", geoStr)
+			fmt.Fprintf(&sb, "  %s %-14s %s\n", StyleError.Render("○"), "Geoblock", geoStr)
 		} else {
 			geoStr := StyleSuccess.Render(fmt.Sprintf("%s %s", t.OverviewGeoAllowed, geo.Country))
-			fmt.Fprintf(&sb, " %s %-12s %s\n", StyleSuccess.Render("●"), "Geoblock", geoStr)
+			fmt.Fprintf(&sb, "  %s %-14s %s\n", StyleSuccess.Render("●"), "Geoblock", geoStr)
 		}
 	}
 
 	age := int(time.Since(m.health.UpdatedAt).Seconds())
-	sb.WriteString(" " + StyleMuted.Render(fmt.Sprintf(t.OverviewHealthUpdated, age)) + "\n")
+	sb.WriteString("\n  " + StyleMuted.Render(fmt.Sprintf(t.OverviewHealthUpdated, age)) + "\n")
 	return sb.String()
 }
 
 func (m OverviewModel) View() string {
-	half := m.width / 2
+	t := i18n.T()
+	half := (m.width - 3) / 2
 
-	// Left: subsystems
-	var left strings.Builder
-	left.WriteString(StyleSectionTitle.Render(i18n.T().OverviewSubsystems) + "\n")
+	// ── Left panel: subsystems ─────────────────────────────────────────────
+	var leftContent strings.Builder
 	for _, s := range m.subsystems {
 		dot := StyleSuccess.Render("●")
-		name := StyleFgDim.Render(fmt.Sprintf("%-20s", s.Name))
-		status := StyleSuccess.Render(i18n.T().OverviewActive)
+		name := StyleFgDim.Render(fmt.Sprintf("%-22s", s.Name))
+		status := StyleSuccess.Render(t.OverviewActive)
 		if !s.Active {
 			dot = StyleMuted.Render("○")
-			name = StyleMuted.Render(fmt.Sprintf("%-20s", s.Name))
-			status = StyleMuted.Render(i18n.T().OverviewInactive)
+			name = StyleMuted.Render(fmt.Sprintf("%-22s", s.Name))
+			status = StyleMuted.Render(t.OverviewInactive)
 		}
-		fmt.Fprintf(&left, " %s %s %s\n", dot, name, status)
+		fmt.Fprintf(&leftContent, "  %s %s %s\n", dot, name, status)
 	}
+	leftPanel := renderPanel(t.OverviewSubsystems, leftContent.String(), half, false)
 
-	// Right: quick stats
-	var right strings.Builder
-	right.WriteString(StyleSectionTitle.Render(i18n.T().OverviewStats) + "\n")
-
+	// ── Right panel: quick stats ───────────────────────────────────────────
 	label := StyleFgDim.Render
-	val := StyleBold.Render
-
-	fmt.Fprintf(&right, " %s  %s\n", label(fmt.Sprintf("%-22s", i18n.T().OverviewBalance)), val(fmt.Sprintf("%.2f", m.balance)))
-	fmt.Fprintf(&right, " %s  %s\n", label(fmt.Sprintf("%-22s", i18n.T().OverviewOpenOrders)), val(fmt.Sprintf("%d", m.openOrders)))
-	fmt.Fprintf(&right, " %s  %s\n", label(fmt.Sprintf("%-22s", i18n.T().OverviewPositions)), val(fmt.Sprintf("%d", m.positions)))
+	val := StyleGlow.Render
 
 	pnlStr := fmt.Sprintf("%+.2f", m.pnlToday)
 	if m.pnlToday >= 0 {
@@ -220,18 +212,26 @@ func (m OverviewModel) View() string {
 	} else {
 		pnlStr = StyleError.Render(pnlStr)
 	}
-	fmt.Fprintf(&right, " %s  %s\n", label(fmt.Sprintf("%-22s", i18n.T().OverviewPnLToday)), pnlStr)
-	fmt.Fprintf(&right, " %s  %s\n", label(fmt.Sprintf("%-22s", i18n.T().OverviewCopyTraders)), val(fmt.Sprintf("%d", m.traders)))
 
-	leftBox := StyleBorderActive.Width(half - 2).Render(left.String())
-	rightBox := StyleBorder.Width(half - 2).Render(right.String())
-	topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	var rightContent strings.Builder
+	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewBalance)), val(fmt.Sprintf("$%.2f", m.balance)))
+	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewOpenOrders)), StyleBold.Render(fmt.Sprintf("%d", m.openOrders)))
+	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewPositions)), StyleBold.Render(fmt.Sprintf("%d", m.positions)))
+	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewPnLToday)), pnlStr)
+	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
+	rightPanel := renderPanel(t.OverviewStats, rightContent.String(), half, true)
 
-	healthBox := StyleBorder.Width(m.width - 4).Render(m.renderHealthBlock())
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, " ", rightPanel)
 
-	// Bottom: wallet summary (only when wallets are registered)
+	// ── Health panel ───────────────────────────────────────────────────────
+	healthPanel := renderPanel(t.OverviewHealth, m.renderHealthBlock(), m.width, false)
+
+	// ── Help panel ─────────────────────────────────────────────────────────
+	helpPanel := renderHelpPanel("[1-8] switch tab   [Tab] next   [q] quit", m.width)
+
+	// ── Wallets panel ──────────────────────────────────────────────────────
 	if len(m.wallets) == 0 {
-		return lipgloss.JoinVertical(lipgloss.Left, topRow, healthBox)
+		return lipgloss.JoinVertical(lipgloss.Left, " ", topRow, " ", healthPanel, " ", helpPanel)
 	}
 
 	var totalBal, totalPnL float64
@@ -244,38 +244,27 @@ func (m OverviewModel) View() string {
 		}
 	}
 
-	t := i18n.T()
-	var wb strings.Builder
-	wb.WriteString(StyleSectionTitle.Render(t.OverviewWallets) + "\n")
-
-	// Aggregate line
 	totalPnLStr := fmt.Sprintf("%+.2f", totalPnL)
 	if totalPnL >= 0 {
 		totalPnLStr = StyleSuccess.Render(totalPnLStr)
 	} else {
 		totalPnLStr = StyleError.Render(totalPnLStr)
 	}
-	fmt.Fprintf(&wb, " %s %s  │  %s %s  │  %s %d/%d\n",
-		label(t.OverviewTotalBalance+":")+" ", val(fmt.Sprintf("$%.2f", totalBal)),
-		label(t.OverviewTotalPnL+":")+" ", totalPnLStr,
-		label(t.OverviewActiveWallets+":")+" ", activeCount, len(m.wallets),
-	)
-	wb.WriteString("\n")
 
-	// Per-wallet rows
-	colW := (m.width - 8) / 4
-	if colW < 10 {
-		colW = 10
-	}
-	hdr := StyleFgDim.Render(
-		fmt.Sprintf("  %-*s  %-*s  %-*s  %s",
-			colW, "Label",
-			12, "Balance",
-			12, "P&L",
-			"Status",
-		),
+	var walletsContent strings.Builder
+	fmt.Fprintf(&walletsContent, "  %s %s  │  %s %s  │  %s %d/%d\n\n",
+		label(t.OverviewTotalBalance+":"), val(fmt.Sprintf("$%.2f", totalBal)),
+		label(t.OverviewTotalPnL+":"), totalPnLStr,
+		label(t.OverviewActiveWallets+":"), activeCount, len(m.wallets),
 	)
-	wb.WriteString(hdr + "\n")
+
+	colW := (m.width - 12) / 4
+	if colW < 12 {
+		colW = 12
+	}
+	hdr := StyleFgDim.Bold(true).Render(fmt.Sprintf("  %-*s  %-14s  %-14s  %s", colW, "LABEL", "BALANCE", "P&L", "STATUS"))
+	walletsContent.WriteString(hdr + "\n")
+	walletsContent.WriteString(StyleMuted.Render("  "+strings.Repeat("─", m.width-8)) + "\n")
 
 	for _, w := range m.wallets {
 		lbl := w.label
@@ -289,20 +278,13 @@ func (m OverviewModel) View() string {
 		} else {
 			wPnLStr = StyleError.Render(wPnLStr)
 		}
-		var statusStr string
+		statusStr := StyleMuted.Render("○ OFF")
 		if w.enabled {
 			statusStr = StyleSuccess.Render("● ON")
-		} else {
-			statusStr = StyleMuted.Render("○ OFF")
 		}
-		fmt.Fprintf(&wb, "  %-*s  %-12s  %-12s  %s\n",
-			colW, lbl,
-			balStr,
-			wPnLStr,
-			statusStr,
-		)
+		fmt.Fprintf(&walletsContent, "  %-*s  %-14s  %-14s  %s\n", colW, lbl, balStr, wPnLStr, statusStr)
 	}
 
-	walletsBox := StyleBorder.Width(m.width - 4).Render(wb.String())
-	return lipgloss.JoinVertical(lipgloss.Left, topRow, walletsBox, healthBox)
+	walletsPanel := renderPanel(t.OverviewWallets, walletsContent.String(), m.width, false)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", topRow, " ", walletsPanel, " ", healthPanel, " ", helpPanel)
 }
