@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 // TraderRow is a row in the tracked traders table.
@@ -63,7 +63,14 @@ func NewCopytradingModel(cfg *config.Config, cfgPath string, width, height int) 
 		table.WithHeight(max(height/2-3, 1)),
 	)
 	s := table.DefaultStyles()
-	s.Header = s.Header.Bold(true)
+	s.Header = s.Header.
+		Bold(true).
+		Foreground(ColorAccent).
+		Background(ColorSurface)
+	s.Selected = s.Selected.
+		Foreground(ColorBg).
+		Background(ColorAccent).
+		Bold(true)
 	t.SetStyles(s)
 
 	return CopytradingModel{
@@ -84,6 +91,8 @@ func makeFormInputs() []textinput.Model {
 		ti := textinput.New()
 		ti.Placeholder = ph
 		ti.CharLimit = 80
+		ti.PromptStyle = StyleAccent
+		ti.Cursor.Style = StyleAccent
 		inputs[i] = ti
 	}
 	inputs[0].Focus()
@@ -99,7 +108,11 @@ func (m CopytradingModel) IsEditing() bool {
 func (m *CopytradingModel) SetTraderRows(rows []TraderRow) {
 	tableRows := make([]table.Row, len(rows))
 	for i, r := range rows {
-		tableRows[i] = table.Row{r.Address, r.Label, r.Status, r.AllocPct}
+		status := StyleMuted.Render("○ " + r.Status)
+		if r.Status == "active" {
+			status = StyleSuccess.Render("● " + r.Status)
+		}
+		tableRows[i] = table.Row{r.Address, r.Label, status, r.AllocPct}
 	}
 	m.tradersTable.SetRows(tableRows)
 }
@@ -324,54 +337,76 @@ func (m *CopytradingModel) syncTable() {
 }
 
 func (m CopytradingModel) View() string {
-	var sb strings.Builder
-	sb.WriteString(StyleBold.Render(i18n.T().CopyTraders) + "\n")
-	sb.WriteString(m.tradersTable.View() + "\n")
-
 	switch m.mode {
-	case copyModeTable:
-		help := "  " + StyleMuted.Render("[a] add  [e] edit  [d] delete  [space] toggle")
-		sb.WriteString(help + "\n")
 	case copyModeAddForm:
-		sb.WriteString(m.renderForm("Add Trader") + "\n")
+		return m.viewForm("Add Trader")
 	case copyModeEditForm:
-		sb.WriteString(m.renderForm("Edit Trader") + "\n")
+		return m.viewForm("Edit Trader")
 	case copyModeConfirmDelete:
-		addr := ""
-		if m.cfg != nil && m.editIdx < len(m.cfg.Copytrading.Traders) {
-			addr = m.cfg.Copytrading.Traders[m.editIdx].Address
-		}
-		prompt := StyleBold.Render(fmt.Sprintf("  Delete %s? [y/N]", addr))
-		sb.WriteString(prompt + "\n")
+		return m.viewConfirmDelete()
 	}
-
-	sb.WriteString("\n" + StyleBold.Render(i18n.T().CopyRecentTrades) + "\n")
-	if len(m.recentTrades) == 0 {
-		sb.WriteString(StyleMuted.Render("  " + i18n.T().CopyNoData + "\n"))
-	}
-	for _, t := range m.recentTrades {
-		sb.WriteString("  " + t + "\n")
-	}
-	return lipgloss.NewStyle().Padding(0, 1).Render(sb.String())
+	return m.viewTable()
 }
 
-// renderForm renders the add/edit textinput form.
-func (m CopytradingModel) renderForm(title string) string {
-	var sb strings.Builder
-	sb.WriteString("\n  " + StyleBold.Render("── "+title+" ──") + "\n")
-	labels := []string{"Address:     ", "Label:       ", "Alloc %:     ", "Max Pos USD: "}
-	for i, inp := range m.inputs {
-		prefix := "  "
-		if m.formFocus == i {
-			prefix = StyleAccent.Render("> ")
+func (m CopytradingModel) viewTable() string {
+	t := i18n.T()
+
+	var tradersContent string
+	if m.cfg == nil || len(m.cfg.Copytrading.Traders) == 0 {
+		tradersContent = renderEmptyState("⇌", "No traders configured", "Press [a] to add one", m.width)
+	} else {
+		tradersContent = "\n" + m.tradersTable.View()
+	}
+	tradersPanel := renderPanel(t.CopyTraders, tradersContent, m.width, true)
+
+	var tradesContent strings.Builder
+	tradesContent.WriteString("\n")
+	if len(m.recentTrades) == 0 {
+		tradesContent.WriteString("  " + StyleMuted.Render(t.CopyNoData) + "\n")
+	} else {
+		for _, tr := range m.recentTrades {
+			tradesContent.WriteString("  " + tr + "\n")
 		}
-		sb.WriteString(prefix + StyleMuted.Render(labels[i]) + inp.View() + "\n")
+	}
+	tradesPanel := renderPanel(t.CopyRecentTrades, tradesContent.String(), m.width, false)
+
+	helpPanel := renderHelpPanel("↑↓ navigate   a add   e edit   d delete   Space toggle", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", tradersPanel, " ", tradesPanel, " ", helpPanel)
+}
+
+func (m CopytradingModel) viewForm(title string) string {
+	labels := []string{"Address:    ", "Label:      ", "Alloc %:    ", "Max Pos USD:"}
+	var sb strings.Builder
+	sb.WriteString("\n")
+	for i, inp := range m.inputs {
+		prefix := "   "
+		if m.formFocus == i {
+			prefix = StyleAccent.Render(" ▶ ")
+		}
+		sb.WriteString(prefix + StyleMuted.Render(labels[i]) + " " + inp.View() + "\n")
 	}
 	if m.formErr != "" {
-		sb.WriteString("  " + StyleError.Render("Error: "+m.formErr) + "\n")
+		sb.WriteString("\n   " + StyleError.Render("✖ "+m.formErr) + "\n")
 	}
-	sb.WriteString("  " + StyleMuted.Render("[Enter] save  [Tab] next field  [Esc] cancel") + "\n")
-	return sb.String()
+	sb.WriteString("\n")
+	formPanel := renderPanel(title, sb.String(), m.width, true)
+	helpPanel := renderHelpPanel("Enter save   Tab next field   esc cancel", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", formPanel, " ", helpPanel)
+}
+
+func (m CopytradingModel) viewConfirmDelete() string {
+	addr := ""
+	if m.cfg != nil && m.editIdx < len(m.cfg.Copytrading.Traders) {
+		addr = m.cfg.Copytrading.Traders[m.editIdx].Address
+	}
+	content := fmt.Sprintf(
+		"\n   Delete trader %s?\n\n   %s   %s\n",
+		StyleWarning.Render(addr),
+		StyleError.Render("[y] Yes, delete"),
+		StyleMuted.Render("[n] Cancel"),
+	)
+	panel := renderPanel("Confirm Delete", content, m.width, true)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", panel)
 }
 
 // addTrader appends a new trader to cfg. Returns error if address is empty or already exists.
