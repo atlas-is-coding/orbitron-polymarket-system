@@ -2,13 +2,12 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 // TradingSubTab identifies which sub-tab is active inside Trading.
@@ -50,12 +49,12 @@ type CancelAllOrdersMsg struct{}
 
 // TradingModel is the Trading tab sub-model (Orders + Positions with sub-tabs).
 type TradingModel struct {
-	subTab    TradingSubTab
-	orders    table.Model
-	orderRows []OrderRow
-	positions table.Model
-	width     int
-	height    int
+	subTab       TradingSubTab
+	orders       table.Model
+	orderRows    []OrderRow
+	positions    table.Model
+	width        int
+	height       int
 }
 
 // NewTradingModel creates a new TradingModel.
@@ -83,8 +82,8 @@ func NewTradingModel(width, height int) TradingModel {
 		Foreground(ColorAccent).
 		Background(ColorSurface)
 	os.Selected = os.Selected.
-		Foreground(ColorFg).
-		Background(ColorSelected).
+		Foreground(ColorBg).
+		Background(ColorAccent).
 		Bold(true)
 	ot.SetStyles(os)
 
@@ -109,8 +108,8 @@ func NewTradingModel(width, height int) TradingModel {
 		Foreground(ColorAccent).
 		Background(ColorSurface)
 	ps.Selected = ps.Selected.
-		Foreground(ColorFg).
-		Background(ColorSelected).
+		Foreground(ColorBg).
+		Background(ColorAccent).
 		Bold(true)
 	pt.SetStyles(ps)
 
@@ -142,6 +141,9 @@ func (m *TradingModel) SetPositionRows(rows []PositionRow) {
 	m.positions.SetRows(tableRows)
 }
 
+// SetStrategyRows is a no-op here since strategies were moved to a dedicated tab.
+func (m *TradingModel) SetStrategyRows(rows []StrategyRow) {}
+
 func (m TradingModel) Init() tea.Cmd { return nil }
 
 func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
@@ -158,7 +160,7 @@ func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 			m.positions.Focus()
 			m.orders.Blur()
 			return m, nil
-		case "d", "D":
+		case "x", "X":
 			if m.subTab == SubTabOrders {
 				if idx := m.orders.Cursor(); idx >= 0 && idx < len(m.orderRows) {
 					id := m.orderRows[idx].ID
@@ -166,7 +168,7 @@ func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 				}
 			}
 			return m, nil
-		case "a", "A":
+		case "ctrl+x":
 			if m.subTab == SubTabOrders {
 				return m, func() tea.Msg { return CancelAllOrdersMsg{} }
 			}
@@ -177,63 +179,45 @@ func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.subTab == SubTabOrders {
 		m.orders, cmd = m.orders.Update(msg)
-	} else {
+	} else if m.subTab == SubTabPositions {
 		m.positions, cmd = m.positions.Update(msg)
 	}
 	return m, cmd
 }
 
-func (m TradingModel) renderSubTabBar() string {
+func (m TradingModel) View() string {
 	t := i18n.T()
-	var sb strings.Builder
 
-	ordersLabel := fmt.Sprintf(" o:%s ", t.TabOrders)
-	posLabel := fmt.Sprintf(" p:%s ", t.TabPositions)
-
+	// ── Inline sub-tab selector ─────────────────────────────────────────────
+	ordersLabel := fmt.Sprintf(" o: %s ", t.TabOrders)
+	posLabel := fmt.Sprintf(" p: %s ", t.TabPositions)
+	var subTabLine string
 	if m.subTab == SubTabOrders {
-		sb.WriteString(StyleSubTabActive.Render(ordersLabel))
-		sb.WriteString("  ")
-		sb.WriteString(StyleSubTabInactive.Render(posLabel))
+		subTabLine = StyleSubTabActive.Render(ordersLabel) + "  " + StyleSubTabInactive.Render(posLabel)
 	} else {
-		sb.WriteString(StyleSubTabInactive.Render(ordersLabel))
-		sb.WriteString("  ")
-		sb.WriteString(StyleSubTabActive.Render(posLabel))
+		subTabLine = StyleSubTabInactive.Render(ordersLabel) + "  " + StyleSubTabActive.Render(posLabel)
 	}
 
-	return lipgloss.NewStyle().
-		Background(ColorBg).
-		Padding(0, 1).
-		Width(m.width).
-		Render(sb.String())
-}
-
-func (m TradingModel) renderEmptyState(text string) string {
-	return StyleEmptyState.Width(m.width - 4).Render(
-		"\n\n  ◈  " + text + "\n\n",
-	)
-}
-
-func (m TradingModel) View() string {
-	subBar := m.renderSubTabBar()
-
+	// ── Content + help ──────────────────────────────────────────────────────
 	var content string
+	var helpKeys string
 	if m.subTab == SubTabOrders {
 		if len(m.orderRows) == 0 {
-			content = m.renderEmptyState(i18n.T().OrdersEmpty)
+			content = renderEmptyState("◈", t.OrdersEmpty, "", m.width)
 		} else {
 			content = m.orders.View()
 		}
-		help := StyleHelpBar.Width(m.width).Render(i18n.T().OrdersHelp)
-		return lipgloss.JoinVertical(lipgloss.Left, subBar, content, help)
+		helpKeys = "↑↓ navigate   x cancel order   ctrl+x cancel all   o/p switch"
+	} else {
+		if len(m.positions.Rows()) == 0 {
+			content = renderEmptyState("◈", t.PosEmpty, "", m.width)
+		} else {
+			content = m.positions.View()
+		}
+		helpKeys = "↑↓ navigate   o/p switch"
 	}
 
-	// Positions
-	posRows := m.positions.Rows()
-	if len(posRows) == 0 {
-		content = m.renderEmptyState(i18n.T().PosEmpty)
-	} else {
-		content = m.positions.View()
-	}
-	help := StyleHelpBar.Width(m.width).Render(i18n.T().PosHelp)
-	return lipgloss.JoinVertical(lipgloss.Left, subBar, content, help)
+	tablePanel := renderPanel("", content, m.width, true)
+	helpPanel := renderHelpPanel(helpKeys, m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", subTabLine, " ", tablePanel, " ", helpPanel)
 }
