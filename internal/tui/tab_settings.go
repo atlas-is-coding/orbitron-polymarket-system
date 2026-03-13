@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 // FieldKind is the type of a settings field.
@@ -504,6 +504,8 @@ func NewSettingsModel(cfg *config.Config, cfgPath string, width, height int, onS
 			ti := textinput.New()
 			ti.SetValue(cur)
 			ti.CharLimit = 256
+			ti.PromptStyle = StyleAccent
+			ti.Cursor.Style = StyleAccent
 			if f.Kind == KindPassword {
 				ti.EchoMode = textinput.EchoPassword
 			}
@@ -727,32 +729,28 @@ func (m SettingsModel) renderWidget(i int) string {
 	switch f.Kind {
 	case KindBool:
 		if m.optionIdx[i] == 1 {
-			s := StyleToggleOn.Render("●  ON ")
+			s := StyleToggleOn.Render("● ON ")
 			if focused {
 				return lipgloss.NewStyle().
-					Border(lipgloss.RoundedBorder()).
+					Border(BorderRounded).
 					BorderForeground(ColorSuccess).
-					Padding(0, 1).
 					Render(s)
 			}
 			return lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
+				Border(BorderRounded).
 				BorderForeground(ColorBorder).
-				Padding(0, 1).
 				Render(s)
 		}
-		s := StyleToggleOff.Render("○  OFF")
+		s := StyleToggleOff.Render("○ OFF")
 		if focused {
 			return lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
+				Border(BorderRounded).
 				BorderForeground(ColorAccent).
-				Padding(0, 1).
 				Render(s)
 		}
 		return lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(BorderRounded).
 			BorderForeground(ColorBorder).
-			Padding(0, 1).
 			Render(s)
 
 	case KindEnum:
@@ -762,19 +760,17 @@ func (m SettingsModel) renderWidget(i int) string {
 		}
 		left := StyleEnumArrow.Render("‹")
 		right := StyleEnumArrow.Render("›")
-		val := StyleEnumValue.Render(fmt.Sprintf(" %-14s", cur))
+		val := StyleEnumValue.Render(fmt.Sprintf(" %-16s", cur))
 		if focused {
 			return lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
+				Border(BorderRounded).
 				BorderForeground(ColorAccent).
-				Padding(0, 0).
 				Render(left + val + right)
 		}
 		return lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(BorderRounded).
 			BorderForeground(ColorBorder).
-			Padding(0, 0).
-			Render(StyleMuted.Render("‹") + StyleFgDim.Render(fmt.Sprintf(" %-14s", cur)) + StyleMuted.Render("›"))
+			Render(StyleMuted.Render("‹") + StyleFgDim.Render(fmt.Sprintf(" %-16s", cur)) + StyleMuted.Render("›"))
 
 	default:
 		return m.inputs[i].View()
@@ -782,34 +778,36 @@ func (m SettingsModel) renderWidget(i int) string {
 }
 
 func (m SettingsModel) View() string {
-	halfW := max((m.width-4)/2, 30)
-	contentH := max(m.height-10, 5)
+	halfW := max((m.width-6)/2, 28)
+	t := i18n.T()
 
-	// ── Section sub-tabs ────────────────────────────────────────────────────
+	// ── Section sub-tab selector ────────────────────────────────────────────
 	var sectionBar strings.Builder
 	for i, s := range sectionNames() {
 		if i == m.activeSection {
-			sectionBar.WriteString(StyleTabActive.Render(" " + s + " "))
+			sectionBar.WriteString(StyleSubTabActive.Render(" " + s + " "))
 		} else {
-			sectionBar.WriteString(StyleTabInactive.Render(" " + s + " "))
+			sectionBar.WriteString(StyleSubTabInactive.Render(" " + s + " "))
 		}
+		sectionBar.WriteString("  ")
 	}
 
 	// ── Left: fields list ───────────────────────────────────────────────────
 	idxs := m.sectionIndexes(m.activeSection)
 	var leftLines []string
+	leftLines = append(leftLines, "")
 	for _, idx := range idxs {
 		f := m.fields[idx]
 		mod := ""
 		if m.modified[idx] {
 			mod = " " + StyleWarning.Render("●")
 		}
-		cur := "  "
+		cur := "   "
 		if idx == m.cursor {
-			cur = StylePrimary.Render("▶ ")
+			cur = StyleAccent.Render(" ▶ ")
 		}
 		widget := m.renderWidget(idx)
-		label := fmt.Sprintf("%-22s", f.Label())
+		label := fmt.Sprintf("%-24s", f.Label())
 		if idx == m.cursor {
 			label = StyleBold.Render(label)
 		} else {
@@ -817,74 +815,80 @@ func (m SettingsModel) View() string {
 		}
 		line := fmt.Sprintf("%s%s  %s%s", cur, label, widget, mod)
 		leftLines = append(leftLines, line)
+		leftLines = append(leftLines, "")
 	}
-	leftContent := strings.Join(leftLines, "\n")
-	leftBox := StyleBorderActive.Width(halfW).Height(contentH).Render(leftContent)
+	leftBox := renderPanel("", strings.Join(leftLines, "\n"), halfW, true)
 
 	// ── Right: tooltip ──────────────────────────────────────────────────────
 	var tipLines []string
+	tipLines = append(tipLines, "")
 	if m.cursor >= 0 && m.cursor < len(m.fields) {
 		f := m.fields[m.cursor]
-		tipLines = append(tipLines, StyleBold.Render(f.Label()))
+		tipLines = append(tipLines, "   "+StyleGlow.Render(f.Label()))
 		tipLines = append(tipLines, "")
 		for _, line := range strings.Split(f.Tooltip(), "\n") {
-			tipLines = append(tipLines, StyleTooltip.Render(line))
+			tipLines = append(tipLines, "   "+StyleTooltip.Render(line))
 		}
 
-		// For enum: show all options
 		if f.Kind == KindEnum && len(f.Options) > 0 {
 			tipLines = append(tipLines, "")
-			tipLines = append(tipLines, StyleFgDim.Render(i18n.T().SettingsOptions))
+			tipLines = append(tipLines, "   "+StyleFgDim.Render(t.SettingsOptions))
 			for j, opt := range f.Options {
-				mark := "  "
+				mark := "     "
 				if j == m.optionIdx[m.cursor] {
-					mark = StyleSuccess.Render("▶ ")
+					mark = StyleSuccess.Render("   ▶ ")
 				}
 				tipLines = append(tipLines, mark+StyleEnumValue.Render(opt))
 			}
 		}
 
 		tipLines = append(tipLines, "")
-		cur := m.currentValue(m.cursor)
+		curVal := m.currentValue(m.cursor)
 		if f.Kind == KindPassword && !m.editing {
-			cur = strings.Repeat("•", min(len(cur), 20))
+			curVal = strings.Repeat("•", min(len(curVal), 20))
 		}
-		tipLines = append(tipLines, StyleMuted.Render(i18n.T().SettingsValue)+cur)
+		tipLines = append(tipLines, "   "+StyleMuted.Render(t.SettingsValue)+StyleFgDim.Render(curVal))
 		if m.modified[m.cursor] {
-			tipLines = append(tipLines, StyleWarning.Render(i18n.T().SettingsUnsaved))
+			tipLines = append(tipLines, "   "+StyleWarning.Render(t.SettingsUnsaved))
 		}
 	}
-	rightBox := StyleBorder.Width(halfW).Height(contentH).Render(strings.Join(tipLines, "\n"))
+	rightBox := renderPanel("", strings.Join(tipLines, "\n"), halfW, false)
 
 	// ── Error line ──────────────────────────────────────────────────────────
 	errLine := ""
 	if m.errMsg != "" {
-		errLine = StyleError.Render("  ✖ "+m.errMsg) + "\n"
+		errLine = " " + StyleError.Render("✖ "+m.errMsg)
 	}
 
 	// ── Help bar (context-aware) ─────────────────────────────────────────────
 	var helpParts []string
-	helpParts = append(helpParts, i18n.T().HelpField)
-	helpParts = append(helpParts, i18n.T().HelpSection)
+	helpParts = append(helpParts, t.HelpField)
+	helpParts = append(helpParts, t.HelpSection)
 
-	f := m.fields[m.cursor]
-	switch f.Kind {
-	case KindBool:
-		helpParts = append(helpParts, i18n.T().HelpToggle)
-	case KindEnum:
-		helpParts = append(helpParts, i18n.T().HelpNextOption)
-	default:
-		helpParts = append(helpParts, i18n.T().HelpEdit)
+	if m.cursor >= 0 && m.cursor < len(m.fields) {
+		f := m.fields[m.cursor]
+		switch f.Kind {
+		case KindBool:
+			helpParts = append(helpParts, t.HelpToggle)
+		case KindEnum:
+			helpParts = append(helpParts, t.HelpNextOption)
+		default:
+			helpParts = append(helpParts, t.HelpEdit)
+		}
 	}
-	helpParts = append(helpParts, i18n.T().HelpSave)
-	helpParts = append(helpParts, i18n.T().HelpReset)
+	helpParts = append(helpParts, t.HelpSave)
+	helpParts = append(helpParts, t.HelpReset)
 
-	help := StyleHelpBar.Render("  " + strings.Join(helpParts, "  ·  ") + "  ")
+	helpPanel := renderHelpPanel(strings.Join(helpParts, "  │  "), m.width)
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		sectionBar.String(),
-		lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "  ", rightBox),
-		errLine,
-		help,
-	)
+	rows := []string{
+		" " + sectionBar.String(),
+		"",
+		lipgloss.JoinHorizontal(lipgloss.Top, " ", leftBox, " ", rightBox),
+	}
+	if errLine != "" {
+		rows = append(rows, errLine)
+	}
+	rows = append(rows, " ", helpPanel)
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
