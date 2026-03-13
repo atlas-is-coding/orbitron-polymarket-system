@@ -80,7 +80,14 @@ func NewWalletsModel(wm WalletProvider, cfgPath string, width, height int) Walle
 		table.WithHeight(max(height/2-3, 3)),
 	)
 	s := table.DefaultStyles()
-	s.Header = s.Header.Bold(true)
+	s.Header = s.Header.
+		Bold(true).
+		Foreground(ColorAccent).
+		Background(ColorSurface)
+	s.Selected = s.Selected.
+		Foreground(ColorBg).
+		Background(ColorAccent).
+		Bold(true)
 	t.SetStyles(s)
 
 	m := WalletsModel{
@@ -103,6 +110,8 @@ func makeWalletFormInputs() []textinput.Model {
 		ti := textinput.New()
 		ti.Placeholder = labels[i]
 		ti.CharLimit = 256
+		ti.PromptStyle = StyleAccent
+		ti.Cursor.Style = StyleAccent
 		if passwords[i] {
 			ti.EchoMode = textinput.EchoPassword
 		}
@@ -381,24 +390,22 @@ func (m WalletsModel) View() string {
 }
 
 func (m WalletsModel) viewTable() string {
-	helpText := StyleHelpBar.Render("  [a] add  [e] edit  [d] delete  [space] toggle  [enter] details  ")
-
+	var content string
 	if m.wm == nil || len(m.wm.WalletIDs()) == 0 {
-		placeholder := lipgloss.NewStyle().
-			Padding(1, 2).
-			Render(StyleMuted.Render("No wallets configured. Press [a] to add one."))
-		box := StyleBorderActive.Width(m.width - 4).Render(placeholder)
-		return lipgloss.JoinVertical(lipgloss.Left, box, helpText)
+		content = renderEmptyState("◎", "No wallets configured", "Press [a] to add one", m.width)
+	} else {
+		content = "\n" + m.walletsTable.View()
 	}
-
-	tableView := StyleBorderActive.Width(m.width - 4).Render(m.walletsTable.View())
-	return lipgloss.JoinVertical(lipgloss.Left, tableView, helpText)
+	tablePanel := renderPanel("Wallets", content, m.width, true)
+	helpPanel := renderHelpPanel("↑↓ navigate   a add   e edit   d delete   Space toggle   Enter details", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, " ", helpPanel)
 }
 
 func (m WalletsModel) viewDetail() string {
 	id := m.detailID
 	if m.wm == nil {
-		return StyleBorderActive.Width(m.width - 4).Render(StyleError.Render("  Wallet provider unavailable"))
+		return lipgloss.JoinVertical(lipgloss.Left, " ",
+			renderPanel("Wallet Detail", StyleError.Render("  Wallet provider unavailable"), m.width, true))
 	}
 
 	label := m.wm.WalletLabel(id)
@@ -425,38 +432,37 @@ func (m WalletsModel) viewDetail() string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(StyleBold.Render(fmt.Sprintf("Wallet: %s", label)))
+	sb.WriteString("\n   " + StyleBold.Render(fmt.Sprintf("Wallet: %s", label)))
 	sb.WriteString("  ")
 	sb.WriteString(statusStr)
-	sb.WriteString("\n")
+	sb.WriteString("\n   ")
 	sb.WriteString(StyleFgDim.Render("Address: "))
 	sb.WriteString(addr)
 	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("  %-12s  $%.2f\n", StyleFgDim.Render("Balance:"), bal))
-	sb.WriteString(fmt.Sprintf("  %-12s  %s\n", StyleFgDim.Render("P&L:"), pnlStr))
-	sb.WriteString(fmt.Sprintf("  %-12s  %d\n", StyleFgDim.Render("Open Orders:"), orders))
-	sb.WriteString(fmt.Sprintf("  %-12s  %d\n", StyleFgDim.Render("Total Trades:"), total))
+	sb.WriteString(fmt.Sprintf("   %-14s  $%.2f\n", StyleFgDim.Render("Balance:"), bal))
+	sb.WriteString(fmt.Sprintf("   %-14s  %s\n", StyleFgDim.Render("P&L:"), pnlStr))
+	sb.WriteString(fmt.Sprintf("   %-14s  %d\n", StyleFgDim.Render("Open Orders:"), orders))
+	sb.WriteString(fmt.Sprintf("   %-14s  %d\n\n", StyleFgDim.Render("Total Trades:"), total))
 
-	box := StyleBorderActive.Width(m.width - 4).Render(sb.String())
-	help := StyleHelpBar.Render("  [esc] back  ")
-	return lipgloss.JoinVertical(lipgloss.Left, box, help)
+	detailPanel := renderPanel("Wallet Detail", sb.String(), m.width, true)
+	helpPanel := renderHelpPanel("esc back", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", detailPanel, " ", helpPanel)
 }
 
 func (m WalletsModel) viewForm(title, helpLine string) string {
 	fieldNames := []string{"Label", "Private Key", "API Key", "API Secret", "Passphrase", "Chain ID"}
 
 	var sb strings.Builder
-	sb.WriteString(StyleBold.Render("── "+title+" ──"))
-	sb.WriteString("\n\n")
+	sb.WriteString("\n")
 
 	for i, ti := range m.inputs {
 		var prefix string
 		var labelStr string
 		if i == m.formFocus {
-			prefix = StyleAccent.Render("> ")
+			prefix = StyleAccent.Render(" ▶ ")
 			labelStr = StyleBold.Render(fmt.Sprintf("%-14s", fieldNames[i]))
 		} else {
-			prefix = "  "
+			prefix = "   "
 			labelStr = StyleFgDim.Render(fmt.Sprintf("%-14s", fieldNames[i]))
 		}
 		sb.WriteString(prefix)
@@ -468,12 +474,13 @@ func (m WalletsModel) viewForm(title, helpLine string) string {
 
 	if m.formErr != "" {
 		sb.WriteString("\n")
-		sb.WriteString(StyleError.Render("  ✖ " + m.formErr))
+		sb.WriteString(StyleError.Render("   ✖ " + m.formErr))
 	}
 
-	box := StyleBorderActive.Width(m.width - 4).Render(sb.String())
-	helpBar := StyleHelpBar.Render("  " + helpLine + "  ")
-	return lipgloss.JoinVertical(lipgloss.Left, box, helpBar)
+	sb.WriteString("\n")
+	formPanel := renderPanel(title, sb.String(), m.width, true)
+	helpPanel := renderHelpPanel(helpLine, m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", formPanel, " ", helpPanel)
 }
 
 func (m WalletsModel) viewConfirmDelete() string {
@@ -486,12 +493,12 @@ func (m WalletsModel) viewConfirmDelete() string {
 		label = id
 	}
 
-	text := fmt.Sprintf(
-		"%s\n\n  Delete wallet %s?\n\n  %s   %s",
-		StyleBold.Render("Confirm Delete"),
+	content := fmt.Sprintf(
+		"\n   Delete wallet %s?\n\n   %s   %s\n",
 		StyleWarning.Render(fmt.Sprintf("%q", label)),
 		StyleError.Render("[y] Yes, delete"),
 		StyleMuted.Render("[n] Cancel"),
 	)
-	return StyleBorderActive.Width(m.width - 4).Render(text)
+	panel := renderPanel("Confirm Delete", content, m.width, true)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", panel)
 }
