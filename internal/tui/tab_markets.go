@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
 )
 
 type marketsMode int
@@ -34,9 +34,10 @@ type MarketsModel struct {
 	tagIdx    int
 	cursor    int
 	detail    *gamma.Market
+	err       error
 
 	// multi-select
-	selected  map[string]bool // conditionID → selected for batch buy
+	selected map[string]bool // conditionID → selected for batch buy
 
 	// batch buy form
 	batchMode bool
@@ -61,14 +62,20 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 	pi := textinput.New()
 	pi.Placeholder = "0.50"
 	pi.Width = 8
+	pi.PromptStyle = StyleAccent
+	pi.Cursor.Style = StyleAccent
 
 	si := textinput.New()
 	si.Placeholder = "100"
 	si.Width = 8
+	si.PromptStyle = StyleAccent
+	si.Cursor.Style = StyleAccent
 
 	bs := textinput.New()
 	bs.Placeholder = "50"
 	bs.Width = 8
+	bs.PromptStyle = StyleAccent
+	bs.Cursor.Style = StyleAccent
 
 	sel := make(map[string]bool)
 	if primaryID != "" {
@@ -94,10 +101,13 @@ func (m MarketsModel) Init() tea.Cmd { return nil }
 func (m MarketsModel) Update(msg tea.Msg) (MarketsModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case MarketsUpdatedMsg:
-		m.markets = msg.Markets
-		m.tags = msg.Tags
-		if m.cursor >= len(m.markets) && len(m.markets) > 0 {
-			m.cursor = len(m.markets) - 1
+		m.err = msg.Err
+		if msg.Err == nil {
+			m.markets = msg.Markets
+			m.tags = msg.Tags
+			if m.cursor >= len(m.markets) && len(m.markets) > 0 {
+				m.cursor = len(m.markets) - 1
+			}
 		}
 
 	case tea.KeyMsg:
@@ -159,12 +169,14 @@ func (m MarketsModel) updateList(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 			m.batchMode = true
 			m.batchSide = "YES"
 			m.batchSize.Focus()
+			return m, textinput.Blink
 		}
 	case "n":
 		if len(m.selected) > 0 {
 			m.batchMode = true
 			m.batchSide = "NO"
 			m.batchSize.Focus()
+			return m, textinput.Blink
 		}
 	case "escape", "esc":
 		m.selected = make(map[string]bool)
@@ -185,6 +197,7 @@ func (m MarketsModel) updateDetail(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 		}
 		m.mode = modeOrder
 		m.priceInput.Focus()
+		return m, textinput.Blink
 	case "s":
 		m.orderSide = "NO"
 		if len(m.detail.OutcomePrices) > 1 {
@@ -192,6 +205,7 @@ func (m MarketsModel) updateDetail(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 		}
 		m.mode = modeOrder
 		m.priceInput.Focus()
+		return m, textinput.Blink
 	}
 	return m, nil
 }
@@ -213,7 +227,7 @@ func (m MarketsModel) updateOrder(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 			m.sizeInput.Blur()
 			m.priceInput.Focus()
 		}
-		return m, nil
+		return m, textinput.Blink
 	}
 	var cmd tea.Cmd
 	if m.priceInput.Focused() {
@@ -341,6 +355,15 @@ func (m MarketsModel) View() string {
 func (m MarketsModel) viewList() string {
 	var sb strings.Builder
 
+	if m.err != nil {
+		sb.WriteString("\n   " + StyleError.Render("Error fetching markets") + "\n\n")
+		sb.WriteString("   " + StyleMuted.Render(fmt.Sprintf("%v", m.err)) + "\n\n")
+		if strings.Contains(strings.ToLower(m.err.Error()), "timeout") || strings.Contains(strings.ToLower(m.err.Error()), "connection") {
+			sb.WriteString("   " + StyleBold.Render("Tip: ") + "This might be due to geoblocking. Try enabling Proxy in Settings.\n")
+		}
+		return lipgloss.JoinVertical(lipgloss.Left, " ", renderPanel("Markets", sb.String(), m.width, true))
+	}
+
 	// Tag filter row
 	tagLabel := "All"
 	for _, tg := range m.tags {
@@ -349,29 +372,29 @@ func (m MarketsModel) viewList() string {
 			break
 		}
 	}
-	filterLine := fmt.Sprintf("Filter: [%s]  [f/F] cycle  [Space] select  [b/n] batch buy", tagLabel)
-	sb.WriteString(StyleMuted.Render(filterLine) + "\n")
+	filterLine := fmt.Sprintf("  Filter: [%s]  f/F cycle  Space select  b/n batch buy", StyleAccent.Render(tagLabel))
+	sb.WriteString("\n" + filterLine + "\n")
 
 	// Selection / batch status bar
 	if len(m.selected) > 0 {
 		status := fmt.Sprintf("  %d selected", len(m.selected))
 		if m.batchMode {
-			sb.WriteString(StyleFieldActive.Render(status+" · Batch "+m.batchSide) + "\n")
+			sb.WriteString("\n" + StyleFieldActive.Render(status+" · Batch "+m.batchSide) + "\n")
 			sb.WriteString(fmt.Sprintf("  Size per market ($): %s\n", m.batchSize.View()))
-			sb.WriteString(StyleHelpBar.Render("  [Enter] execute  [Esc] cancel") + "\n")
+			sb.WriteString("  " + StyleMuted.Render("Enter execute   esc cancel") + "\n")
 		} else {
-			sb.WriteString(StyleFieldActive.Render(status+" · [b] Buy YES  [n] Buy NO  [Esc] clear") + "\n")
+			sb.WriteString("\n" + StyleFieldActive.Render(status+" · b Buy YES   n Buy NO   esc clear") + "\n")
 		}
 	}
 	sb.WriteString("\n")
 
 	filtered := m.filtered()
 	if len(filtered) == 0 {
-		sb.WriteString(StyleMuted.Render("No markets found."))
-		return sb.String()
+		sb.WriteString("  " + StyleMuted.Render("No markets found.") + "\n")
+		return lipgloss.JoinVertical(lipgloss.Left, " ", renderPanel("Markets", sb.String(), m.width, true))
 	}
 
-	visibleH := m.height - 10
+	visibleH := m.height - 12
 	if visibleH < 5 {
 		visibleH = 5
 	}
@@ -389,25 +412,29 @@ func (m MarketsModel) viewList() string {
 		yesPrice := mktYesProb(mk)
 		sel := " "
 		if m.selected[mk.ConditionID] {
-			sel = "✓"
+			sel = StyleAccent.Render("✓")
 		}
-		line := fmt.Sprintf("[%s] %-50s YES %-5s  Vol $%s",
+		line := fmt.Sprintf(" [%s] %-50s YES %-6s Vol $%s",
 			sel,
 			mktTruncate(mk.Question, 50),
-			fmt.Sprintf("%.0f%%", yesPrice*100),
-			mktFormatVolume(float64(mk.Volume)),
+			StyleSuccess.Render(fmt.Sprintf("%.0f%%", yesPrice*100)),
+			StyleMuted.Render(mktFormatVolume(float64(mk.Volume))),
 		)
 		if i == m.cursor {
-			sb.WriteString(StyleFieldActive.Render("▶ "+line) + "\n")
+			sb.WriteString(" " + StyleFieldActive.Render("▶"+line) + "\n")
 		} else {
-			sb.WriteString("  " + line + "\n")
+			sb.WriteString("   " + line + "\n")
 		}
 	}
 
+	listPanel := renderPanel("Markets", sb.String(), m.width, true)
+
+	helpPanel := ""
 	if len(m.selected) == 0 {
-		sb.WriteString("\n" + StyleHelpBar.Render("[Enter] detail  [Space] select  [f/F] filter  [↑↓/jk] navigate"))
+		helpPanel = renderHelpPanel("Enter detail   Space select   f/F filter   ↑↓/jk navigate", m.width)
 	}
-	return sb.String()
+
+	return lipgloss.JoinVertical(lipgloss.Left, " ", listPanel, " ", helpPanel)
 }
 
 func (m MarketsModel) viewDetail() string {
@@ -419,16 +446,16 @@ func (m MarketsModel) viewDetail() string {
 	no := 1 - yes
 
 	var sb strings.Builder
-	sb.WriteString(StyleBold.Render(mk.Question) + "\n")
-	sb.WriteString(StyleMuted.Render(fmt.Sprintf(
+	sb.WriteString("\n  " + StyleBold.Render(mk.Question) + "\n\n")
+	sb.WriteString("  " + StyleMuted.Render(fmt.Sprintf(
 		"End: %s  |  Liq: $%s\n\n",
 		mk.EndDateISO, mktFormatVolume(float64(mk.Liquidity)),
 	)))
 
-	yesBar := mktProgressBar(yes, 28)
-	noBar := mktProgressBar(no, 28)
-	sb.WriteString(fmt.Sprintf("YES  %s  %.1f¢\n", yesBar, yes*100))
-	sb.WriteString(fmt.Sprintf("NO   %s  %.1f¢\n\n", noBar, no*100))
+	yesBar := mktProgressBar(yes, 28, StyleSuccess)
+	noBar := mktProgressBar(no, 28, StyleError)
+	sb.WriteString(fmt.Sprintf("  YES  %s  %s\n", yesBar, StyleSuccess.Render(fmt.Sprintf("%.1f¢", yes*100))))
+	sb.WriteString(fmt.Sprintf("  NO   %s  %s\n\n", noBar, StyleError.Render(fmt.Sprintf("%.1f¢", no*100))))
 
 	walletLabel := "none"
 	for _, w := range m.wallets {
@@ -437,9 +464,11 @@ func (m MarketsModel) viewDetail() string {
 			break
 		}
 	}
-	sb.WriteString(StyleMuted.Render("Wallet: "+walletLabel) + "\n\n")
-	sb.WriteString(StyleHelpBar.Render("[b] Buy YES  [s] Buy NO  [Esc] Back  (price auto-filled)"))
-	return sb.String()
+	sb.WriteString("  " + StyleMuted.Render("Wallet: "+walletLabel) + "\n\n")
+
+	detailPanel := renderPanel("Market Detail", sb.String(), m.width, true)
+	helpPanel := renderHelpPanel("b Buy YES   s Buy NO   esc back   (price auto-filled)", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", detailPanel, " ", helpPanel)
 }
 
 func (m MarketsModel) viewOrder() string {
@@ -447,20 +476,37 @@ func (m MarketsModel) viewOrder() string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString(StyleBold.Render(fmt.Sprintf(
-		"Buy %s — %s\n\n", m.orderSide, mktTruncate(m.detail.Question, 50),
+
+	sideColor := StyleSuccess
+	if m.orderSide == "NO" {
+		sideColor = StyleError
+	}
+
+	sb.WriteString("\n  " + StyleBold.Render(fmt.Sprintf(
+		"Buy %s — %s\n\n", sideColor.Render(m.orderSide), mktTruncate(m.detail.Question, 50),
 	)))
-	sb.WriteString(fmt.Sprintf("Price (0-1):  %s\n", m.priceInput.View()))
-	sb.WriteString(fmt.Sprintf("Size (USDC):  %s\n", m.sizeInput.View()))
+
+	prefixP := "   "
+	prefixS := "   "
+	if m.priceInput.Focused() {
+		prefixP = StyleAccent.Render(" ▶ ")
+	} else if m.sizeInput.Focused() {
+		prefixS = StyleAccent.Render(" ▶ ")
+	}
+
+	sb.WriteString(fmt.Sprintf("%sPrice (0-1):  %s\n", prefixP, m.priceInput.View()))
+	sb.WriteString(fmt.Sprintf("%sSize (USDC):  %s\n", prefixS, m.sizeInput.View()))
 
 	var price, size float64
 	fmt.Sscanf(m.priceInput.Value(), "%f", &price)
 	fmt.Sscanf(m.sizeInput.Value(), "%f", &size)
 	if price > 0 && size > 0 {
-		sb.WriteString(StyleMuted.Render(fmt.Sprintf("\n→ Cost: $%.2f\n", price*size)))
+		sb.WriteString(StyleMuted.Render(fmt.Sprintf("\n  → Cost: $%.2f\n", price*size)))
 	}
-	sb.WriteString("\n" + StyleHelpBar.Render("[Tab] switch field  [Enter] submit  [Esc] cancel"))
-	return sb.String()
+
+	orderPanel := renderPanel("Place Order", sb.String(), m.width, true)
+	helpPanel := renderHelpPanel("Tab switch field   Enter submit   esc cancel", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", orderPanel, " ", helpPanel)
 }
 
 func (m MarketsModel) updateBatch(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
@@ -516,7 +562,7 @@ func mktYesProb(m gamma.Market) float64 {
 	return 0.5
 }
 
-func mktProgressBar(pct float64, width int) string {
+func mktProgressBar(pct float64, width int, filledStyle lipgloss.Style) string {
 	filled := int(pct * float64(width))
 	if filled > width {
 		filled = width
@@ -524,7 +570,7 @@ func mktProgressBar(pct float64, width int) string {
 	if filled < 0 {
 		filled = 0
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#a78bfa")).Render(strings.Repeat("█", filled)) +
+	return filledStyle.Render(strings.Repeat("█", filled)) +
 		StyleMuted.Render(strings.Repeat("░", width-filled))
 }
 
