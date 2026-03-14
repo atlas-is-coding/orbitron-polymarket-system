@@ -1,154 +1,215 @@
-# Orbitron 📈🤖
-**Official Website**: [getorbitron.net](https://getorbitron.net)
+<div align="center">
 
+<img src="internal/webui/web/src/assets/logo.svg" alt="Orbitron" width="110" />
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/orbitron/bot)](https://goreportcard.com/report/github.com/orbitron/bot)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+# Orbitron
 
-*Read this in other languages: [Русский](README_ru.md), [中文](README_zh.md), [한국어](README_ko.md), [日本語](README_ja.md).*
+**Advanced algorithmic trading & portfolio management bot for Polymarket CTF Exchange**
 
-Orbitron is an advanced algorithmic trading and management bot for the **Polymarket CTF Exchange**. It features a robust multi-interface architecture including an interactive Terminal User Interface (TUI), a Vue 3 Web UI, and a comprehensive Telegram bot for remote management.
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8247E5?style=flat-square)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/atlasdev/orbitron?style=flat-square)](https://goreportcard.com/report/github.com/atlasdev/orbitron)
+[![Stars](https://img.shields.io/github/stars/atlas-is-coding/orbitron-polymarket-system?style=flat-square&color=FFD700)](https://github.com/atlas-is-coding/orbitron-polymarket-system/stargazers)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-555?style=flat-square)](https://github.com/atlas-is-coding/orbitron-polymarket-system)
+[![Polygon](https://img.shields.io/badge/Polygon-8247E5?style=flat-square&logo=polygon&logoColor=white)](https://polygon.technology/)
 
-## 🌟 Comprehensive Features
+[🌐 getorbitron.net](https://getorbitron.net) &nbsp;·&nbsp; [English](README.md) &nbsp;·&nbsp; [Русский](README_ru.md) &nbsp;·&nbsp; [中文](README_zh.md) &nbsp;·&nbsp; [한국어](README_ko.md) &nbsp;·&nbsp; [日本語](README_ja.md)
 
-*   **Multi-Interface Experience:**
-    *   **TUI:** A beautiful terminal interface with separate tabs for Markets, Trading, Copytrading, Wallets, Strategies, Settings, and Logs.
-    *   **Web UI:** A Vue 3 SPA with real-time WebSocket updates, JWT authentication, and a responsive design.
-    *   **Telegram Bot:** An interactive bot using inline keyboards and multi-step conversations that mirrors the TUI functionality.
-*   **Algorithmic Trading Engine:** Built-in strategies including Arbitrage, Cross-Market, Fade Chaos, Market Making, Positive EV, and Riskless Rate. Easily register new custom strategies.
-*   **Advanced Copy Trading:** Monitor target wallets via the Data API and automatically copy positions via the CLOB API. Supports dynamic size-mode allocations (`proportional` or `fixed_pct`).
-*   **Real-Time Monitoring & Alerts:**
-    *   **Trades Monitor:** Tracks open orders, trade fills, and positions.
-    *   **Market Alerts:** Evaluates real-time alert conditions against market state diffs.
-*   **Secure Authentication:** L1/L2 credentials architecture. Automatic EIP-712 signature derivation—L2 credentials are kept entirely in memory and are never stored in your config file. Signatures expire automatically in 30 seconds for security.
-*   **Multi-Wallet Support:** Manage multiple active wallets, toggle them on/off, and view aggregated stats directly from any of the UIs.
-*   **Internationalization (i18n):** Native, hot-reloading support for English, Russian, Chinese, Japanese, and Korean across all interfaces.
+</div>
 
-## 🏗 Architecture Overview
+---
 
-The bot operates across seven core, context-cancellable subsystems:
+## Overview
 
-1.  **WebSocket Client:** Persistent connections with auto-reconnect to Polymarket CLOB (`market`, `user`, `asset` channels).
-2.  **Monitor:** Polls Gamma & Data API for market state diffs and evaluates real-time alert conditions.
-3.  **Trading Engine:** Scalable Goroutine-based execution layer for pluggable trading strategies (`trading.Strategy`).
-4.  **Notifier:** Configurable alerting system (defaulting to Telegram).
-5.  **Copy Trader:** Tracks configured wallets and replicates their positions. Hot-reloads on configuration changes without restarting the bot.
-6.  **Telegram Bot:** Interactive mirror of the TUI using a single-admin model (`AdminChatID`).
-7.  **Web UI:** Embedded HTTP server + WebSocket hub serving a Vue 3 SPA.
+Orbitron is a self-hosted, multi-interface bot for the **Polymarket CTF Exchange**. It combines a pluggable algorithmic trading engine with copy-trading, real-time market monitoring, and a secure multi-wallet architecture - all controllable from a terminal, browser, or Telegram chat.
 
-## ⚙️ Configuration (`config.toml`)
+> Trading and database features are **disabled by default** for safety. Enable only what you need in `config.toml`.
 
-The bot is controlled entirely by `config.toml`. Trading and database features are disabled by default for safety.
+---
 
-Key sections include:
-*   `[auth]`: Requires `private_key` (hex, no `0x` prefix). L2 credentials are auto-derived at startup.
-*   `[webui]`: `enabled` (true/false), `listen` (e.g., `127.0.0.1:8080`), `jwt_secret` (used for signing and as the login password).
-*   `[ui]`: `language` (`en`, `ru`, `zh`, `ja`, `ko`). Hot-reloads instantly.
-*   `[monitor.trades]`: `enabled`, `poll_interval_ms`. Requires L2 auth.
-*   `[copytrading]`: `enabled`, `size_mode` (`proportional`/`fixed_pct`), and the `[[copytrading.traders]]` list. Requires database and L2 auth.
-*   `[telegram]`: `enabled`, `bot_token`, `admin_chat_id` (single admin target).
-*   `[database]`: `enabled`, `path` (SQLite DB path).
-*   `chain_id`: `137` for Polygon Mainnet, `80002` for Amoy Testnet.
+## Features
 
-## 🚀 Installation & Setup
+|  |  |  |
+|:---:|:---:|:---:|
+| **🖥 Terminal UI** | **🌐 Web UI** | **🤖 Telegram Bot** |
+| BubbleTea TUI with tabbed layout - Markets, Trading, Copy Trading, Wallets, Strategies, Settings, Logs | Vue 3 SPA with real-time WebSocket updates, JWT authentication, and responsive dark theme | Full-featured bot mirror with inline keyboards and multi-step conversations |
+| **⚡ 6 Trading Strategies** | **📊 Copy Trading** | **🔐 Secure Auth** |
+| Arbitrage, Cross-Market, Fade Chaos, Market Making, Positive EV, Riskless Rate. Register your own in 3 lines | Monitor target wallets via Data API and auto-replicate their positions via CLOB API | L1 EIP-712 + L2 HMAC-SHA256. API keys derived in-memory at startup, never written to disk |
+| **💼 Multi-Wallet** | **🔔 Alerts & Monitor** | **🌍 5 Languages** |
+| Manage multiple active wallets. Toggle them on/off and view aggregated P&L from any interface | Real-time trade fills, position tracking, and price alerts - delivered instantly to Telegram | EN · RU · ZH · JA · KO with hot-reload - switch language without restarting |
 
-### Prerequisites
+---
 
-*   [Go 1.24+](https://golang.org/doc/install)
-*   [Node.js 18+](https://nodejs.org/) (Only needed if modifying the Web UI)
-*   Polymarket Wallet Private Key (for L1 Signature derivation)
+## Architecture
 
-### Setup Steps
+Orbitron runs as seven independent, context-cancellable subsystems:
 
-#### Option 1: Universal Setup Script (Recommended)
-We provide a universal `setup.sh` script that works on Linux, macOS, and Windows (via Git Bash/WSL). It automatically installs Go and Node.js (if missing), sets up your `config.toml`, builds the Vue 3 frontend, and compiles the Go backend.
+```mermaid
+graph LR
+    subgraph interfaces["  Interfaces  "]
+        TUI["🖥 TUI\nBubbleTea"]
+        WEB["🌐 Web UI\nVue 3"]
+        TG["🤖 Telegram Bot"]
+    end
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-org/orbitron.git
-    cd orbitron
-    ```
+    subgraph core["  Core Engine  "]
+        ENG["⚡ Trading Engine\nStrategy Executor"]
+        COPY["📊 Copy Trader\nWallet Tracker"]
+        MON["🔔 Monitor\nAlert Engine"]
+        WS["🔌 WebSocket\nAuto-reconnect"]
+        NOT["📢 Notifier"]
+    end
 
-2.  **Run the setup script:**
-    ```bash
-    ./setup.sh
-    ```
+    subgraph apis["  Polymarket APIs  "]
+        CLOB["CLOB API"]
+        GAMMA["Gamma API"]
+        DATA["Data API"]
+        WSS["WebSocket Feed"]
+    end
 
-#### Option 2: Manual Setup
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-org/orbitron.git
-    cd orbitron
-    ```
+    TUI & WEB --> ENG & COPY & MON
+    NOT --> TG
+    ENG --> CLOB
+    COPY --> DATA & CLOB
+    MON --> GAMMA & DATA
+    WS <--> WSS
+```
 
-2.  **Configure the Bot:**
-    Create a `config.toml` file in the root directory. You can start the bot without it to use the TUI wizard, which will securely help you configure your `private_key`.
+---
 
-3.  **Build and Run:**
-    ```bash
-    # Build the binary
-    go build ./...
+## Quick Start
 
-    # Run the bot
-    go run ./cmd/bot/ --config config.toml
-    ```
+### Option 1 - Setup Script (Recommended)
 
-### Headless Mode
-To run the bot in a server environment without the TUI, use the headless flag:
+Works on Linux, macOS, and Windows (Git Bash / WSL). Installs Go & Node.js if missing, builds the frontend, and compiles the binary.
+
+```bash
+git clone https://github.com/atlas-is-coding/orbitron-polymarket-system.git
+cd orbitron-polymarket-system
+./setup.sh
+```
+
+### Option 2 - Manual Build
+
+```bash
+git clone https://github.com/atlas-is-coding/orbitron-polymarket-system.git
+cd orbitron-polymarket-system
+
+# Build the frontend (only needed if you modify Web UI sources)
+cd internal/webui/web && npm install && npm run build && cd ../../..
+
+# Run
+go run ./cmd/bot/ --config config.toml
+```
+
+### Headless / Server Mode
+
 ```bash
 go run ./cmd/bot/ --config config.toml --no-tui
 ```
 
-## 🛠 Troubleshooting & Common Issues
+> **No config.toml?** Run the bot without it - the TUI wizard launches automatically and walks you through a secure setup, including your private key configuration.
 
-*   **API Key / 401 Unauthorized:** Ensure your `private_key` is correct. The bot automatically derives the L2 API key, secret, and passphrase at startup. L2 signatures expire in 30 seconds; ensure your system clock is synchronized.
-*   **Web UI "Network Error":** If a Go HTTP handler panics, the browser reports a generic "Network Error" because Go closes the TCP connection without a JSON body. Check the terminal logs for the actual Go panic stack trace.
-*   **Missing Market Data in Web UI / TUI:** The internal EventBus drops messages silently if the buffer is full. If you have logging set to `trace` and the bot is producing too many logs, important messages like `MarketsUpdatedMsg` might be dropped. Reduce log level to `info` or `debug`.
-*   **WebSocket "Bad Handshake":** The bot connects to specific channels (`.../ws/market`), not the root WS URL. This is handled internally, but verify your firewall/network allows WebSocket connections to Polymarket.
-*   **Polymarket Token IDs Parsing:** Token IDs from Polymarket Gamma API are decimal strings. The bot parses them correctly using `big.Int.SetString(id, 10)`. Do not attempt to parse them as hex directly in your own scripts.
+---
 
-## 💻 Development Guide
+## Configuration
 
-### Building the Web UI
-The Vue 3 Web UI is embedded into the Go binary. If you modify the files in `internal/webui/web/src`, you must rebuild the frontend for the Go binary to pick up the changes:
-```bash
-cd internal/webui/web
-npm install
-npm run build
+All behavior is controlled by `config.toml`. Copy `config.toml.example` as a starting point.
+
+<details>
+<summary><strong>Key configuration sections</strong></summary>
+
+<br>
+
+| Section | Key Fields | Notes |
+|---|---|---|
+| `[[wallets]]` | `private_key`, `api_key`, `api_secret`, `passphrase`, `chain_id` | `chain_id` `137` = Polygon Mainnet, `80002` = Amoy Testnet |
+| `[trading]` | `enabled`, `max_position_usd`, `slippage_pct` | Disabled by default |
+| `[trading.strategies.*]` | `enabled`, `execute_orders`, strategy params | Each strategy has its own subsection; all off by default |
+| `[trading.risk]` | `stop_loss_pct`, `take_profit_pct`, `max_daily_loss_usd` | Applied globally across all active strategies |
+| `[copytrading]` | `enabled`, `size_mode`, `traders` | `size_mode`: `proportional` or `fixed_pct` |
+| `[monitor.trades]` | `enabled`, `poll_interval_ms` | Requires L2 auth |
+| `[webui]` | `enabled`, `listen`, `jwt_secret` | `jwt_secret` doubles as the login password |
+| `[telegram]` | `enabled`, `bot_token`, `admin_chat_id` | Single-admin model |
+| `[database]` | `enabled`, `path` | SQLite; required for copy trading |
+| `[ui]` | `language` | `en`, `ru`, `zh`, `ja`, `ko` - hot-reloads on change |
+| `[proxy]` | `enabled`, `type`, `addr` | HTTP / SOCKS5 proxy support |
+
+</details>
+
+---
+
+## Trading Strategies
+
+All six strategies implement the `trading.Strategy` interface and run as independent goroutines inside the trading engine.
+
+| Strategy | Description |
+|---|---|
+| **Arbitrage** | Detects price discrepancies across complementary YES/NO outcomes and captures the spread |
+| **Cross-Market** | Finds correlated markets with divergent pricing and trades the divergence |
+| **Fade Chaos** | Fades extreme price spikes, betting on mean reversion after irrational moves |
+| **Market Making** | Places resting limit orders on both sides of the book to earn the bid-ask spread |
+| **Positive EV** | Scans for markets where the implied probability appears significantly mispriced |
+| **Riskless Rate** | Identifies near-resolved binary markets priced below the risk-free rate |
+
+---
+
+## Development
+
+### Adding a Custom Strategy
+
+```go
+// 1. Implement the interface
+type MyStrategy struct{}
+
+func (s *MyStrategy) Name() string                    { return "my_strategy" }
+func (s *MyStrategy) Start(ctx context.Context) error { /* trading logic */ return nil }
+func (s *MyStrategy) Stop()                           { /* cleanup */ }
+
+// 2. Register in cmd/bot/main.go
+engine.Register(&MyStrategy{})
 ```
 
-### Extending the Bot
-*   **New Trading Strategy:** Implement the `trading.Strategy` interface (`Name`, `Start`, `Stop`), instantiate it in `main.go`, and call `engine.Register(s)`.
-*   **New Configuration Setting:** Add the field to `tab_settings.go`, `Locale` struct, update the 5 `locales/*.json` files, and add logic to `applyConfigKey()` in `config_key.go`. Update the Vue UI in `SettingsView.vue` and its locale files.
-*   **New Telegram Command:** Add the handler in `internal/telegrambot/handlers.go` within the `handleCommand` switch statement.
+### Rebuilding the Web UI
+
+The Vue 3 frontend is embedded into the Go binary at compile time. After modifying `internal/webui/web/src`:
+
+```bash
+cd internal/webui/web
+npm install && npm run build
+```
 
 ### Running Tests
+
 ```bash
 # Unit tests
 go test ./...
 
-# Integration tests (requires real Polymarket API & L1 Key)
+# Integration tests - requires a real Polymarket API key
 POLY_PRIVATE_KEY=0xYOUR_KEY go test ./... -tags=integration -timeout 90s
 ```
 
-## Building
+---
 
-To enable Builder Program features, encode your app token once:
+## Troubleshooting
 
-```bash
-go run ./cmd/tokenenc encode YOUR_REAL_APP_TOKEN
-```
+<details>
+<summary><strong>Common issues</strong></summary>
 
-Then build with the encoded token:
+<br>
 
-```bash
-go build \
-  -ldflags="-X 'github.com/atlasdev/orbitron/internal/license.rawToken=OUTPUT_FROM_ABOVE' \
-            -X 'github.com/atlasdev/orbitron/internal/license.LicenseServerURL=https://your-vps.com/api/v1/license'" \
-  ./cmd/bot/
-```
+| Issue | Cause & Solution |
+|---|---|
+| **401 Unauthorized** | Verify `private_key` is correct hex without `0x` prefix. L2 HMAC signatures expire in 30 s - sync your system clock (`timedatectl`, `w32tm`) |
+| **Web UI shows "Network Error"** | A Go handler panicked before writing response headers. Check the terminal logs for the stack trace - there is no JSON body in this case |
+| **Markets not loading in TUI / Web UI** | The internal EventBus buffer may be saturated at `trace` log level. Set `log.level = "info"` or `"debug"` in config |
+| **WebSocket "Bad Handshake"** | The bot connects to specific channel paths (`.../ws/market`, `.../ws/user`), not the root URL. Check that your firewall allows outbound WebSocket connections to Polymarket |
+| **Copy trading not working** | Requires `[database] enabled = true` and valid L2 credentials in `[[wallets]]` |
 
-Building without `-ldflags` still works — Builder features are simply disabled.
+</details>
 
-## 📜 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+---
+
+## License
+
+[MIT](LICENSE) © 2025 Orbitron
