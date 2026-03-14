@@ -40,3 +40,6 @@ func xorBytes(src []byte) []byte {
 	}
 	return out
 }
+
+// EncodeTokenPublic encodes a plaintext token for use with go build -ldflags.
+func EncodeTokenPublic(plain string) string { return encodeToken(plain) }
