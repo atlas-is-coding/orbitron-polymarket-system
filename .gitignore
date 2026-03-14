@@ -3,6 +3,7 @@ __NOTES.md
 POLYMARKET_DOCS.md
 CLAUDE.md
 CLAUDE copy.md
+PRODUCTION_CHECKLIST.md
 GEMINI.md
 .claude/
 .gemini/
@@ -12,6 +13,7 @@ GEMINI.md
 bot
 *.exe
 tmp/
+dist/
 
 # Data & Logs
 data/

@@ -1,123 +1,215 @@
-# Polytrade Bot 📈🤖
+<div align="center">
 
-*Прочитайте это на других языках: [English](README.md), [中文](README_zh.md), [한국어](README_ko.md), [日本語](README_ja.md).*
+<img src="internal/webui/web/src/assets/logo.svg" alt="Orbitron" width="110" />
 
-Polytrade Bot - это передовой бот для алгоритмической торговли и управления портфелем на бирже **Polymarket CTF**. Он обладает надежной многопользовательской архитектурой, включающей интерактивный терминальный интерфейс (TUI), веб-интерфейс на базе Vue 3 и полнофункционального Telegram-бота для удаленного управления.
+# Orbitron
 
-## 🌟 Подробный функционал
+**Продвинутый бот алгоритмической торговли и управления портфелем на Polymarket CTF Exchange**
 
-*   **Мультиинтерфейс:**
-    *   **TUI:** Красивый терминальный интерфейс с отдельными вкладками: Рынки, Торговля, Копитрейдинг, Кошельки, Стратегии, Настройки и Логи.
-    *   **Web UI:** SPA на Vue 3 с обновлениями в реальном времени через WebSocket, JWT-аутентификацией и адаптивным дизайном.
-    *   **Telegram Bot:** Интерактивный бот с inline-клавиатурами и пошаговыми диалогами, который полностью дублирует функционал TUI.
-*   **Торговый движок:** Встроенные стратегии, включая Арбитраж, Кросс-маркет, Fade Chaos, Маркетмейкинг и другие. Легко подключайте собственные алгоритмические стратегии.
-*   **Продвинутый копитрейдинг:** Отслеживайте целевые кошельки в реальном времени через Data API и автоматически копируйте их позиции через CLOB API. Поддерживает динамическое распределение объемов (`proportional` или `fixed_pct`).
-*   **Мониторинг и уведомления:**
-    *   **Trades Monitor:** Отслеживает открытые ордера, исполнения сделок и позиции.
-    *   **Market Alerts:** Оценивает условия для уведомлений в реальном времени на основе изменений состояния рынка.
-*   **Безопасная аутентификация:** Архитектура учетных данных L1/L2. Автоматическая генерация подписей EIP-712 — ключи L2 создаются исключительно в оперативной памяти и нигде не сохраняются. Подписи живут 30 секунд для максимальной безопасности.
-*   **Поддержка нескольких кошельков:** Удобное управление несколькими активными кошельками, их включение/отключение и просмотр сводной статистики прямо из интерфейса.
-*   **Интернационализация (i18n):** Нативная поддержка английского, русского, китайского, японского и корейского языков с мгновенным переключением.
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8247E5?style=flat-square)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/atlasdev/orbitron?style=flat-square)](https://goreportcard.com/report/github.com/atlasdev/orbitron)
+[![Stars](https://img.shields.io/github/stars/atlas-is-coding/orbitron-polymarket-system?style=flat-square&color=FFD700)](https://github.com/atlas-is-coding/orbitron-polymarket-system/stargazers)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-555?style=flat-square)](https://github.com/atlas-is-coding/orbitron-polymarket-system)
+[![Polygon](https://img.shields.io/badge/Polygon-8247E5?style=flat-square&logo=polygon&logoColor=white)](https://polygon.technology/)
 
-## 🏗 Архитектура и подсистемы
+[🌐 getorbitron.net](https://getorbitron.net) &nbsp;·&nbsp; [English](README.md) &nbsp;·&nbsp; [Русский](README_ru.md) &nbsp;·&nbsp; [中文](README_zh.md) &nbsp;·&nbsp; [한국어](README_ko.md) &nbsp;·&nbsp; [日本語](README_ja.md)
 
-Бот работает на основе семи независимых подсистем:
+</div>
 
-1.  **WebSocket Client:** Постоянное соединение с автопереподключением к Polymarket CLOB (каналы `market`, `user`, `asset`).
-2.  **Monitor:** Опрашивает Gamma и Data API, выявляя изменения на рынке и генерируя алерты.
-3.  **Trading Engine:** Масштабируемый слой на горутинах для выполнения подключаемых торговых стратегий (`trading.Strategy`).
-4.  **Notifier:** Настраиваемая система уведомлений (по умолчанию Telegram).
-5.  **Copy Trader:** Отслеживает кошельки и копирует их позиции. Поддерживает "горячую" перезагрузку списка трейдеров без остановки бота.
-6.  **Telegram Bot:** Интерактивное зеркало TUI с моделью одного администратора (`AdminChatID`).
-7.  **Web UI:** Встроенный HTTP-сервер + WebSocket хаб, раздающий Vue 3 SPA.
+---
 
-## ⚙️ Конфигурация (`config.toml`)
+## Обзор
 
-Все управление ботом осуществляется через `config.toml`. По соображениям безопасности торговля и база данных по умолчанию отключены.
+Orbitron — это самохостируемый многоинтерфейсный бот для биржи **Polymarket CTF**. Он объединяет движок алгоритмической торговли с копитрейдингом, мониторингом рынка в реальном времени и безопасной мультикошельковой архитектурой — всем этим можно управлять из терминала, браузера или Telegram.
 
-Ключевые секции:
-*   `[auth]`: Требует `private_key` (hex, без префикса `0x`). Учетные данные L2 генерируются автоматически при старте.
-*   `[webui]`: `enabled` (true/false), `listen` (например, `127.0.0.1:8080`), `jwt_secret` (используется для подписи токенов и как пароль для входа).
-*   `[ui]`: `language` (`en`, `ru`, `zh`, `ja`, `ko`). Переключается без перезагрузки.
-*   `[monitor.trades]`: `enabled`, `poll_interval_ms`. Требует авторизации L2.
-*   `[copytrading]`: `enabled`, `size_mode` (`proportional`/`fixed_pct`), и список `[[copytrading.traders]]`. Требует БД и L2.
-*   `[telegram]`: `enabled`, `bot_token`, `admin_chat_id` (ID чата администратора).
-*   `[database]`: `enabled`, `path` (Путь к SQLite).
-*   `chain_id`: `137` для Polygon Mainnet, `80002` для Amoy Testnet.
+> Торговля и база данных **отключены по умолчанию** для безопасности. Включайте только нужное в `config.toml`.
 
-## 🚀 Установка и запуск
+---
 
-### Требования
+## Функциональность
 
-*   [Go 1.24+](https://golang.org/doc/install)
-*   [Node.js 18+](https://nodejs.org/) (Только для сборки Web UI)
-*   Приватный ключ кошелька Polymarket
+|  |  |  |
+|:---:|:---:|:---:|
+| **🖥 Terminal UI** | **🌐 Web UI** | **🤖 Telegram Bot** |
+| TUI на BubbleTea с вкладками — Рынки, Торговля, Копитрейдинг, Кошельки, Стратегии, Настройки, Логи | Vue 3 SPA с обновлениями через WebSocket, JWT-аутентификацией и тёмной темой | Полнофункциональное зеркало TUI с inline-клавиатурами и пошаговыми диалогами |
+| **⚡ 6 торговых стратегий** | **📊 Копитрейдинг** | **🔐 Безопасная авторизация** |
+| Арбитраж, Кросс-маркет, Fade Chaos, Маркетмейкинг, Positive EV, Riskless Rate. Добавляйте свои за 3 строки | Мониторинг кошельков через Data API и автокопирование позиций через CLOB API | L1 EIP-712 + L2 HMAC-SHA256. API-ключи выводятся в памяти при старте, на диск не записываются |
+| **💼 Мультикошелёк** | **🔔 Алерты и мониторинг** | **🌍 5 языков** |
+| Несколько активных кошельков с переключением и агрегированным P&L из любого интерфейса | Исполнения ордеров, позиции и ценовые алерты в реальном времени — доставка в Telegram | EN · RU · ZH · JA · KO с горячей перезагрузкой — без перезапуска |
 
-### Шаги установки
+---
 
-#### Вариант 1: Универсальный скрипт установки (Рекомендуется)
-Мы предоставляем универсальный скрипт `setup.sh`, который работает на Linux, macOS и Windows (через Git Bash/WSL). Он автоматически установит Go и Node.js (если их нет), настроит `config.toml`, соберет фронтенд на Vue 3 и скомпилирует бэкенд на Go.
+## Архитектура
 
-1.  **Клонируйте репозиторий:**
-    ```bash
-    git clone https://github.com/your-org/polytrade-bot.git
-    cd polytrade-bot
-    ```
+Orbitron работает на семи независимых, прерываемых по контексту подсистемах:
 
-2.  **Запустите скрипт установки:**
-    ```bash
-    ./setup.sh
-    ```
+```mermaid
+graph LR
+    subgraph interfaces["  Интерфейсы  "]
+        TUI["🖥 TUI\nBubbleTea"]
+        WEB["🌐 Web UI\nVue 3"]
+        TG["🤖 Telegram Bot"]
+    end
 
-#### Вариант 2: Ручная установка
-1.  **Клонируйте репозиторий:**
-    ```bash
-    git clone https://github.com/your-org/polytrade-bot.git
-    cd polytrade-bot
-    ```
+    subgraph core["  Ядро  "]
+        ENG["⚡ Торговый движок\nStrategy Executor"]
+        COPY["📊 Copy Trader\nWallet Tracker"]
+        MON["🔔 Монитор\nAlert Engine"]
+        WS["🔌 WebSocket\nАвтопереподключение"]
+        NOT["📢 Notifier"]
+    end
 
-2.  **Настройка бота:**
-    Создайте файл `config.toml` в корневой директории. Вы можете запустить бота без него: встроенный TUI-мастер настройки поможет безопасно ввести `private_key`.
+    subgraph apis["  Polymarket APIs  "]
+        CLOB["CLOB API"]
+        GAMMA["Gamma API"]
+        DATA["Data API"]
+        WSS["WebSocket Feed"]
+    end
 
-3.  **Сборка и запуск:**
-    ```bash
-    go build ./...
-    go run ./cmd/bot/ --config config.toml
-    ```
+    TUI & WEB --> ENG & COPY & MON
+    NOT --> TG
+    ENG --> CLOB
+    COPY --> DATA & CLOB
+    MON --> GAMMA & DATA
+    WS <--> WSS
+```
 
-### Фоновый режим (Headless)
-Для запуска на сервере без TUI используйте флаг:
+---
+
+## Быстрый старт
+
+### Вариант 1 — Setup Script (рекомендуется)
+
+Работает на Linux, macOS и Windows (Git Bash / WSL). Устанавливает Go и Node.js при необходимости, собирает фронтенд и компилирует бинарник.
+
+```bash
+git clone https://github.com/atlas-is-coding/orbitron-polymarket-system.git
+cd orbitron-polymarket-system
+./setup.sh
+```
+
+### Вариант 2 — Ручная сборка
+
+```bash
+git clone https://github.com/atlas-is-coding/orbitron-polymarket-system.git
+cd orbitron-polymarket-system
+
+# Сборка фронтенда (только при изменении исходников Web UI)
+cd internal/webui/web && npm install && npm run build && cd ../../..
+
+# Запуск
+go run ./cmd/bot/ --config config.toml
+```
+
+### Headless / серверный режим
+
 ```bash
 go run ./cmd/bot/ --config config.toml --no-tui
 ```
 
-## 🛠 Частые ошибки и их решение
+> **Нет config.toml?** Запустите бот без него — TUI-мастер запустится автоматически и проведёт через настройку, включая безопасную конфигурацию приватного ключа.
 
-*   **Ошибка 401 Unauthorized:** Убедитесь, что `private_key` указан верно. Бот сам получает L2 API ключ. Подписи L2 истекают через 30 секунд; проверьте, что время на вашем сервере синхронизировано (NTP).
-*   **"Network Error" в Web UI:** Если в Go HTTP обработчике происходит panic, браузер выдает обобщенную "Network Error". Реальную причину (стектрейс) нужно искать в логах терминала.
-*   **Пропадают данные рынков в UI:** Внутренняя шина событий (EventBus) отбрасывает сообщения, если буфер переполнен. Если уровень логов установлен на `trace`, спам логов может вытеснить важные сообщения (`MarketsUpdatedMsg`). Снизьте уровень логов до `info` или `debug`.
-*   **Polymarket Token IDs:** Gamma API возвращает Token ID как десятичные строки. Не пытайтесь парсить их как hex-значения, иначе подпись ордера будет неверной. Бот делает это правильно через `big.Int.SetString(id, 10)`.
+---
 
-## 💻 Руководство по разработке
+## Конфигурация
 
-### Сборка Web UI
-Фронтенд на Vue 3 встроен в бинарник Go. Если вы меняете файлы в `internal/webui/web/src`, фронтенд нужно пересобрать:
-```bash
-cd internal/webui/web
-npm install
-npm run build
+Всё поведение задаётся в `config.toml`. За основу возьмите `config.toml.example`.
+
+<details>
+<summary><strong>Ключевые секции конфигурации</strong></summary>
+
+<br>
+
+| Секция | Ключевые поля | Примечания |
+|---|---|---|
+| `[[wallets]]` | `private_key`, `api_key`, `api_secret`, `passphrase`, `chain_id` | `chain_id` `137` = Polygon Mainnet, `80002` = Amoy Testnet |
+| `[trading]` | `enabled`, `max_position_usd`, `slippage_pct` | Отключено по умолчанию |
+| `[trading.strategies.*]` | `enabled`, `execute_orders`, параметры стратегии | У каждой стратегии своя подсекция |
+| `[trading.risk]` | `stop_loss_pct`, `take_profit_pct`, `max_daily_loss_usd` | Применяется ко всем активным стратегиям |
+| `[copytrading]` | `enabled`, `size_mode`, `traders` | `size_mode`: `proportional` или `fixed_pct` |
+| `[monitor.trades]` | `enabled`, `poll_interval_ms` | Требует L2 авторизацию |
+| `[webui]` | `enabled`, `listen`, `jwt_secret` | `jwt_secret` — одновременно пароль для входа |
+| `[telegram]` | `enabled`, `bot_token`, `admin_chat_id` | Один администратор |
+| `[database]` | `enabled`, `path` | SQLite; обязателен для копитрейдинга |
+| `[ui]` | `language` | `en`, `ru`, `zh`, `ja`, `ko` — горячая перезагрузка |
+| `[proxy]` | `enabled`, `type`, `addr` | Поддержка HTTP / SOCKS5 прокси |
+
+</details>
+
+---
+
+## Торговые стратегии
+
+Все шесть стратегий реализуют интерфейс `trading.Strategy` и работают как независимые горутины внутри торгового движка.
+
+| Стратегия | Описание |
+|---|---|
+| **Arbitrage** | Обнаруживает расхождения цен между взаимодополняющими исходами YES/NO и захватывает спред |
+| **Cross-Market** | Находит коррелирующие рынки с расходящимися ценами и торгует дивергенцию |
+| **Fade Chaos** | Торгует против экстремальных ценовых всплесков, ставя на возврат к среднему |
+| **Market Making** | Выставляет лимитные ордера по обе стороны стакана для получения bid-ask спреда |
+| **Positive EV** | Сканирует рынки с явно неверно оценёнными вероятностями |
+| **Riskless Rate** | Выявляет бинарные рынки у разрешения, торгующиеся ниже безрисковой ставки |
+
+---
+
+## Разработка
+
+### Добавление собственной стратегии
+
+```go
+// 1. Реализуйте интерфейс
+type MyStrategy struct{}
+
+func (s *MyStrategy) Name() string                    { return "my_strategy" }
+func (s *MyStrategy) Start(ctx context.Context) error { /* логика торговли */ return nil }
+func (s *MyStrategy) Stop()                           { /* очистка ресурсов */ }
+
+// 2. Зарегистрируйте в cmd/bot/main.go
+engine.Register(&MyStrategy{})
 ```
 
-### Расширение функционала
-*   **Новая стратегия:** Реализуйте интерфейс `trading.Strategy` (`Name`, `Start`, `Stop`), добавьте ее инициализацию в `main.go` и вызовите `engine.Register(s)`.
-*   **Новая настройка конфигурации:** Добавьте поле в `tab_settings.go`, структуру `Locale`, обновите 5 файлов `locales/*.json` и пропишите логику в `applyConfigKey()` в `config_key.go`. Также обновите `SettingsView.vue`.
-*   **Новая команда Telegram:** Добавьте обработчик в `internal/telegrambot/handlers.go` внутри блока `handleCommand`.
+### Пересборка Web UI
 
-### Тестирование
+Фронтенд на Vue 3 встраивается в Go-бинарник при компиляции. После изменений в `internal/webui/web/src`:
+
+```bash
+cd internal/webui/web
+npm install && npm run build
+```
+
+### Запуск тестов
+
 ```bash
 # Юнит-тесты
 go test ./...
 
-# Интеграционные тесты (требуют API Polymarket и L1 ключ)
-POLY_PRIVATE_KEY=0xВАШ_КЛЮЧ go test ./... -tags=integration -timeout 90s
+# Интеграционные тесты — требуют реальный API-ключ Polymarket
+POLY_PRIVATE_KEY=0xYOUR_KEY go test ./... -tags=integration -timeout 90s
 ```
+
+---
+
+## Устранение неполадок
+
+<details>
+<summary><strong>Частые проблемы</strong></summary>
+
+<br>
+
+| Проблема | Причина и решение |
+|---|---|
+| **401 Unauthorized** | Проверьте `private_key` — hex без префикса `0x`. Подписи L2 HMAC живут 30 с — синхронизируйте системные часы |
+| **Web UI показывает "Network Error"** | Go-хендлер запаниковал до отправки заголовков. Проверьте логи в терминале — JSON-тела в ответе не будет |
+| **Рынки не загружаются в TUI / Web UI** | Буфер EventBus может быть переполнен при уровне `trace`. Установите `log.level = "info"` или `"debug"` |
+| **WebSocket "Bad Handshake"** | Бот подключается к конкретным путям (`.../ws/market`, `.../ws/user`), а не к корневому URL. Проверьте файрвол |
+| **Копитрейдинг не работает** | Требует `[database] enabled = true` и валидные L2-учётные данные в `[[wallets]]` |
+
+</details>
+
+---
+
+## Лицензия
+
+[MIT](LICENSE) © 2025 Orbitron
