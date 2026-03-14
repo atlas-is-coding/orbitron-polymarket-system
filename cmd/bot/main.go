@@ -14,27 +14,30 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
-	"github.com/atlasdev/polytrade-bot/internal/api/data"
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/api/ws"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/copytrading"
-	"github.com/atlasdev/polytrade-bot/internal/health"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/logger"
-	"github.com/atlasdev/polytrade-bot/internal/markets"
-	"github.com/atlasdev/polytrade-bot/internal/monitor"
-	"github.com/atlasdev/polytrade-bot/internal/notify"
-	telegramNotify "github.com/atlasdev/polytrade-bot/internal/notify/telegram"
-	"github.com/atlasdev/polytrade-bot/internal/storage/sqlite"
-	"github.com/atlasdev/polytrade-bot/internal/telegrambot"
-	"github.com/atlasdev/polytrade-bot/internal/trading"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
-	"github.com/atlasdev/polytrade-bot/internal/wallet"
-	"github.com/atlasdev/polytrade-bot/internal/webui"
+	"github.com/atlasdev/orbitron/internal/api"
+	"github.com/atlasdev/orbitron/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/api/data"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/api/ws"
+	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/copytrading"
+	"github.com/atlasdev/orbitron/internal/health"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/logger"
+	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/monitor"
+	"github.com/atlasdev/orbitron/internal/notify"
+	telegramNotify "github.com/atlasdev/orbitron/internal/notify/telegram"
+	"github.com/atlasdev/orbitron/internal/storage/sqlite"
+	"github.com/atlasdev/orbitron/internal/telegrambot"
+	"github.com/atlasdev/orbitron/internal/trading"
+	"github.com/atlasdev/orbitron/internal/trading/risk"
+	"github.com/atlasdev/orbitron/internal/trading/strategies"
+	"github.com/atlasdev/orbitron/internal/license"
+	"github.com/atlasdev/orbitron/internal/tui"
+	"github.com/atlasdev/orbitron/internal/wallet"
+	"github.com/atlasdev/orbitron/internal/webui"
 )
 
 // healthPublisher adapts health.Publisher to tui.EventBus.
@@ -46,6 +49,136 @@ func (p *healthPublisher) Send(snap health.HealthSnapshot) {
 	}
 }
 
+type executorAdapter struct{ e *copytrading.OrderExecutor }
+
+func (a *executorAdapter) Open(assetID string, sizeUSD float64, negRisk bool) (*copytrading.OpenResult, error) {
+	return a.e.Open(assetID, sizeUSD, negRisk)
+}
+func (a *executorAdapter) Close(assetID string, sizeShares, avgBuyPrice float64, negRisk bool) (*copytrading.CloseResult, error) {
+	return a.e.Close(assetID, sizeShares, avgBuyPrice, negRisk)
+}
+func (a *executorAdapter) PlaceLimit(tokenID, side, orderType string, price, sizeUSD float64) (string, error) {
+	return a.e.PlaceLimit(tokenID, side, orderType, price, sizeUSD)
+}
+
+// engineAdapter implements tui.TradingProvider and webui.TradingProvider.
+type engineAdapter struct {
+	engine  *trading.Engine
+	wm      *wallet.Manager
+	bus     *tui.EventBus
+	ctx     context.Context
+	cfgPath string
+}
+
+func (a *engineAdapter) WalletIDs() []string { return a.wm.WalletIDs() }
+func (a *engineAdapter) WalletLabel(id string) string { return a.wm.WalletLabel(id) }
+func (a *engineAdapter) WalletAddress(id string) string { return a.wm.WalletAddress(id) }
+func (a *engineAdapter) WalletEnabled(id string) bool { return a.wm.WalletEnabled(id) }
+func (a *engineAdapter) WalletStats(id string) (float64, float64, int, int) {
+	return a.wm.WalletStats(id)
+}
+func (a *engineAdapter) AvailableWallets() []string { return a.wm.AvailableWallets() }
+
+func (a *engineAdapter) Remove(id string) error           { return a.wm.Remove(id) }
+func (a *engineAdapter) Toggle(id string, enabled bool) error { return a.wm.Toggle(id, enabled) }
+func (a *engineAdapter) UpdateLabel(id, label string) error { return a.wm.UpdateLabel(id, label) }
+func (a *engineAdapter) SetPrimary(id string) error      { return a.wm.SetPrimary(id) }
+func (a *engineAdapter) PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64, negRisk bool) (string, error) {
+	return a.wm.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD, negRisk)
+}
+
+func (a *engineAdapter) StartStrategy(name string) error {
+	err := a.engine.StartStrategy(a.ctx, name)
+	if err == nil && a.bus != nil {
+		a.bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(a.engine, a.wm)})
+	}
+	return err
+}
+
+func (a *engineAdapter) StopStrategy(name string) error {
+	err := a.engine.StopStrategy(name)
+	if err == nil && a.bus != nil {
+		a.bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(a.engine, a.wm)})
+	}
+	return err
+}
+
+func (a *engineAdapter) SetStrategyWallets(name string, walletIDs []string) error {
+	execAdapters := make(map[string]interface{})
+	for _, wid := range walletIDs {
+		inst, ok := a.wm.Get(wid)
+		if !ok {
+			return fmt.Errorf("wallet %s not found", wid)
+		}
+		if inst.Executor == nil {
+			return fmt.Errorf("wallet %s has no executor", wid)
+		}
+		execAdapters[wid] = &executorAdapter{inst.Executor}
+	}
+
+	// Update in-memory config for persistence
+	cfg, err := config.Load(a.cfgPath)
+	if err == nil {
+		updated := false
+		switch name {
+		case "arbitrage":
+			cfg.Trading.Strategies.Arbitrage.WalletIDs = walletIDs
+			updated = true
+		case "market_making":
+			cfg.Trading.Strategies.MarketMaking.WalletIDs = walletIDs
+			updated = true
+		case "positive_ev":
+			cfg.Trading.Strategies.PositiveEV.WalletIDs = walletIDs
+			updated = true
+		case "riskless_rate":
+			cfg.Trading.Strategies.RisklessRate.WalletIDs = walletIDs
+			updated = true
+		case "fade_chaos":
+			cfg.Trading.Strategies.FadeChaos.WalletIDs = walletIDs
+			updated = true
+		case "cross_market":
+			cfg.Trading.Strategies.CrossMarket.WalletIDs = walletIDs
+			updated = true
+		}
+		if updated {
+			config.Save(a.cfgPath, cfg)
+		}
+	}
+
+	err = a.engine.SetStrategyWallets(name, walletIDs, execAdapters)
+	if err == nil {
+		if s, ok := a.engine.Get(name); ok {
+			s.SetWalletIDs(walletIDs)
+		}
+		if a.bus != nil {
+			a.bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(a.engine, a.wm)})
+		}
+	}
+	return err
+}
+
+func (a *engineAdapter) Strategies() []trading.Strategy {
+	return a.engine.Strategies()
+}
+
+func (a *engineAdapter) CancelOrder(id string) error {
+	for _, inst := range a.wm.Wallets() {
+		if inst.TradesMon != nil && inst.Cfg.Enabled {
+			return inst.TradesMon.CancelOrder(id)
+		}
+	}
+	return fmt.Errorf("no active trades monitor")
+}
+
+func (a *engineAdapter) CancelAllOrders() error {
+	for _, inst := range a.wm.Wallets() {
+		if inst.TradesMon != nil && inst.Cfg.Enabled {
+			return inst.TradesMon.CancelAllOrders()
+		}
+	}
+	return fmt.Errorf("no active trades monitor")
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -54,12 +187,12 @@ func main() {
 }
 
 func run() error {
-	// --- Флаги ---
+	// --- Flags ---
 	cfgPath := flag.String("config", "config.toml", "path to config file")
 	noTUI := flag.Bool("no-tui", false, "disable TUI, use plain log output (headless/CI)")
 	flag.Parse()
 
-	// --- Первичная настройка (wizard) если config.toml не существует ---
+	// --- Initial setup (wizard) if config.toml does not exist ---
 	if _, err := os.Stat(*cfgPath); os.IsNotExist(err) && !*noTUI {
 		p := tea.NewProgram(tui.NewWizardModel(80, 24, *cfgPath), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
@@ -70,7 +203,7 @@ func run() error {
 		}
 	}
 
-	// --- Конфиг ---
+	// --- Configuration ---
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -82,10 +215,10 @@ func run() error {
 		return fmt.Errorf("proxy: %w", err)
 	}
 
-	// --- Язык интерфейса ---
+	// --- Interface language ---
 	i18n.SetLanguage(cfg.UI.Language)
 
-	// --- Файловый логгер (если задан log.file) ---
+	// --- File logger (if log.file is set) ---
 	var logFileCloser func()
 	var fileWriter io.Writer
 	if cfg.Log.File != "" {
@@ -103,7 +236,7 @@ func run() error {
 		}
 	}()
 
-	// --- EventBus + LogWriter (TUI режим или WebUI) ---
+	// --- EventBus + LogWriter (TUI mode or WebUI) ---
 	var bus *tui.EventBus
 	var log zerolog.Logger
 	if !*noTUI || cfg.WebUI.Enabled {
@@ -125,6 +258,15 @@ func run() error {
 		log.Info().Str("type", cfg.Proxy.Type).Str("addr", cfg.Proxy.Addr).Msg("proxy enabled")
 	}
 
+	// Load Builder Program credentials (non-fatal: bot runs without them).
+	builderCreds, licenseErr := license.Load()
+	if licenseErr != nil {
+		log.Warn().Err(licenseErr).Msg("builder credentials unavailable — Builder features disabled")
+	} else if builderCreds != nil {
+		log.Info().Str("key", builderCreds.APIKey[:4]+"***").Msg("builder credentials loaded")
+	}
+	_ = builderCreds // suppress unused warning until Builder API integration
+
 	// --- Geoblock check ---
 	if geo, geoErr := health.CheckGeoblock(proxyDial); geoErr != nil {
 		log.Warn().Err(geoErr).Msg("geoblock check failed (continuing)")
@@ -143,13 +285,14 @@ func run() error {
 	// --- Wallet Manager ---
 	wm := wallet.NewManager(bus)
 	wm.SetDialer(proxyDial)
+	wm.SetLogger(log)
 
-	// --- HTTP клиенты ---
+	// --- HTTP clients ---
 	clobHTTP := api.NewClientWithDialer(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
 	gammaHTTP := api.NewClientWithDialer(cfg.API.GammaURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
 	dataHTTP := api.NewClientWithDialer(cfg.API.DataURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
 
-	// --- API клиенты (shared/public) ---
+	// --- API clients (shared/public) ---
 	gammaClient := gamma.NewClient(gammaHTTP)
 	dataClient := data.NewClient(dataHTTP)
 
@@ -238,21 +381,23 @@ func run() error {
 			ClobClient: wClobClient,
 			Stats:      &wallet.WalletStats{},
 		}
+		if l1 != nil {
+			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
+			inst.Executor = copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, log)
+		}
 		if cfg.Monitor.Trades.Enabled {
-			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr)
+			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr, db)
 			if bus != nil {
 				tm.SetBus(bus)
 			}
 			inst.TradesMon = tm
 		}
 		if cfg.Copytrading.Enabled && db != nil && l1 != nil {
-			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
-			executor := copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, log)
 			ct := copytrading.NewCopyTrader(
 				*cfgPath,
 				func() *config.CopytradingConfig { return &cfg.Copytrading },
 				dataClient,
-				executor,
+				inst.Executor,
 				db,
 				notifier,
 				wClobClient,
@@ -266,8 +411,61 @@ func run() error {
 		wm.AddActive(inst)
 	}
 
+	// --- Context with graceful shutdown ---
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// --- Trading Engine ---
-	engine := trading.NewEngine(log)
+	engine := trading.NewEngine(log, wm)
+
+	// --- Risk Manager ---
+	riskMgr := risk.NewManager(cfg.Trading.Risk)
+
+	// --- Trading Strategies ---
+	// Helper to find executor by wallet ID or primary
+	getExecutors := func(wids []string) map[string]strategies.Executor {
+		execs := make(map[string]strategies.Executor)
+		if len(wids) == 0 {
+			// Fallback to primary
+			allWids := wm.WalletIDs()
+			for _, id := range allWids {
+				inst, ok := wm.Get(id)
+				if ok && inst.Cfg.Primary && inst.Cfg.Enabled && inst.Executor != nil {
+					execs[id] = &executorAdapter{inst.Executor}
+					break
+				}
+			}
+			return execs
+		}
+		for _, wid := range wids {
+			if wid == "" { continue }
+			inst, ok := wm.Get(wid)
+			if ok && inst.Cfg.Enabled && inst.Executor != nil {
+				execs[wid] = &executorAdapter{inst.Executor}
+			}
+		}
+		return execs
+	}
+
+	sc := cfg.Trading.Strategies
+	engine.Register(strategies.NewArbitrageStrategy(
+		gammaClient, getExecutors(sc.Arbitrage.WalletIDs), notifier, bus, riskMgr, sc.Arbitrage, log,
+	))
+	engine.Register(strategies.NewMarketMakingStrategy(
+		gammaClient, pubClobClient, getExecutors(sc.MarketMaking.WalletIDs), notifier, bus, riskMgr, sc.MarketMaking, log,
+	))
+	engine.Register(strategies.NewPositiveEVStrategy(
+		gammaClient, getExecutors(sc.PositiveEV.WalletIDs), notifier, bus, riskMgr, sc.PositiveEV, log,
+	))
+	engine.Register(strategies.NewRisklessRateStrategy(
+		gammaClient, getExecutors(sc.RisklessRate.WalletIDs), notifier, bus, riskMgr, sc.RisklessRate, log,
+	))
+	engine.Register(strategies.NewFadeTheChaosStrategy(
+		gammaClient, getExecutors(sc.FadeChaos.WalletIDs), notifier, bus, riskMgr, sc.FadeChaos, log,
+	))
+	engine.Register(strategies.NewCrossMarketStrategy(
+		gammaClient, getExecutors(sc.CrossMarket.WalletIDs), notifier, bus, riskMgr, sc.CrossMarket, log,
+	))
 
 	// --- Market Monitor ---
 	mon := monitor.New(gammaClient, notifier, &cfg.Monitor, log)
@@ -293,10 +491,6 @@ func run() error {
 		log,
 	)
 
-	// --- Context с graceful shutdown ---
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -305,7 +499,7 @@ func run() error {
 		cancel()
 	}()
 
-	// --- Запуск подсистем ---
+	// --- Start subsystems ---
 	errCh := make(chan error, 8)
 
 	startSubsystem := func(name string, fn func() error) {
@@ -351,7 +545,9 @@ func run() error {
 	}
 
 	// --- Stats poller (wallet balance / P&L via Data API) ---
-	go wm.RunStatsPoller(ctx, dataClient, 30*time.Second)
+	go wm.RunStatsPoller(ctx, dataClient, 30*time.Second, db)
+
+	adapter := &engineAdapter{engine: engine, wm: wm, bus: bus, ctx: ctx, cfgPath: *cfgPath}
 
 	// --- Telegram Bot (interactive) ---
 	// Initialised before subsystems so it can be started alongside them.
@@ -384,20 +580,24 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, wm, wm, marketsService, wm, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, adapter, marketsService, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 
-	// --- TUI режим ---
+	// --- TUI mode ---
 	if !*noTUI && bus != nil {
-		// ConfigWatcher — hot reload через fsnotify
+		// ConfigWatcher — hot reload via fsnotify
 		watcher, _ := config.NewWatcher(*cfgPath, func(newCfg *config.Config) {
 			bus.Send(tui.ConfigReloadedMsg{Config: newCfg})
+			bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
 		})
 		go watcher.Run(ctx)
 
-		// Запускаем TUI
-		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, 0, 0, nil, wm)
+		// Emit initial strategies
+		bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
+
+		// Start TUI
+		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, 0, 0, nil, adapter)
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {
@@ -412,12 +612,12 @@ func run() error {
 			return fmt.Errorf("tui: %w", err)
 		}
 		// Goodbye message (printed after alt screen is restored)
-		fmt.Println("\n  ◈ polytrade-bot — shutdown complete. Goodbye!")
+		fmt.Println("\n  ◈ orbitron — shutdown complete. Goodbye!")
 		cancel()
 		return nil
 	}
 
-	// --- Headless режим ---
+	// --- Headless mode ---
 	log.Info().Msg(i18n.T().LogBotRunning)
 	select {
 	case <-ctx.Done():
