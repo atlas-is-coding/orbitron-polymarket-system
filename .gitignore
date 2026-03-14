@@ -2,6 +2,7 @@
 __NOTES.md
 POLYMARKET_DOCS.md
 CLAUDE.md
+CLAUDE copy.md
 GEMINI.md
 .claude/
 .gemini/
@@ -16,8 +17,8 @@ tmp/
 data/
 *.log
 
-# Tests
-*_test.go
+# Secrets
+config.toml
 
 # Docs
 docs/
