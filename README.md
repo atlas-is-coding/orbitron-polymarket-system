@@ -1,11 +1,13 @@
-# Polytrade Bot 📈🤖
+# Orbitron 📈🤖
+**Official Website**: [getorbitron.net](https://getorbitron.net)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/polytrade/bot)](https://goreportcard.com/report/github.com/polytrade/bot)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/orbitron/bot)](https://goreportcard.com/report/github.com/orbitron/bot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 *Read this in other languages: [Русский](README_ru.md), [中文](README_zh.md), [한국어](README_ko.md), [日本語](README_ja.md).*
 
-Polytrade Bot is an advanced algorithmic trading and management bot for the **Polymarket CTF Exchange**. It features a robust multi-interface architecture including an interactive Terminal User Interface (TUI), a Vue 3 Web UI, and a comprehensive Telegram bot for remote management.
+Orbitron is an advanced algorithmic trading and management bot for the **Polymarket CTF Exchange**. It features a robust multi-interface architecture including an interactive Terminal User Interface (TUI), a Vue 3 Web UI, and a comprehensive Telegram bot for remote management.
 
 ## 🌟 Comprehensive Features
 
@@ -63,8 +65,8 @@ We provide a universal `setup.sh` script that works on Linux, macOS, and Windows
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-org/polytrade-bot.git
-    cd polytrade-bot
+    git clone https://github.com/your-org/orbitron.git
+    cd orbitron
     ```
 
 2.  **Run the setup script:**
@@ -75,8 +77,8 @@ We provide a universal `setup.sh` script that works on Linux, macOS, and Windows
 #### Option 2: Manual Setup
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-org/polytrade-bot.git
-    cd polytrade-bot
+    git clone https://github.com/your-org/orbitron.git
+    cd orbitron
     ```
 
 2.  **Configure the Bot:**
@@ -128,6 +130,25 @@ go test ./...
 # Integration tests (requires real Polymarket API & L1 Key)
 POLY_PRIVATE_KEY=0xYOUR_KEY go test ./... -tags=integration -timeout 90s
 ```
+
+## Building
+
+To enable Builder Program features, encode your app token once:
+
+```bash
+go run ./cmd/tokenenc encode YOUR_REAL_APP_TOKEN
+```
+
+Then build with the encoded token:
+
+```bash
+go build \
+  -ldflags="-X 'github.com/atlasdev/orbitron/internal/license.rawToken=OUTPUT_FROM_ABOVE' \
+            -X 'github.com/atlasdev/orbitron/internal/license.LicenseServerURL=https://your-vps.com/api/v1/license'" \
+  ./cmd/bot/
+```
+
+Building without `-ldflags` still works — Builder features are simply disabled.
 
 ## 📜 License
 This project is licensed under the MIT License - see the LICENSE file for details.
