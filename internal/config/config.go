@@ -7,7 +7,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// WalletConfig — настройки одного кошелька.
+// WalletConfig — settings for a single wallet.
 type WalletConfig struct {
 	ID         string `toml:"id"           json:"id"`
 	Label      string `toml:"label"        json:"label"`
@@ -21,7 +21,7 @@ type WalletConfig struct {
 	NegRisk    bool   `toml:"neg_risk"     json:"neg_risk"`
 }
 
-// Config — корневая структура конфигурации.
+// Config — root configuration structure.
 type Config struct {
 	Wallets     []WalletConfig    `toml:"wallets"     json:"wallets"`
 	Auth        AuthConfig        `toml:"auth"        json:"auth"` // Deprecated: use [[wallets]]; kept for migration
@@ -71,19 +71,19 @@ type MonitorConfig struct {
 	Trades         TradesMonitorConfig `toml:"trades"          json:"trades"`
 }
 
-// TradesMonitorConfig — конфигурация монитора сделок и позиций.
+// TradesMonitorConfig — configuration for trades and positions monitor.
 type TradesMonitorConfig struct {
-	// Enabled — включить мониторинг ордеров/сделок/позиций
+	// Enabled — enable monitoring of orders/trades/positions
 	Enabled bool `toml:"enabled" json:"enabled"`
-	// PollIntervalMs — интервал опроса API в миллисекундах
+	// PollIntervalMs — API polling interval in milliseconds
 	PollIntervalMs int `toml:"poll_interval_ms" json:"poll_interval_ms"`
-	// TrackPositions — отслеживать позиции через CLOB /positions
+	// TrackPositions — track positions via CLOB /positions
 	TrackPositions bool `toml:"track_positions" json:"track_positions"`
-	// AlertOnFill — отправлять алерт при исполнении ордера
+	// AlertOnFill — send alert on order fill
 	AlertOnFill bool `toml:"alert_on_fill" json:"alert_on_fill"`
-	// AlertOnCancel — отправлять алерт при отмене ордера
+	// AlertOnCancel — send alert on order cancel
 	AlertOnCancel bool `toml:"alert_on_cancel" json:"alert_on_cancel"`
-	// TradesLimit — максимальное количество сделок в одном запросе
+	// TradesLimit — maximum number of trades in one request
 	TradesLimit int `toml:"trades_limit" json:"trades_limit"`
 }
 
@@ -123,35 +123,35 @@ type ProxyConfig struct {
 	Password string `toml:"password" json:"password"`
 }
 
-// CopytradingConfig — конфигурация подсистемы копитрейдинга.
+// CopytradingConfig — copytrading subsystem configuration.
 type CopytradingConfig struct {
-	// Enabled — включить копитрейдинг
+	// Enabled — enable copytrading
 	Enabled bool `toml:"enabled" json:"enabled"`
-	// PollIntervalMs — интервал опроса позиций трейдеров (миллисекунды)
+	// PollIntervalMs — polling interval for trader positions (milliseconds)
 	PollIntervalMs int `toml:"poll_interval_ms" json:"poll_interval_ms"`
-	// SizeMode — глобальный метод расчёта размера: "proportional" или "fixed_pct"
+	// SizeMode — global size calculation method: "proportional" or "fixed_pct"
 	SizeMode string `toml:"size_mode" json:"size_mode"`
-	// Traders — список отслеживаемых трейдеров
+	// Traders — list of tracked traders
 	Traders []TraderConfig `toml:"traders" json:"traders"`
 }
 
-// TraderConfig — настройки одного копируемого трейдера.
+// TraderConfig — settings for a single copied trader.
 type TraderConfig struct {
-	// Address — proxy-wallet адрес трейдера (из Data API)
+	// Address — trader proxy-wallet address (from Data API)
 	Address string `toml:"address" json:"address"`
-	// Label — метка для логов и алертов
+	// Label — label for logs and alerts
 	Label string `toml:"label" json:"label"`
-	// Enabled — можно временно отключить без удаления из конфига
+	// Enabled — can be temporarily disabled without removing from config
 	Enabled bool `toml:"enabled" json:"enabled"`
-	// AllocationPct — % нашего баланса, выделяемый этому трейдеру
+	// AllocationPct — % of our balance allocated to this trader
 	AllocationPct float64 `toml:"allocation_pct" json:"allocation_pct"`
-	// MaxPositionUSD — максимальный размер одной позиции в USD
+	// MaxPositionUSD — maximum size of a single position in USD
 	MaxPositionUSD float64 `toml:"max_position_usd" json:"max_position_usd"`
-	// SizeMode — переопределяет глобальный (если не пустая строка)
+	// SizeMode — overrides global (if not empty string)
 	SizeMode string `toml:"size_mode" json:"size_mode"`
 }
 
-// StrategiesConfig — конфигурация всех торговых стратегий.
+// StrategiesConfig — configuration for all trading strategies.
 type StrategiesConfig struct {
 	Arbitrage    ArbitrageConfig    `toml:"arbitrage"     json:"arbitrage"`
 	MarketMaking MarketMakingConfig `toml:"market_making" json:"market_making"`
@@ -161,7 +161,7 @@ type StrategiesConfig struct {
 	CrossMarket  CrossMarketConfig  `toml:"cross_market"  json:"cross_market"`
 }
 
-// RiskConfig — глобальные параметры риск-менеджмента.
+// RiskConfig — global risk management parameters.
 type RiskConfig struct {
 	StopLossPct     float64 `toml:"stop_loss_pct"      json:"stop_loss_pct"`
 	TakeProfitPct   float64 `toml:"take_profit_pct"    json:"take_profit_pct"`
@@ -170,6 +170,7 @@ type RiskConfig struct {
 
 type ArbitrageConfig struct {
 	Enabled        bool    `toml:"enabled"          json:"enabled"`
+	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
 	MinProfitUSD   float64 `toml:"min_profit_usd"   json:"min_profit_usd"`
 	MaxPositionUSD float64 `toml:"max_position_usd" json:"max_position_usd"`
 	PollIntervalMs int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
@@ -178,6 +179,7 @@ type ArbitrageConfig struct {
 
 type MarketMakingConfig struct {
 	Enabled              bool    `toml:"enabled"                json:"enabled"`
+	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
 	SpreadPct            float64 `toml:"spread_pct"             json:"spread_pct"`
 	MaxPositionUSD       float64 `toml:"max_position_usd"       json:"max_position_usd"`
 	RebalanceIntervalSec int     `toml:"rebalance_interval_sec" json:"rebalance_interval_sec"`
@@ -186,16 +188,19 @@ type MarketMakingConfig struct {
 }
 
 type PositiveEVConfig struct {
-	Enabled         bool    `toml:"enabled"          json:"enabled"`
-	MinEdgePct      float64 `toml:"min_edge_pct"     json:"min_edge_pct"`
-	MinLiquidityUSD float64 `toml:"min_liquidity_usd" json:"min_liquidity_usd"`
-	MaxPositionUSD  float64 `toml:"max_position_usd" json:"max_position_usd"`
-	PollIntervalMs  int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
-	ExecuteOrders   bool    `toml:"execute_orders"   json:"execute_orders"`
+	Enabled         bool     `toml:"enabled"           json:"enabled"`
+	WalletIDs       []string `toml:"wallet_ids"        json:"wallet_ids"`
+	MinEdgePct      float64  `toml:"min_edge_pct"      json:"min_edge_pct"`
+	MinLiquidityUSD float64  `toml:"min_liquidity_usd" json:"min_liquidity_usd"`
+	MaxPositionUSD  float64  `toml:"max_position_usd"  json:"max_position_usd"`
+	MaxDurationDays int      `toml:"max_duration_days" json:"max_duration_days"`
+	PollIntervalMs  int      `toml:"poll_interval_ms"  json:"poll_interval_ms"`
+	ExecuteOrders   bool     `toml:"execute_orders"    json:"execute_orders"`
 }
 
 type RisklessRateConfig struct {
 	Enabled         bool    `toml:"enabled"          json:"enabled"`
+	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
 	MinDurationDays int     `toml:"min_duration_days" json:"min_duration_days"`
 	MaxNOPrice      float64 `toml:"max_no_price"     json:"max_no_price"`
 	MaxPositionUSD  float64 `toml:"max_position_usd" json:"max_position_usd"`
@@ -205,6 +210,7 @@ type RisklessRateConfig struct {
 
 type FadeChaosConfig struct {
 	Enabled           bool    `toml:"enabled"              json:"enabled"`
+	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
 	SpikeThresholdPct float64 `toml:"spike_threshold_pct"  json:"spike_threshold_pct"`
 	CooldownSec       int     `toml:"cooldown_sec"         json:"cooldown_sec"`
 	MaxPositionUSD    float64 `toml:"max_position_usd"     json:"max_position_usd"`
@@ -213,14 +219,49 @@ type FadeChaosConfig struct {
 }
 
 type CrossMarketConfig struct {
-	Enabled          bool    `toml:"enabled"            json:"enabled"`
-	MinDivergencePct float64 `toml:"min_divergence_pct" json:"min_divergence_pct"`
-	MaxPositionUSD   float64 `toml:"max_position_usd"   json:"max_position_usd"`
-	PollIntervalMs   int     `toml:"poll_interval_ms"   json:"poll_interval_ms"`
-	ExecuteOrders    bool    `toml:"execute_orders"     json:"execute_orders"`
+	Enabled          bool     `toml:"enabled"            json:"enabled"`
+	WalletIDs        []string `toml:"wallet_ids"         json:"wallet_ids"`
+	MinDivergencePct float64  `toml:"min_divergence_pct" json:"min_divergence_pct"`
+	MaxPositionUSD   float64  `toml:"max_position_usd"   json:"max_position_usd"`
+	CooldownSec      int      `toml:"cooldown_sec"       json:"cooldown_sec"`
+	PollIntervalMs   int      `toml:"poll_interval_ms"   json:"poll_interval_ms"`
+	ExecuteOrders    bool     `toml:"execute_orders"     json:"execute_orders"`
 }
 
-// Save сериализует cfg в TOML и записывает в файл path (создаёт или перезаписывает).
+// applyEnvOverlay overrides secret fields with values from environment variables.
+// It runs after migrateAuth and before validate so env vars take final precedence.
+func (c *Config) applyEnvOverlay() {
+	env := func(key string) string { return os.Getenv(key) }
+	if len(c.Wallets) == 0 {
+		c.Wallets = append(c.Wallets, WalletConfig{ChainID: 137})
+	}
+	if v := env("POLY_PRIVATE_KEY"); v != "" {
+		c.Wallets[0].PrivateKey = v
+	}
+	if v := env("POLY_API_KEY"); v != "" {
+		c.Wallets[0].APIKey = v
+	}
+	if v := env("POLY_API_SECRET"); v != "" {
+		c.Wallets[0].APISecret = v
+	}
+	if v := env("POLY_PASSPHRASE"); v != "" {
+		c.Wallets[0].Passphrase = v
+	}
+	if v := env("TELEGRAM_BOT_TOKEN"); v != "" {
+		c.Telegram.BotToken = v
+	}
+	if v := env("WEBUI_JWT_SECRET"); v != "" {
+		c.WebUI.JWTSecret = v
+	}
+	if v := env("POLY_PROXY_USERNAME"); v != "" {
+		c.Proxy.Username = v
+	}
+	if v := env("POLY_PROXY_PASSWORD"); v != "" {
+		c.Proxy.Password = v
+	}
+}
+
+// Save serializes cfg to TOML and writes to path (creates or overwrites).
 func Save(path string, cfg *Config) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -230,7 +271,7 @@ func Save(path string, cfg *Config) error {
 	return toml.NewEncoder(f).Encode(cfg)
 }
 
-// Load читает и парсит TOML-конфиг из указанного файла.
+// Load reads and parses TOML config from the specified file.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -243,6 +284,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg.migrateAuth()
+	cfg.applyEnvOverlay()
 
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("config: validation: %w", err)
@@ -318,6 +360,9 @@ func (c *Config) validate() error {
 	if c.Trading.Strategies.PositiveEV.MaxPositionUSD <= 0 {
 		c.Trading.Strategies.PositiveEV.MaxPositionUSD = 50.0
 	}
+	if c.Trading.Strategies.PositiveEV.MaxDurationDays <= 0 {
+		c.Trading.Strategies.PositiveEV.MaxDurationDays = 14
+	}
 	if c.Trading.Strategies.PositiveEV.PollIntervalMs <= 0 {
 		c.Trading.Strategies.PositiveEV.PollIntervalMs = 30000
 	}
@@ -350,6 +395,9 @@ func (c *Config) validate() error {
 	}
 	if c.Trading.Strategies.CrossMarket.MaxPositionUSD <= 0 {
 		c.Trading.Strategies.CrossMarket.MaxPositionUSD = 75.0
+	}
+	if c.Trading.Strategies.CrossMarket.CooldownSec <= 0 {
+		c.Trading.Strategies.CrossMarket.CooldownSec = 300
 	}
 	if c.Trading.Strategies.CrossMarket.PollIntervalMs <= 0 {
 		c.Trading.Strategies.CrossMarket.PollIntervalMs = 30000
