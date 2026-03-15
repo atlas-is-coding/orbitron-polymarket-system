@@ -1,5 +1,19 @@
 package updater
 
-// Dir returns the directory used for storing updater state and downloaded binaries.
-// This stub will be replaced in Task 8.
-func Dir() string { return "." }
+import (
+	"os"
+	"path/filepath"
+)
+
+// sourceDir is the canonical resolver for the bot's source/binary directory.
+// Override in tests: updater.sourceDir = func() string { return t.TempDir() }
+var sourceDir = func() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	return filepath.Dir(exe)
+}
+
+// Dir returns the source/binary directory for this process.
+func Dir() string { return sourceDir() }
