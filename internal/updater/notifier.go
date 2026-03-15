@@ -51,6 +51,8 @@ func (n *Notifier) Notify(version, releaseNotes, publishedAt string) {
 func (n *Notifier) NotifyError(msg string) {
 	log.Error().Msg("updater: " + msg)
 	if n.telegram != nil {
-		_ = n.telegram.Send(context.Background(), "Orbitron updater error: "+msg)
+		if err := n.telegram.Send(context.Background(), "Orbitron updater error: "+msg); err != nil {
+			log.Warn().Err(err).Msg("updater: telegram error notification failed")
+		}
 	}
 }
