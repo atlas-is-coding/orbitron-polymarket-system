@@ -173,3 +173,104 @@ func TestWalletStats(t *testing.T) {
 		t.Errorf("expected 0 rows for wallet-2, got %d", len(rows2))
 	}
 }
+
+func TestMarketCache_UpsertAndGet(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	records := []storage.MarketCacheRecord{
+		{ConditionID: "cond-1", Data: `{"question":"Q1"}`, UpdatedAt: now, FirstSeen: now},
+		{ConditionID: "cond-2", Data: `{"question":"Q2"}`, UpdatedAt: now, FirstSeen: now},
+	}
+
+	if err := db.UpsertMarkets(ctx, records); err != nil {
+		t.Fatalf("UpsertMarkets: %v", err)
+	}
+
+	all, err := db.GetCachedMarkets(ctx)
+	if err != nil {
+		t.Fatalf("GetCachedMarkets: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 cached markets, got %d", len(all))
+	}
+}
+
+func TestMarketCache_UpsertPreservesFirstSeen(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	original := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// First insert
+	if err := db.UpsertMarkets(ctx, []storage.MarketCacheRecord{
+		{ConditionID: "cond-x", Data: `{}`, UpdatedAt: original, FirstSeen: original},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second upsert with later FirstSeen — original must be preserved
+	if err := db.UpsertMarkets(ctx, []storage.MarketCacheRecord{
+		{ConditionID: "cond-x", Data: `{"updated":true}`, UpdatedAt: later, FirstSeen: later},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	all, err := db.GetCachedMarkets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("expected 1, got %d", len(all))
+	}
+	if !all[0].FirstSeen.Equal(original) {
+		t.Errorf("FirstSeen should be %v, got %v", original, all[0].FirstSeen)
+	}
+	// Data should be updated
+	if all[0].Data != `{"updated":true}` {
+		t.Errorf("Data not updated: %q", all[0].Data)
+	}
+}
+
+func TestMarketCache_GetNewMarkets(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	old := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	newTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	cutoff := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	records := []storage.MarketCacheRecord{
+		{ConditionID: "old-1", Data: `{}`, UpdatedAt: old, FirstSeen: old},
+		{ConditionID: "new-1", Data: `{}`, UpdatedAt: newTime, FirstSeen: newTime},
+	}
+	if err := db.UpsertMarkets(ctx, records); err != nil {
+		t.Fatal(err)
+	}
+
+	newMarkets, err := db.GetNewMarkets(ctx, cutoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(newMarkets) != 1 {
+		t.Fatalf("expected 1 new market, got %d", len(newMarkets))
+	}
+	if newMarkets[0].ConditionID != "new-1" {
+		t.Errorf("expected new-1, got %s", newMarkets[0].ConditionID)
+	}
+}

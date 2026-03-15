@@ -101,7 +101,59 @@ func (d *DB) migrate() error {
 	if err != nil {
 		return fmt.Errorf("sqlite: create wallet_stats: %w", err)
 	}
+	_, err = d.db.Exec(`
+		CREATE TABLE IF NOT EXISTS sent_alerts (
+			alert_type   TEXT    NOT NULL,
+			condition_id TEXT    NOT NULL,
+			sent_at      INTEGER NOT NULL,
+			PRIMARY KEY (alert_type, condition_id)
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("sqlite: create sent_alerts: %w", err)
+	}
+	_, err = d.db.Exec(`
+		CREATE TABLE IF NOT EXISTS markets_cache (
+			condition_id TEXT    PRIMARY KEY,
+			data         TEXT    NOT NULL,
+			updated_at   INTEGER NOT NULL,
+			first_seen   INTEGER NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_markets_cache_first_seen
+			ON markets_cache(first_seen);
+	`)
+	if err != nil {
+		return fmt.Errorf("sqlite: create markets_cache: %w", err)
+	}
 	return nil
+}
+
+// --- SentAlertStore ---
+
+// WasAlertSent проверяет, было ли уведомление отправлено в течение cooldown.
+func (d *DB) WasAlertSent(ctx context.Context, alertType, conditionID string, cooldown time.Duration) (bool, error) {
+	cutoff := time.Now().Add(-cooldown).Unix()
+	var sentAt int64
+	err := d.db.QueryRowContext(ctx,
+		`SELECT sent_at FROM sent_alerts WHERE alert_type = ? AND condition_id = ? AND sent_at > ?`,
+		alertType, conditionID, cutoff,
+	).Scan(&sentAt)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// MarkAlertSent записывает (или обновляет) время последней отправки уведомления.
+func (d *DB) MarkAlertSent(ctx context.Context, alertType, conditionID string) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT OR REPLACE INTO sent_alerts (alert_type, condition_id, sent_at) VALUES (?, ?, ?)`,
+		alertType, conditionID, time.Now().Unix(),
+	)
+	return err
 }
 
 // --- TradeStore ---
@@ -315,6 +367,78 @@ func (d *DB) GetWalletStats(ctx context.Context, walletID string, limit int) ([]
 		}
 		r.FetchedAt = time.Unix(ts, 0)
 		result = append(result, &r)
+	}
+	return result, rows.Err()
+}
+
+// --- MarketCacheStore ---
+
+// UpsertMarkets вставляет или обновляет кеш маркетов.
+// first_seen не перезаписывается если запись уже существует.
+func (d *DB) UpsertMarkets(ctx context.Context, records []storage.MarketCacheRecord) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO markets_cache (condition_id, data, updated_at, first_seen)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(condition_id) DO UPDATE SET
+			data       = excluded.data,
+			updated_at = excluded.updated_at,
+			first_seen = first_seen
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range records {
+		if _, err := stmt.ExecContext(ctx,
+			r.ConditionID, r.Data,
+			r.UpdatedAt.Unix(), r.FirstSeen.Unix(),
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetCachedMarkets возвращает все маркеты из кеша.
+func (d *DB) GetCachedMarkets(ctx context.Context) ([]storage.MarketCacheRecord, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT condition_id, data, updated_at, first_seen FROM markets_cache`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanMarketCacheRows(rows)
+}
+
+// GetNewMarkets возвращает маркеты с first_seen >= since.
+func (d *DB) GetNewMarkets(ctx context.Context, since time.Time) ([]storage.MarketCacheRecord, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT condition_id, data, updated_at, first_seen FROM markets_cache WHERE first_seen >= ?`,
+		since.Unix(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanMarketCacheRows(rows)
+}
+
+func scanMarketCacheRows(rows *sql.Rows) ([]storage.MarketCacheRecord, error) {
+	var result []storage.MarketCacheRecord
+	for rows.Next() {
+		var r storage.MarketCacheRecord
+		var ua, fs int64
+		if err := rows.Scan(&r.ConditionID, &r.Data, &ua, &fs); err != nil {
+			return nil, err
+		}
+		r.UpdatedAt = time.Unix(ua, 0).UTC()
+		r.FirstSeen = time.Unix(fs, 0).UTC()
+		result = append(result, r)
 	}
 	return result, rows.Err()
 }
