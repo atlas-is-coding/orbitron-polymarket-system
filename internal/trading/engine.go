@@ -178,3 +178,15 @@ func (e *Engine) Stop() {
 		}
 	}
 }
+
+// IsIdle returns true when no strategy is currently running.
+func (e *Engine) IsIdle() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	for _, en := range e.entries {
+		if en.cancel != nil {
+			return false
+		}
+	}
+	return true
+}

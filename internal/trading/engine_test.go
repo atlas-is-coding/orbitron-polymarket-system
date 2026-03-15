@@ -85,3 +85,26 @@ func TestEngine_Stop_CallsStopOnStrategies(t *testing.T) {
 	engine.Stop()
 	assert.True(t, s.stopped.Load())
 }
+
+func TestEngine_IsIdle(t *testing.T) {
+	log := zerolog.Nop()
+	e := trading.NewEngine(log)
+	// No strategies registered → idle
+	assert.True(t, e.IsIdle())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := &fakeStrategy{name: "s1"} // blocks until ctx.Done()
+	e.Register(s)
+	// Registered but not started → idle
+	assert.True(t, e.IsIdle())
+
+	require.NoError(t, e.StartStrategy(ctx, "s1"))
+	// cancel is set synchronously inside StartStrategy → not idle
+	assert.False(t, e.IsIdle())
+
+	require.NoError(t, e.StopStrategy("s1"))
+	// cancel cleared → idle again
+	assert.True(t, e.IsIdle())
+}
