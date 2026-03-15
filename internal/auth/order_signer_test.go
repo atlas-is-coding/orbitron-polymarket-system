@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/auth"
+	"github.com/atlasdev/orbitron/internal/auth"
 	"github.com/ethereum/go-ethereum/common"
 )
 

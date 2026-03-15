@@ -1,6 +1,6 @@
 package strategies
 
-import "github.com/atlasdev/polytrade-bot/internal/copytrading"
+import "github.com/atlasdev/orbitron/internal/copytrading"
 
 // Executor places and closes orders on Polymarket.
 // copytrading.OrderExecutor implements this interface.

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
+	"github.com/atlasdev/orbitron/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/auth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 )
@@ -136,6 +136,50 @@ func (e *OrderExecutor) Close(assetID string, sizeShares, avgBuyPrice float64, n
 		Msg("closed copy position")
 
 	return &CloseResult{OrderID: resp.OrderID, Price: price, PnL: pnl}, nil
+}
+
+// PlaceLimit places a limit order at a specified price.
+// side is "YES" (buy) or "NO" (sell); orderType is "GTC" or "FOK".
+// Returns the order ID on success.
+func (e *OrderExecutor) PlaceLimit(tokenID, side, orderType string, price, sizeUSD float64) (string, error) {
+	if price <= 0 {
+		return "", fmt.Errorf("executor: invalid limit price %.4f", price)
+	}
+	sizeShares := sizeUSD / price
+
+	authSide := auth.Buy
+	if side == "NO" {
+		authSide = auth.Sell
+	}
+
+	req, err := e.buildOrderRequest(tokenID, price, sizeShares, authSide)
+	if err != nil {
+		return "", fmt.Errorf("executor: build limit order: %w", err)
+	}
+
+	ot := clob.OrderTypeGTC
+	if orderType == "FOK" {
+		ot = clob.OrderTypeFOK
+	}
+	req.OrderType = ot
+
+	resp, err := e.clob.CreateOrder(req)
+	if err != nil {
+		return "", fmt.Errorf("executor: CreateOrder limit: %w", err)
+	}
+	if !resp.Success {
+		return "", fmt.Errorf("executor: limit order rejected: %s", resp.ErrorMsg)
+	}
+
+	e.logger.Info().
+		Str("token_id", tokenID).
+		Str("side", side).
+		Str("order_id", resp.OrderID).
+		Float64("price", price).
+		Float64("size_usd", sizeUSD).
+		Msg("placed limit order")
+
+	return resp.OrderID, nil
 }
 
 // buildOrderRequest строит подписанный CreateOrderRequest для CLOB API.

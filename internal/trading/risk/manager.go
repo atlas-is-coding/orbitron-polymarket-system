@@ -6,16 +6,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 // Manager tracks daily P&L and enforces circuit breaker + stop-loss/take-profit.
 type Manager struct {
-	cfg         config.RiskConfig
-	dailyLoss   float64
-	lastReset   time.Time
-	broken      atomic.Bool
-	mu          sync.Mutex
+	cfg       config.RiskConfig
+	dailyLoss float64
+	lastReset time.Time
+	broken    atomic.Bool
+	mu        sync.Mutex
 }
 
 // NewManager creates a RiskManager with the given config.

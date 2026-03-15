@@ -3,7 +3,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 // RootModel is the top-level BubbleTea model.
@@ -21,11 +21,11 @@ func NewRootModel(
 	bus *EventBus,
 	width, height int,
 	onSave func(string),
-	wm WalletProvider,
+	tp TradingProvider,
 ) RootModel {
 	return RootModel{
 		splash:     NewSplashModel(width, height),
-		app:        NewAppModel(cfg, cfgPath, bus, width, height, onSave, wm),
+		app:        NewAppModel(cfg, cfgPath, bus, width, height, onSave, tp),
 		showSplash: true,
 	}
 }

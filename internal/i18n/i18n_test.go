@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/i18n"
 )
 
 func TestT_ReturnsNonNil(t *testing.T) {

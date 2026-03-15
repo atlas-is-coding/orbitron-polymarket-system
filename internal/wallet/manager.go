@@ -6,12 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/copytrading"
-	"github.com/atlasdev/polytrade-bot/internal/health"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api"
+	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/copytrading"
+	"github.com/atlasdev/orbitron/internal/health"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // Manager manages the set of active and inactive wallet instances.
@@ -21,6 +21,7 @@ type Manager struct {
 	instances []*WalletInstance
 	bus       *tui.EventBus
 	dialFn    api.DialFunc
+	log       zerolog.Logger
 }
 
 // NewManager creates a Manager. bus may be nil (e.g., in tests or headless mode).
@@ -31,6 +32,24 @@ func NewManager(bus *tui.EventBus) *Manager {
 // SetDialer sets the proxy dialer used for geoblock checks before order placement.
 func (m *Manager) SetDialer(dial api.DialFunc) {
 	m.dialFn = dial
+}
+
+// SetLogger sets the logger for the manager.
+func (m *Manager) SetLogger(log zerolog.Logger) {
+	m.log = log
+}
+
+// AvailableWallets returns IDs of all enabled wallets that have an active executor.
+func (m *Manager) AvailableWallets() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var ids []string
+	for _, w := range m.instances {
+		if w.Cfg.Enabled && w.Executor != nil {
+			ids = append(ids, w.Cfg.ID)
+		}
+	}
+	return ids
 }
 
 // AddInactive adds a wallet without starting any subsystems.
@@ -222,7 +241,8 @@ func (m *Manager) SetPrimary(id string) error {
 
 // PlaceOrder places a limit order for the wallet identified by walletID.
 // Requires the wallet to be active (have ClobClient and L2 credentials configured).
-func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error) {
+// negRisk is passed through to the order signer (neg-risk markets).
+func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64, negRisk bool) (string, error) {
 	geo, geoErr := health.CheckGeoblock(m.dialFn)
 	if geoErr == nil && geo.Blocked {
 		return "", fmt.Errorf("trading blocked in %s (IP: %s) — configure [proxy] in config.toml", geo.Country, geo.IP)
@@ -252,7 +272,7 @@ func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, s
 	if err != nil {
 		return "", fmt.Errorf("wallet %q: derive L1: %w", walletID, err)
 	}
-	signer := auth.NewOrderSigner(l1, inst.Cfg.ChainID, inst.Cfg.NegRisk)
+	signer := auth.NewOrderSigner(l1, inst.Cfg.ChainID, negRisk)
 
 	exec := copytrading.NewOrderExecutor(
 		inst.ClobClient,

@@ -3,7 +3,9 @@ package license
 import "encoding/hex"
 
 // rawToken is set at build time via:
-//   go build -ldflags="-X 'github.com/atlasdev/orbitron/internal/license.rawToken=ENCODED'"
+//
+//	go build -ldflags="-X 'github.com/atlasdev/orbitron/internal/license.rawToken=ENCODED'"
+//
 // where ENCODED = hex(realToken XOR xorKey). Generate with: go run ./cmd/tokenenc encode REAL_TOKEN
 var rawToken = ""
 

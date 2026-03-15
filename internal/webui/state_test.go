@@ -3,7 +3,7 @@ package webui
 import (
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 func TestStateBalance(t *testing.T) {

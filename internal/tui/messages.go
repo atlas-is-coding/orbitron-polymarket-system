@@ -5,9 +5,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/health"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/health"
 )
 
 // ConfigReloadedMsg is sent when config.toml changes on disk.
@@ -172,6 +172,21 @@ type SplashDoneMsg struct{}
 type MarketsUpdatedMsg struct {
 	Markets []gamma.Market
 	Tags    []gamma.Tag
+	Err     error
+}
+
+// StrategyRow represents a single strategy in the strategies table.
+type StrategyRow struct {
+	Name        string
+	Status      string // "active" or "stopped"
+	WalletID    string
+	WalletLabel string
+	Details     string
+}
+
+// StrategiesUpdateMsg carries a fresh snapshot of strategy states.
+type StrategiesUpdateMsg struct {
+	Rows []StrategyRow
 }
 
 // MarketAlertMsg is published when a price threshold alert triggers.
@@ -191,10 +206,10 @@ type CopytradingTradeMsg struct{ Line string }
 type PlaceOrderMsg struct {
 	ConditionID string
 	WalletIDs   []string
-	Side        string  // "YES" or "NO"
+	Side        string // "YES" or "NO"
 	Price       float64
 	Size        float64
-	OrderType   string  // "GTC", "FOK", "FAK"
+	OrderType   string // "GTC", "FOK", "FAK"
 }
 
 // BatchPlaceOrderMsg places the same order on multiple markets sequentially (one wallet).

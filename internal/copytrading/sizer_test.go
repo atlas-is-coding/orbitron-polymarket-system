@@ -3,7 +3,7 @@ package copytrading_test
 import (
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/copytrading"
+	"github.com/atlasdev/orbitron/internal/copytrading"
 )
 
 func TestSizeCalculatorProportional(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/api/clob"
 	"github.com/rs/zerolog"
 )
 

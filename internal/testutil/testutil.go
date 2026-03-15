@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
-	"github.com/atlasdev/polytrade-bot/internal/api/data"
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
+	"github.com/atlasdev/orbitron/internal/api"
+	"github.com/atlasdev/orbitron/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/api/data"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/auth"
 )
 
 const (

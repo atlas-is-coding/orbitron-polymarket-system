@@ -3,8 +3,8 @@ package wallet_test
 import (
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/wallet"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/wallet"
 )
 
 func TestManagerAddGet(t *testing.T) {

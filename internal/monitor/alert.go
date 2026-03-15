@@ -1,7 +1,7 @@
 // Package monitor отслеживает рынки и генерирует алерты.
 package monitor
 
-import "github.com/atlasdev/polytrade-bot/internal/api/gamma"
+import "github.com/atlasdev/orbitron/internal/api/gamma"
 
 // AlertType — тип алерта.
 type AlertType string

@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/notify"
-	"github.com/atlasdev/polytrade-bot/internal/trading/risk"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/notify"
+	"github.com/atlasdev/orbitron/internal/trading/risk"
+	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
 
@@ -28,7 +28,7 @@ type ArbitrageSignal struct {
 // ArbitrageStrategy buys YES+NO when their sum < $1.00.
 type ArbitrageStrategy struct {
 	gamma    *gamma.Client
-	executor Executor   // nil = signal-only
+	executor Executor // nil = signal-only
 	notifier notify.Notifier
 	bus      *tui.EventBus
 	risk     *risk.Manager

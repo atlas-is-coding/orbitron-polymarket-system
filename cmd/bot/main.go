@@ -146,13 +146,8 @@ func (a *engineAdapter) SetStrategyWallets(name string, walletIDs []string) erro
 	}
 
 	err = a.engine.SetStrategyWallets(name, walletIDs, execAdapters)
-	if err == nil {
-		if s, ok := a.engine.Get(name); ok {
-			s.SetWalletIDs(walletIDs)
-		}
-		if a.bus != nil {
-			a.bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(a.engine, a.wm)})
-		}
+	if err == nil && a.bus != nil {
+		a.bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(a.engine, a.wm)})
 	}
 	return err
 }
@@ -422,49 +417,48 @@ func run() error {
 	riskMgr := risk.NewManager(cfg.Trading.Risk)
 
 	// --- Trading Strategies ---
-	// Helper to find executor by wallet ID or primary
-	getExecutors := func(wids []string) map[string]strategies.Executor {
-		execs := make(map[string]strategies.Executor)
+	// Helper to find executor by wallet ID or primary (returns the first available).
+	getExecutor := func(wids []string) strategies.Executor {
 		if len(wids) == 0 {
 			// Fallback to primary
-			allWids := wm.WalletIDs()
-			for _, id := range allWids {
+			for _, id := range wm.WalletIDs() {
 				inst, ok := wm.Get(id)
 				if ok && inst.Cfg.Primary && inst.Cfg.Enabled && inst.Executor != nil {
-					execs[id] = &executorAdapter{inst.Executor}
-					break
+					return &executorAdapter{inst.Executor}
 				}
 			}
-			return execs
+			return nil
 		}
 		for _, wid := range wids {
-			if wid == "" { continue }
+			if wid == "" {
+				continue
+			}
 			inst, ok := wm.Get(wid)
 			if ok && inst.Cfg.Enabled && inst.Executor != nil {
-				execs[wid] = &executorAdapter{inst.Executor}
+				return &executorAdapter{inst.Executor}
 			}
 		}
-		return execs
+		return nil
 	}
 
 	sc := cfg.Trading.Strategies
 	engine.Register(strategies.NewArbitrageStrategy(
-		gammaClient, getExecutors(sc.Arbitrage.WalletIDs), notifier, bus, riskMgr, sc.Arbitrage, log,
+		gammaClient, getExecutor(sc.Arbitrage.WalletIDs), notifier, bus, riskMgr, sc.Arbitrage, log,
 	))
 	engine.Register(strategies.NewMarketMakingStrategy(
-		gammaClient, pubClobClient, getExecutors(sc.MarketMaking.WalletIDs), notifier, bus, riskMgr, sc.MarketMaking, log,
+		gammaClient, pubClobClient, getExecutor(sc.MarketMaking.WalletIDs), notifier, bus, riskMgr, sc.MarketMaking, log,
 	))
 	engine.Register(strategies.NewPositiveEVStrategy(
-		gammaClient, getExecutors(sc.PositiveEV.WalletIDs), notifier, bus, riskMgr, sc.PositiveEV, log,
+		gammaClient, getExecutor(sc.PositiveEV.WalletIDs), notifier, bus, riskMgr, sc.PositiveEV, log,
 	))
 	engine.Register(strategies.NewRisklessRateStrategy(
-		gammaClient, getExecutors(sc.RisklessRate.WalletIDs), notifier, bus, riskMgr, sc.RisklessRate, log,
+		gammaClient, getExecutor(sc.RisklessRate.WalletIDs), notifier, bus, riskMgr, sc.RisklessRate, log,
 	))
 	engine.Register(strategies.NewFadeTheChaosStrategy(
-		gammaClient, getExecutors(sc.FadeChaos.WalletIDs), notifier, bus, riskMgr, sc.FadeChaos, log,
+		gammaClient, getExecutor(sc.FadeChaos.WalletIDs), notifier, bus, riskMgr, sc.FadeChaos, log,
 	))
 	engine.Register(strategies.NewCrossMarketStrategy(
-		gammaClient, getExecutors(sc.CrossMarket.WalletIDs), notifier, bus, riskMgr, sc.CrossMarket, log,
+		gammaClient, getExecutor(sc.CrossMarket.WalletIDs), notifier, bus, riskMgr, sc.CrossMarket, log,
 	))
 
 	// --- Market Monitor ---

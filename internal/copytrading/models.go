@@ -2,7 +2,7 @@
 package copytrading
 
 import (
-	"github.com/atlasdev/polytrade-bot/internal/api/data"
+	"github.com/atlasdev/orbitron/internal/api/data"
 )
 
 // TraderState — снимок позиций трейдера: map[assetID]Position.

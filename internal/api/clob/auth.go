@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/atlasdev/polytrade-bot/internal/auth"
+	"github.com/atlasdev/orbitron/internal/auth"
 )
 
 // APIKeyCreds — ответ на /auth/derive-api-key и /auth/api-key (POST).
@@ -61,14 +61,14 @@ func (c *Client) DeriveAPIKey(l1 *auth.L1Signer) (*auth.L2Credentials, error) {
 	}, nil
 }
 
-func (c * Client) GetServerTime() (int64, error) {
+func (c *Client) GetServerTime() (int64, error) {
 	resp, err := c.http.Get("/time", nil)
 	if err != nil {
 		return 0, fmt.Errorf("clob: GetServerTime: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return 0, fmt.Errorf("clob: GetServerTime: HTTP %d: %s", resp.StatusCode, resp.Body)	
+		return 0, fmt.Errorf("clob: GetServerTime: HTTP %d: %s", resp.StatusCode, resp.Body)
 	}
 
 	var timestamp int64

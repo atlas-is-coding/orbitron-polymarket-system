@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
+	"github.com/atlasdev/orbitron/internal/api"
 )
 
 const geoblockURL = "https://polymarket.com/api/geoblock"

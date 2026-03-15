@@ -10,7 +10,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/atlasdev/polytrade-bot/internal/storage"
+	"github.com/atlasdev/orbitron/internal/storage"
 )
 
 // DB — SQLite реализация storage.Store.

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/atlasdev/polytrade-bot/internal/testutil"
+	"github.com/atlasdev/orbitron/internal/testutil"
 )
 
 func TestGetMarkets_FirstPage(t *testing.T) {

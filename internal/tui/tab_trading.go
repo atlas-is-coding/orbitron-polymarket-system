@@ -49,12 +49,12 @@ type CancelAllOrdersMsg struct{}
 
 // TradingModel is the Trading tab sub-model (Orders + Positions with sub-tabs).
 type TradingModel struct {
-	subTab       TradingSubTab
-	orders       table.Model
-	orderRows    []OrderRow
-	positions    table.Model
-	width        int
-	height       int
+	subTab    TradingSubTab
+	orders    table.Model
+	orderRows []OrderRow
+	positions table.Model
+	width     int
+	height    int
 }
 
 // NewTradingModel creates a new TradingModel.

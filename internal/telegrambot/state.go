@@ -3,9 +3,9 @@ package telegrambot
 import (
 	"sync"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/health"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/health"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // SubsystemStatus holds name + active state.

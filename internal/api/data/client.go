@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
+	"github.com/atlasdev/orbitron/internal/api"
 )
 
 // Client — Data API клиент (https://data-api.polymarket.com).

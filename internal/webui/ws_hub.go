@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gorilla/websocket"
 
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // WsEvent is the JSON envelope sent to web clients.

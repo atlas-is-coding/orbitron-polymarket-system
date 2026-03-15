@@ -1,13 +1,13 @@
 package ws
 
-import "github.com/atlasdev/polytrade-bot/internal/auth"
+import "github.com/atlasdev/orbitron/internal/auth"
 
 // MarketSubscription создаёт запрос подписки на обновления книги ордеров рынков.
 // markets — список condition_id рынков.
 func MarketSubscription(markets []string) SubscribeRequest {
 	return SubscribeRequest{
 		Type:    ChannelMarket,
-		Markets: markets,
+		Markets: &markets,
 	}
 }
 
@@ -16,7 +16,7 @@ func MarketSubscription(markets []string) SubscribeRequest {
 func AssetSubscription(assets []string) SubscribeRequest {
 	return SubscribeRequest{
 		Type:   ChannelAsset,
-		Assets: assets,
+		Assets: &assets,
 	}
 }
 
@@ -50,13 +50,13 @@ type PriceLevel struct {
 
 // UserOrderEvent — событие ордера пользователя (channel: user).
 type UserOrderEvent struct {
-	OrderID       string `json:"order_id"`
-	Status        string `json:"status"`
-	AssetID       string `json:"asset_id"`
-	Side          string `json:"side"`
-	Price         string `json:"price"`
-	OriginalSize  string `json:"original_size"`
-	SizeMatched   string `json:"size_matched"`
+	OrderID      string `json:"order_id"`
+	Status       string `json:"status"`
+	AssetID      string `json:"asset_id"`
+	Side         string `json:"side"`
+	Price        string `json:"price"`
+	OriginalSize string `json:"original_size"`
+	SizeMatched  string `json:"size_matched"`
 }
 
 // UserTradeEvent — событие сделки пользователя (channel: user).

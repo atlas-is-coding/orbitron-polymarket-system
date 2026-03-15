@@ -26,7 +26,7 @@ type TraderRow struct {
 type copyMode int
 
 const (
-	copyModeTable         copyMode = iota
+	copyModeTable copyMode = iota
 	copyModeAddForm
 	copyModeEditForm
 	copyModeConfirmDelete

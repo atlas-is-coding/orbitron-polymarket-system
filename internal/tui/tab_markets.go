@@ -14,7 +14,7 @@ import (
 type marketsMode int
 
 const (
-	modeList   marketsMode = iota
+	modeList marketsMode = iota
 	modeDetail
 	modeOrder
 )

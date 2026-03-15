@@ -3,8 +3,8 @@ package markets_test
 import (
 	"testing"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/markets"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/markets"
 )
 
 func TestServiceAddRemoveAlert(t *testing.T) {

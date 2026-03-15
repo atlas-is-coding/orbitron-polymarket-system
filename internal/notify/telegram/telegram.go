@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
+	"github.com/atlasdev/orbitron/internal/api"
 )
 
 // Notifier отправляет сообщения в Telegram чат.

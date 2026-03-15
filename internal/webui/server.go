@@ -10,25 +10,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
 
 //go:embed web/dist
 var staticFiles embed.FS
 
-
-// New creates a Server. canceler, wallets, adder, mkts, and placer may be nil.
+// New creates a Server. canceler, wallets, and mkts may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
 	bus *tui.EventBus,
 	canceler OrderCanceler,
 	wallets WalletMutator,
-	adder WalletAdder,
 	mkts MarketsProvider,
-	placer OrderPlacer,
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -38,9 +35,7 @@ func New(
 		bus:      bus,
 		canceler: canceler,
 		wallets:  wallets,
-		adder:    adder,
 		mkts:     mkts,
-		placer:   placer,
 		state:    newWebState(),
 		hub:      newHub(),
 	}

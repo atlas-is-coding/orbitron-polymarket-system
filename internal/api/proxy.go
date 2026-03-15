@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 // DialFunc is a function compatible with fasthttp.Client.Dial and

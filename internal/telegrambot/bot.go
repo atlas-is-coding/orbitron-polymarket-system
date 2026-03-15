@@ -9,15 +9,15 @@ import (
 	"strings"
 	"sync"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	tea "github.com/charmbracelet/bubbletea"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rs/zerolog"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/markets"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // OrderCanceler is the subset of TradesMonitor used by the bot for order management.
@@ -51,7 +51,7 @@ type MarketsProvider interface {
 // OrderPlacer places limit orders on behalf of a wallet.
 // Implemented by *wallet.Manager.
 type OrderPlacer interface {
-	PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error)
+	PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64, negRisk bool) (string, error)
 }
 
 // Bot is the interactive Telegram Bot.
@@ -59,11 +59,11 @@ type Bot struct {
 	api      *tgbotapi.BotAPI
 	bus      *tui.EventBus
 	state    *BotState
-	canceler OrderCanceler  // optional; nil if TradesMonitor not running
-	wallets  WalletMutator  // optional; nil if wallet manager unavailable
-	adder    WalletAdder    // optional; nil if wallet manager unavailable
+	canceler OrderCanceler   // optional; nil if TradesMonitor not running
+	wallets  WalletMutator   // optional; nil if wallet manager unavailable
+	adder    WalletAdder     // optional; nil if wallet manager unavailable
 	mkts     MarketsProvider // optional; nil if Markets service not running
-	placer   OrderPlacer    // optional; nil if no active wallet with private key
+	placer   OrderPlacer     // optional; nil if no active wallet with private key
 	log      zerolog.Logger
 
 	cfgMu   sync.RWMutex
@@ -251,7 +251,6 @@ func (b *Bot) processBusMsg(msg tea.Msg) {
 		}
 	}
 }
-
 
 // pollTelegram runs the getUpdates long-polling loop.
 func (b *Bot) pollTelegram(ctx context.Context) error {

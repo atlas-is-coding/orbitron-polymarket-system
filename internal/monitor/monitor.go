@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/notify"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/notify"
 	"github.com/rs/zerolog"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 func baseCfg() *config.Config {

@@ -13,9 +13,9 @@ import (
 type TabID int
 
 const (
-	TabOverview TabID = iota
-	TabTrading        // Orders + Positions
-	TabStrategies     // dedicated strategy management
+	TabOverview   TabID = iota
+	TabTrading          // Orders + Positions
+	TabStrategies       // dedicated strategy management
 	TabWallets
 	TabCopytrading
 	TabMarkets
@@ -76,8 +76,8 @@ func RenderSidebar(active TabID, height int, subsystems []SubsystemStatus) strin
 	}
 
 	// ── Spacer ────────────────────────────────────────────────────────────
-	headerRows := 5       // logo(2) + blank(1) + sep(1) + blank(1)
-	tabRows := len(names) // one row per tab
+	headerRows := 5                   // logo(2) + blank(1) + sep(1) + blank(1)
+	tabRows := len(names)             // one row per tab
 	footerRows := 3 + len(subsystems) // sep(1) + blank(1) + label(1) + dots
 	statusRows := 1
 	used := headerRows + tabRows + footerRows + statusRows

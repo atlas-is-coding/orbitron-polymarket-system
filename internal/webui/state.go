@@ -4,9 +4,9 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/health"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/health"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 const maxLogs = 200

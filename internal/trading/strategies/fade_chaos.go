@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/notify"
-	"github.com/atlasdev/polytrade-bot/internal/trading/risk"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/notify"
+	"github.com/atlasdev/orbitron/internal/trading/risk"
+	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
 

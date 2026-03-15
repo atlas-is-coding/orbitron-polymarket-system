@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 func makeTestServer(t *testing.T) *Server {

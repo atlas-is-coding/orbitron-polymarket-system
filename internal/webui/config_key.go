@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/atlasdev/polytrade-bot/internal/config"
+	"github.com/atlasdev/orbitron/internal/config"
 )
 
 // applyConfigKey sets a dot-notation config key on cfg.

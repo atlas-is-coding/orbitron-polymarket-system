@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/markets"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // OrderCanceler wraps TradesMonitor cancel operations.
@@ -59,10 +59,10 @@ type Server struct {
 	password string
 	bus      *tui.EventBus
 	canceler OrderCanceler
-	wallets  WalletMutator // may be nil
-	adder    WalletAdder   // may be nil
+	wallets  WalletMutator   // may be nil
+	adder    WalletAdder     // may be nil
 	mkts     MarketsProvider // may be nil
-	placer   OrderPlacer    // may be nil
+	placer   OrderPlacer     // may be nil
 	state    *WebState
 	hub      *hub
 }

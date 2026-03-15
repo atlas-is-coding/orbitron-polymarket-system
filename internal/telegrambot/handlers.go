@@ -9,11 +9,11 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/gamma"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/gamma"
+	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // settingEntry describes one editable config field accessible via /set.
@@ -40,8 +40,8 @@ func parseBool(s string) bool {
 var settingsMap = map[string]settingEntry{
 	// UI
 	"ui.language": {
-		get: func(c *config.Config) string { return c.UI.Language },
-		set: func(c *config.Config, v string) error { c.UI.Language = v; return nil },
+		get:   func(c *config.Config) string { return c.UI.Language },
+		set:   func(c *config.Config, v string) error { c.UI.Language = v; return nil },
 		onSet: func(v string) { i18n.SetLanguage(v) },
 	},
 	// Monitor
@@ -181,7 +181,7 @@ var settingsMap = map[string]settingEntry{
 	},
 	"auth.chain_id": {
 		secret: true,
-		get: func(c *config.Config) string { return strconv.FormatInt(c.Auth.ChainID, 10) },
+		get:    func(c *config.Config) string { return strconv.FormatInt(c.Auth.ChainID, 10) },
 		set: func(c *config.Config, v string) error {
 			n, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
@@ -533,21 +533,21 @@ func tradingKeyboard(subTab string, orders []tui.OrderRow) tgbotapi.InlineKeyboa
 // categoryIcon returns an emoji for known category slugs.
 func categoryIcon(slug string) string {
 	icons := map[string]string{
-		"politics":    "🏛",
-		"us-politics": "🏛",
-		"sports":      "⚽",
-		"crypto":      "🔮",
-		"science":     "🔬",
-		"business":    "💼",
-		"culture":     "🎭",
-		"tech":        "💻",
-		"weather":     "🌦",
+		"politics":      "🏛",
+		"us-politics":   "🏛",
+		"sports":        "⚽",
+		"crypto":        "🔮",
+		"science":       "🔬",
+		"business":      "💼",
+		"culture":       "🎭",
+		"tech":          "💻",
+		"weather":       "🌦",
 		"entertainment": "🎬",
-		"economics":   "📈",
-		"world":       "🌍",
-		"nba":         "🏀",
-		"nfl":         "🏈",
-		"soccer":      "⚽",
+		"economics":     "📈",
+		"world":         "🌍",
+		"nba":           "🏀",
+		"nfl":           "🏈",
+		"soccer":        "⚽",
 	}
 	if icon, ok := icons[slug]; ok {
 		return icon + " "
@@ -1129,7 +1129,6 @@ func (b *Bot) sendLogs(chatID int64) {
 	b.sendOrEdit(chatID, RenderLogs(b.state.Logs()), logsKeyboard)
 }
 
-
 func (b *Bot) sendMarkets(chatID int64, tagSlug string) {
 	if b.mkts == nil {
 		b.sendOrEdit(chatID, i18n.T().TgMarketsNA, backKeyboard())
@@ -1580,7 +1579,7 @@ func (b *Bot) doPlaceOrder(_ context.Context, chatID int64, orderData string) {
 	price, _ := strconv.ParseFloat(priceStr, 64)
 	sizeUSD, _ := strconv.ParseFloat(sizeStr, 64)
 
-	orderID, err := b.placer.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD)
+	orderID, err := b.placer.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD, false)
 	if err != nil {
 		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrOrderPlace, err.Error())))
 		return

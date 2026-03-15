@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
+	"github.com/atlasdev/orbitron/internal/api"
 )
 
 const (

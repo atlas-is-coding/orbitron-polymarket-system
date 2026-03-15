@@ -255,6 +255,10 @@ type OrdersFilter struct {
 	Market string
 	// AssetID — token_id
 	AssetID string
+	// MakerAddress — фильтр по адресу кошелька (maker)
+	MakerAddress string
+	// Status — фильтр по статусу ордера (e.g. "LIVE", "MATCHED")
+	Status string
 }
 
 // TradesFilter — параметры фильтрации GET /trades и GET /data/trades.

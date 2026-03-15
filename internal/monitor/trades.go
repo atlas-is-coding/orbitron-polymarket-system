@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
-	"github.com/atlasdev/polytrade-bot/internal/api/data"
-	"github.com/atlasdev/polytrade-bot/internal/config"
-	"github.com/atlasdev/polytrade-bot/internal/i18n"
-	"github.com/atlasdev/polytrade-bot/internal/notify"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/api/data"
+	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/notify"
+	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
 
@@ -41,6 +41,7 @@ type TradesMonitor struct {
 }
 
 // NewTradesMonitor создаёт TradesMonitor.
+// db may be nil; it is accepted for future persistence but not used currently.
 func NewTradesMonitor(
 	clobClient *clob.Client,
 	dataClient *data.Client,
@@ -48,6 +49,7 @@ func NewTradesMonitor(
 	cfg *config.TradesMonitorConfig,
 	log zerolog.Logger,
 	address string,
+	db ...interface{},
 ) *TradesMonitor {
 	return &TradesMonitor{
 		clobClient:   clobClient,

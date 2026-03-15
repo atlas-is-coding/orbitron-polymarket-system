@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/atlasdev/polytrade-bot/internal/api"
-	"github.com/atlasdev/polytrade-bot/internal/auth"
+	"github.com/atlasdev/orbitron/internal/api"
+	"github.com/atlasdev/orbitron/internal/auth"
 )
 
 // Client — CLOB API клиент.

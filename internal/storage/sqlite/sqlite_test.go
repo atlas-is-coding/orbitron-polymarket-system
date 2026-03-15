@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/storage"
-	"github.com/atlasdev/polytrade-bot/internal/storage/sqlite"
+	"github.com/atlasdev/orbitron/internal/storage"
+	"github.com/atlasdev/orbitron/internal/storage/sqlite"
 )
 
 func TestOpen(t *testing.T) {

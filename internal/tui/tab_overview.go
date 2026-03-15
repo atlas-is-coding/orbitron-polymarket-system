@@ -29,16 +29,16 @@ type walletSummaryRow struct {
 
 // OverviewModel is the Overview tab sub-model.
 type OverviewModel struct {
-	subsystems  []SubsystemStatus
-	balance     float64
-	openOrders  int
-	positions   int
-	pnlToday    float64
-	traders     int
-	wallets     []walletSummaryRow
-	width       int
-	height      int
-	health      health.HealthSnapshot
+	subsystems   []SubsystemStatus
+	balance      float64
+	openOrders   int
+	positions    int
+	pnlToday     float64
+	traders      int
+	wallets      []walletSummaryRow
+	width        int
+	height       int
+	health       health.HealthSnapshot
 	healthLoaded bool
 }
 

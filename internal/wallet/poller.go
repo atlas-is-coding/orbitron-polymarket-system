@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/atlasdev/polytrade-bot/internal/api/clob"
-	"github.com/atlasdev/polytrade-bot/internal/api/data"
-	"github.com/atlasdev/polytrade-bot/internal/tui"
+	"github.com/atlasdev/orbitron/internal/api/clob"
+	"github.com/atlasdev/orbitron/internal/api/data"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 // dataClient is the subset of data.Client used by the stats poller.
@@ -18,7 +18,8 @@ type dataClient interface {
 // RunStatsPoller polls per-wallet stats from the Data API every interval
 // and broadcasts WalletStatsMsg via the EventBus.
 // It should be launched as a goroutine: go wm.RunStatsPoller(ctx, dataClient, interval).
-func (m *Manager) RunStatsPoller(ctx context.Context, dc dataClient, interval time.Duration) {
+// db is accepted for future use but currently ignored.
+func (m *Manager) RunStatsPoller(ctx context.Context, dc dataClient, interval time.Duration, db ...interface{}) {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/atlasdev/polytrade-bot/internal/trading"
+	"github.com/atlasdev/orbitron/internal/trading"
 )
 
 type fakeStrategy struct {
