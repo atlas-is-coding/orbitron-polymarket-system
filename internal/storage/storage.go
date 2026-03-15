@@ -101,11 +101,40 @@ type WalletStatsStore interface {
 	GetWalletStats(ctx context.Context, walletID string, limit int) ([]*WalletStatsRecord, error)
 }
 
+// SentAlertStore — хранилище отправленных уведомлений (для дедупликации).
+type SentAlertStore interface {
+	// WasAlertSent возвращает true если уведомление типа alertType для рынка conditionID
+	// уже было отправлено в течение последних cooldown.
+	WasAlertSent(ctx context.Context, alertType, conditionID string, cooldown time.Duration) (bool, error)
+	// MarkAlertSent записывает факт отправки уведомления.
+	MarkAlertSent(ctx context.Context, alertType, conditionID string) error
+}
+
+// MarketCacheRecord — снимок рынка для локального кеша.
+type MarketCacheRecord struct {
+	ConditionID string
+	Data        string    // JSON-encoded gamma.Market
+	UpdatedAt   time.Time
+	FirstSeen   time.Time
+}
+
+// MarketCacheStore — кеш маркетов (для быстрого старта).
+type MarketCacheStore interface {
+	// UpsertMarkets вставляет или обновляет записи. first_seen не перезаписывается.
+	UpsertMarkets(ctx context.Context, records []MarketCacheRecord) error
+	// GetCachedMarkets возвращает все закешированные маркеты.
+	GetCachedMarkets(ctx context.Context) ([]MarketCacheRecord, error)
+	// GetNewMarkets возвращает маркеты, first_seen которых >= since.
+	GetNewMarkets(ctx context.Context, since time.Time) ([]MarketCacheRecord, error)
+}
+
 // Store — объединённый интерфейс хранилища.
 type Store interface {
 	TradeStore
 	OrderStore
 	CopyTradeStore
 	WalletStatsStore
+	SentAlertStore
+	MarketCacheStore // NEW
 	Close() error
 }
