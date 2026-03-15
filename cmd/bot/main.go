@@ -467,13 +467,16 @@ func run() error {
 
 	// --- Market Monitor ---
 	mon := monitor.New(gammaClient, notifier, &cfg.Monitor, log)
+	if db != nil {
+		mon.WithStore(db)
+	}
 
 	// --- Markets Service ---
 	var marketsService *markets.Service
 	if bus != nil || cfg.WebUI.Enabled {
-		marketsService = markets.NewService(gammaClient, bus).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, bus, nil).WithLogger(&log)
 	} else {
-		marketsService = markets.NewService(gammaClient, nil).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, nil, nil).WithLogger(&log)
 	}
 
 	// --- Health Service ---

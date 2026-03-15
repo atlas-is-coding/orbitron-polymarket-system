@@ -8,7 +8,7 @@ import (
 )
 
 func TestServiceAddRemoveAlert(t *testing.T) {
-	svc := markets.NewService(nil, nil)
+	svc := markets.NewService(nil, nil, nil)
 
 	id := svc.AddAlert(markets.AlertRule{
 		ConditionID: "0xabc",
@@ -35,7 +35,7 @@ func TestServiceAddRemoveAlert(t *testing.T) {
 }
 
 func TestServiceGetByTag(t *testing.T) {
-	svc := markets.NewService(nil, nil)
+	svc := markets.NewService(nil, nil, nil)
 	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0x1", Tags: []gamma.Tag{{Slug: "crypto"}}},
 		{ConditionID: "0x2", Tags: []gamma.Tag{{Slug: "politics"}}},
@@ -49,7 +49,7 @@ func TestServiceGetByTag(t *testing.T) {
 }
 
 func TestServiceGetByTagAll(t *testing.T) {
-	svc := markets.NewService(nil, nil)
+	svc := markets.NewService(nil, nil, nil)
 	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0x1"},
 		{ConditionID: "0x2"},
@@ -62,7 +62,7 @@ func TestServiceGetByTagAll(t *testing.T) {
 }
 
 func TestServiceGetMarket(t *testing.T) {
-	svc := markets.NewService(nil, nil)
+	svc := markets.NewService(nil, nil, nil)
 	svc.SetMarketsForTest(t, []gamma.Market{
 		{ConditionID: "0xABC", Question: "Will it?"},
 	})
@@ -78,5 +78,42 @@ func TestServiceGetMarket(t *testing.T) {
 	_, ok = svc.GetMarket("nonexistent")
 	if ok {
 		t.Fatal("GetMarket nonexistent: expected not found")
+	}
+}
+
+func TestServiceGetTrending(t *testing.T) {
+	svc := markets.NewService(nil, nil, nil)
+	svc.SetMarketsForTest(t, []gamma.Market{
+		{ConditionID: "0x1", Volume: 5000},
+		{ConditionID: "0x2", Volume: 1000},
+		{ConditionID: "0x3", Volume: 9000},
+	})
+
+	result := svc.GetTrending(2)
+	if len(result) != 2 {
+		t.Fatalf("GetTrending(2): expected 2, got %d", len(result))
+	}
+	if result[0].ConditionID != "0x3" {
+		t.Errorf("first result should be highest volume, got %s", result[0].ConditionID)
+	}
+}
+
+func TestServiceGetTrendingAll(t *testing.T) {
+	svc := markets.NewService(nil, nil, nil)
+	svc.SetMarketsForTest(t, []gamma.Market{
+		{ConditionID: "0x1", Volume: 100},
+		{ConditionID: "0x2", Volume: 200},
+	})
+
+	result := svc.GetTrending(0) // 0 = no limit
+	if len(result) != 2 {
+		t.Fatalf("GetTrending(0): expected 2, got %d", len(result))
+	}
+}
+
+func TestServiceTotalCount(t *testing.T) {
+	svc := markets.NewService(nil, nil, nil)
+	if svc.TotalCount() != 0 {
+		t.Fatal("initial TotalCount should be 0")
 	}
 }
