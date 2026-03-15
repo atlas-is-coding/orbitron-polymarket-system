@@ -51,6 +51,9 @@ type AppModel struct {
 
 	// Toast overlay
 	toast *toastEntry
+
+	// updateBanner is non-empty when a newer bot version is available.
+	updateBanner string
 }
 
 // contentWidth returns the usable width for tab content (terminal - sidebar - border).
@@ -332,6 +335,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trading = NewTradingModel(cw, ch)
 		m.copytrader = NewCopytradingModel(m.cfg, m.cfgPath, cw, ch)
 		return m, m.bus.WaitForEvent()
+
+	case UpdateAvailableMsg:
+		m.updateBanner = fmt.Sprintf(
+			" ◈ Update available: v%s — %s (published %s) ",
+			msg.Version, msg.ReleaseNotes, msg.PublishedAt,
+		)
+		return m, m.bus.WaitForEvent()
 	}
 
 	// Route key events to active tab
@@ -391,7 +401,18 @@ func (m AppModel) View() string {
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, contentArea)
 	statusBar := m.renderStatusBar()
-	full := lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
+
+	var parts []string
+	if m.updateBanner != "" {
+		banner := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F5A623")).
+			Bold(true).
+			Width(m.width).
+			Render(m.updateBanner)
+		parts = append(parts, banner)
+	}
+	parts = append(parts, body, statusBar)
+	full := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	if m.toast != nil {
 		return m.overlayToast(full)
