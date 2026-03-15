@@ -81,6 +81,9 @@ type MarketsParams struct {
 	SortBy      string
 	// Порядок: ASC, DESC
 	SortOrder   string
+	Order     string // "volume_24hr", "volume", "liquidity", "end_date"
+	Ascending bool   // sort direction; false = descending (default)
+	Closed    *bool  // explicit closed filter
 	// Пагинация
 	Offset      int
 	Limit       int
@@ -92,4 +95,6 @@ type EventsParams struct {
 	Category  string
 	Offset    int
 	Limit     int
+	Order     string
+	Ascending bool
 }

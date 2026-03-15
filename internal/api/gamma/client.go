@@ -104,6 +104,13 @@ func buildMarketsQuery(p MarketsParams) string {
 	if p.Offset > 0 {
 		q += "_offset=" + strconv.Itoa(p.Offset) + "&"
 	}
+	if p.Closed != nil {
+		q += "closed=" + strconv.FormatBool(*p.Closed) + "&"
+	}
+	if p.Order != "" {
+		q += "order=" + p.Order + "&"
+		q += "ascending=" + strconv.FormatBool(p.Ascending) + "&"
+	}
 	if q == "?" {
 		return ""
 	}
@@ -123,6 +130,10 @@ func buildEventsQuery(p EventsParams) string {
 	}
 	if p.Offset > 0 {
 		q += "_offset=" + strconv.Itoa(p.Offset) + "&"
+	}
+	if p.Order != "" {
+		q += "order=" + p.Order + "&"
+		q += "ascending=" + strconv.FormatBool(p.Ascending) + "&"
 	}
 	if q == "?" {
 		return ""
