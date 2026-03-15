@@ -231,3 +231,12 @@ type UpdateAvailableMsg struct {
 	ReleaseNotes string
 	PublishedAt  string
 }
+
+// MarketsLoadingMsg is published during initial market fetch (progress update).
+type MarketsLoadingMsg struct {
+	Loaded int
+	Total  int
+}
+
+// MarketsReadyMsg is published when initial market load completes (or times out).
+type MarketsReadyMsg struct{}
