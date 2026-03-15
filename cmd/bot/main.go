@@ -36,6 +36,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/trading/strategies"
 	"github.com/atlasdev/orbitron/internal/license"
 	"github.com/atlasdev/orbitron/internal/tui"
+	"github.com/atlasdev/orbitron/internal/updater"
 	"github.com/atlasdev/orbitron/internal/wallet"
 	"github.com/atlasdev/orbitron/internal/webui"
 )
@@ -568,6 +569,13 @@ func run() error {
 	if tgBot != nil {
 		startSubsystem("Telegram Bot", func() error { return tgBot.Run(ctx) })
 	}
+
+	// --- Update checker ---
+	// Uses updater.Dir() as the single source of truth for the working directory.
+	// notifier is the Telegram notify.Notifier already configured above.
+	pending := updater.NewPending(updater.Dir())
+	updateNotifier := updater.NewNotifier(bus, notifier)
+	go updater.Start(ctx, engine.IsIdle, updateNotifier, pending)
 
 	if cfg.WebUI.Enabled && bus != nil {
 		var cancelerForWeb webui.OrderCanceler

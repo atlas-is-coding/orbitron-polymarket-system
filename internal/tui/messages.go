@@ -224,3 +224,10 @@ type BatchPlaceOrderMsg struct {
 type HealthSnapshotMsg struct {
 	Snapshot health.HealthSnapshot
 }
+
+// UpdateAvailableMsg is published to EventBus when a newer bot version is detected.
+type UpdateAvailableMsg struct {
+	Version      string
+	ReleaseNotes string
+	PublishedAt  string
+}
