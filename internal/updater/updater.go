@@ -105,6 +105,9 @@ func downloadFile(ctx context.Context, url, dst string) error {
 		return fmt.Errorf("download: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download: unexpected status %d", resp.StatusCode)
+	}
 
 	f, err := os.Create(dst)
 	if err != nil {
