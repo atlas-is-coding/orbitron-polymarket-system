@@ -21,11 +21,19 @@ const (
 
 // OrderExecutor размещает и закрывает ордера на Polymarket через CLOB API.
 type OrderExecutor struct {
-	clob        *clob.Client
-	orderSigner *auth.OrderSigner
-	apiKey      string
-	makerAddr   string
-	logger      zerolog.Logger
+	clob          *clob.Client
+	orderSigner   *auth.OrderSigner
+	apiKey        string
+	makerAddr     string
+	logger        zerolog.Logger
+	builderAPIKey string // опциональный ключ Builder Program
+}
+
+// WithBuilderKey устанавливает Polymarket Builder API key.
+// Возвращает executor для chain-вызовов.
+func (e *OrderExecutor) WithBuilderKey(key string) *OrderExecutor {
+	e.builderAPIKey = key
+	return e
 }
 
 // NewOrderExecutor создаёт OrderExecutor.
@@ -266,7 +274,8 @@ func (e *OrderExecutor) buildOrderRequest(
 			SignatureType: int(auth.EOA),
 			Signature:     sig,
 		},
-		Owner:     e.apiKey,
-		OrderType: clob.OrderTypeGTC,
+		Owner:         e.apiKey,
+		OrderType:     clob.OrderTypeGTC,
+		BuilderApiKey: e.builderAPIKey,
 	}, nil
 }

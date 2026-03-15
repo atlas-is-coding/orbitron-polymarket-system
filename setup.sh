@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 GO_VERSION="1.24.4"
 
-echo -e "${GREEN}Starting Polytrade Bot Universal Setup...${NC}"
+echo -e "${GREEN}Starting Orbitron Universal Setup...${NC}"
 
 # 1. OS and Arch Detection
 OS="$(uname -s)"
@@ -182,13 +182,15 @@ echo -e "${YELLOW}Building Go Backend...${NC}"
 echo -e "${YELLOW}Running go mod tidy...${NC}"
 go mod tidy
 
-BIN_NAME="polytrade-bot"
+BIN_NAME="orbitron-polytrade-bot"
 if [ "$PLATFORM" == "windows" ]; then
-    BIN_NAME="polytrade-bot.exe"
+    BIN_NAME="orbitron-polytrade-bot.exe"
 fi
 
 echo -e "${YELLOW}Compiling main binary ($BIN_NAME)...${NC}"
-go build -o $BIN_NAME ./cmd/bot/
+go build -o $BIN_NAME -ldflags="-X 'github.com/atlas-is-coding/orbitron-polymarket-system/internal/license.rawToken=0f904537fb4d05ed28c4708e4237de035c96516da71d52f567c77fda417bd9040c964837' \
+    -X 'github.com/atlas-is-coding/orbitron-polymarket-system/internal/license.LicenseServerURL=https://getorbitron.net/api/v1/license'" \
+    ./cmd/bot/
 
 if [ -f "$BIN_NAME" ]; then
     echo -e "${GREEN}Backend built successfully: $BIN_NAME${NC}"

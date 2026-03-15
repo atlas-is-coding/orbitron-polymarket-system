@@ -12,7 +12,7 @@ type BuilderCredentials struct {
 }
 
 // LicenseServerURL is the VPS endpoint. Override via ldflags or in tests.
-var LicenseServerURL = "https://your-vps-domain.com/api/v1/license"
+var LicenseServerURL = "https://getorbitron.net/api/v1/license"
 
 // Load fetches builder credentials: from cache if fresh, else from server.
 // Returns nil (no error) when app token is empty — Builder features simply disabled.

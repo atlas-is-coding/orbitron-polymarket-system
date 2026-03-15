@@ -260,7 +260,7 @@ func run() error {
 	} else if builderCreds != nil {
 		log.Info().Str("key", builderCreds.APIKey[:4]+"***").Msg("builder credentials loaded")
 	}
-	_ = builderCreds // suppress unused warning until Builder API integration
+	// builderCreds используются ниже при инициализации кошельков.
 
 	// --- Geoblock check ---
 	if geo, geoErr := health.CheckGeoblock(proxyDial); geoErr != nil {
@@ -379,6 +379,9 @@ func run() error {
 		if l1 != nil {
 			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
 			inst.Executor = copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, log)
+			if builderCreds != nil {
+				inst.Executor.WithBuilderKey(builderCreds.APIKey)
+			}
 		}
 		if cfg.Monitor.Trades.Enabled {
 			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr, db)

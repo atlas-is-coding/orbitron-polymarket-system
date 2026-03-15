@@ -112,6 +112,20 @@ type PositionsParams struct {
 	Offset int
 }
 
+// BuilderAnalytics — статистика Builders Program из Data API.
+type BuilderAnalytics struct {
+	// Адрес/ключ билдера
+	BuilderAddress string  `json:"builderAddress"`
+	// Суммарный объём торгов, атрибутированный билдеру (USDC)
+	TotalVolume    float64 `json:"totalVolume"`
+	// Сборы, заработанные билдером (USDC)
+	TotalFees      float64 `json:"totalFees"`
+	// Количество сделок
+	TradeCount     int     `json:"tradeCount"`
+	// Количество уникальных пользователей
+	UniqueUsers    int     `json:"uniqueUsers"`
+}
+
 // TradesParams — параметры запроса сделок.
 type TradesParams struct {
 	// Адрес кошелька

@@ -151,8 +151,11 @@ type OrdersResponse struct {
 type CreateOrderRequest struct {
 	// Подписанный ордер (EIP-712)
 	Order     SignedOrder `json:"order"`
-	Owner     string     `json:"owner"`
-	OrderType OrderType  `json:"orderType"`
+	Owner     string      `json:"owner"`
+	OrderType OrderType   `json:"orderType"`
+	// BuilderApiKey — ключ Builder Program; атрибутирует объём торгов билдеру.
+	// Устанавливается автоматически при наличии лицензионных credentials.
+	BuilderApiKey string `json:"builderApiKey,omitempty"`
 }
 
 // SignedOrder — подписанный EIP-712 ордер для POST /order.

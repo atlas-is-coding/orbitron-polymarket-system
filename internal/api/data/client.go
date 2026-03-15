@@ -76,6 +76,23 @@ func (c *Client) GetTrades(params TradesParams) ([]Trade, error) {
 	return trades, nil
 }
 
+// GetBuilderAnalytics возвращает статистику Builder Program для указанного ключа/адреса.
+func (c *Client) GetBuilderAnalytics(builderKey string) (*BuilderAnalytics, error) {
+	path := "/builder-analytics?builderAddress=" + builderKey
+	resp, err := c.http.Get(path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("data: GetBuilderAnalytics: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("data: GetBuilderAnalytics HTTP %d: %s", resp.StatusCode, resp.Body)
+	}
+	var analytics BuilderAnalytics
+	if err := json.Unmarshal(resp.Body, &analytics); err != nil {
+		return nil, fmt.Errorf("data: GetBuilderAnalytics: decode: %w", err)
+	}
+	return &analytics, nil
+}
+
 func buildPositionsQuery(p PositionsParams) string {
 	q := "?"
 	if p.User != "" {
