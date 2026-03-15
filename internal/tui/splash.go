@@ -10,17 +10,25 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const splashDuration = 2 * time.Second
+// splashTimerMsg fires when the 3-second minimum display time elapses.
+type splashTimerMsg struct{}
 
-// splashTickMsg fires when splash timer expires.
-type splashTickMsg struct{}
+// splashTimeoutMsg fires when the 15-second hard timeout elapses.
+type splashTimeoutMsg struct{}
 
-// SplashModel is the startup welcome screen shown for splashDuration.
+// SplashModel is the startup welcome screen.
+// Waits for both timerDone and marketsReady before transitioning,
+// with a 15-second hard timeout as a fallback.
 type SplashModel struct {
-	spinner spinner.Model
-	width   int
-	height  int
-	version string
+	spinner      spinner.Model
+	width        int
+	height       int
+	version      string
+	done         bool // guard: SplashDoneMsg already emitted
+	timerDone    bool // 3s minimum display time elapsed
+	marketsReady bool // MarketsReadyMsg received
+	loadedCount  int
+	totalCount   int // 500 during initial load, 0 before first MarketsLoadingMsg
 }
 
 // NewSplashModel creates the splash screen.
@@ -39,8 +47,18 @@ func NewSplashModel(width, height int) SplashModel {
 func (m SplashModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
-		tea.Tick(splashDuration, func(time.Time) tea.Msg { return splashTickMsg{} }),
+		tea.Tick(3*time.Second, func(time.Time) tea.Msg { return splashTimerMsg{} }),
+		tea.Tick(15*time.Second, func(time.Time) tea.Msg { return splashTimeoutMsg{} }),
 	)
+}
+
+// tryDone emits SplashDoneMsg if both conditions are met and not already done.
+func (m *SplashModel) tryDone() tea.Cmd {
+	if !m.done && m.timerDone && m.marketsReady {
+		m.done = true
+		return func() tea.Msg { return SplashDoneMsg{} }
+	}
+	return nil
 }
 
 func (m SplashModel) Update(msg tea.Msg) (SplashModel, tea.Cmd) {
@@ -49,8 +67,26 @@ func (m SplashModel) Update(msg tea.Msg) (SplashModel, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-	case splashTickMsg:
-		return m, func() tea.Msg { return SplashDoneMsg{} }
+	case splashTimerMsg:
+		m.timerDone = true
+		cmd := (&m).tryDone()
+		return m, cmd
+	case splashTimeoutMsg:
+		if !m.done {
+			m.timerDone = true
+			m.marketsReady = true
+			m.done = true
+			return m, func() tea.Msg { return SplashDoneMsg{} }
+		}
+		return m, nil
+	case MarketsLoadingMsg:
+		m.loadedCount = msg.Loaded
+		m.totalCount = msg.Total
+		return m, nil
+	case MarketsReadyMsg:
+		m.marketsReady = true
+		cmd := (&m).tryDone()
+		return m, cmd
 	}
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
@@ -70,7 +106,20 @@ func (m SplashModel) View() string {
 
 	subtitle := StyleSplashSubtitle.Render("            NEXUS TERMINAL  " + m.version)
 	divider := StyleMuted.Render("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	loading := fmt.Sprintf("  %s INITIALIZING SUBSYSTEMS...", m.spinner.View())
+
+	var statusLine string
+	if m.marketsReady {
+		if m.loadedCount > 0 {
+			statusLine = fmt.Sprintf("  %s Markets ready (%d)", m.spinner.View(), m.loadedCount)
+		} else {
+			statusLine = fmt.Sprintf("  %s Markets ready", m.spinner.View())
+		}
+	} else if m.totalCount > 0 {
+		statusLine = fmt.Sprintf("  %s Loading markets... (%d / %d)",
+			m.spinner.View(), m.loadedCount, m.totalCount)
+	} else {
+		statusLine = fmt.Sprintf("  %s INITIALIZING SUBSYSTEMS...", m.spinner.View())
+	}
 
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		"",
@@ -79,7 +128,7 @@ func (m SplashModel) View() string {
 		subtitle,
 		divider,
 		"",
-		StyleFgDim.Render(loading),
+		StyleFgDim.Render(statusLine),
 		"",
 	)
 
