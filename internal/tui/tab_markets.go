@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -17,6 +18,13 @@ const (
 	modeList marketsMode = iota
 	modeDetail
 	modeOrder
+)
+
+type marketsViewMode int
+
+const (
+	viewTrending   marketsViewMode = iota
+	viewCategories
 )
 
 // marketWallet holds display info for a wallet in the Markets tab.
@@ -35,6 +43,11 @@ type MarketsModel struct {
 	cursor    int
 	detail    *gamma.Market
 	err       error
+
+	viewMode    marketsViewMode
+	syncing     bool
+	loadedCount int
+	totalCount  int
 
 	// multi-select
 	selected map[string]bool // conditionID → selected for batch buy
@@ -84,6 +97,7 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 
 	return MarketsModel{
 		mode:       modeList,
+		viewMode:   viewTrending,
 		selected:   make(map[string]bool),
 		batchSize:  bs,
 		orderSide:  "YES",
@@ -100,6 +114,14 @@ func (m MarketsModel) Init() tea.Cmd { return nil }
 
 func (m MarketsModel) Update(msg tea.Msg) (MarketsModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case MarketsLoadingMsg:
+		m.syncing = true
+		m.loadedCount = msg.Loaded
+		m.totalCount = msg.Total
+
+	case MarketsReadyMsg:
+		m.syncing = false
+
 	case MarketsUpdatedMsg:
 		m.err = msg.Err
 		if msg.Err == nil {
@@ -153,6 +175,13 @@ func (m MarketsModel) updateList(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 			m.activeTag = reverseCycleTagSlug(m.activeTag, m.tags)
 		} else {
 			m.activeTag = cycleTagSlug(m.activeTag, m.tags)
+		}
+		m.cursor = 0
+	case "t":
+		if m.viewMode == viewTrending {
+			m.viewMode = viewCategories
+		} else {
+			m.viewMode = viewTrending
 		}
 		m.cursor = 0
 	case "space":
@@ -315,7 +344,7 @@ func reverseCycleTagSlug(currentSlug string, tags []gamma.Tag) string {
 	return ""
 }
 
-func (m MarketsModel) filtered() []gamma.Market {
+func (m MarketsModel) filteredByCategory() []gamma.Market {
 	if m.activeTag == "" {
 		return m.markets
 	}
@@ -338,6 +367,18 @@ func (m MarketsModel) filtered() []gamma.Market {
 	next:
 	}
 	return out
+}
+
+func (m MarketsModel) filtered() []gamma.Market {
+	if m.viewMode == viewTrending {
+		cp := make([]gamma.Market, len(m.markets))
+		copy(cp, m.markets)
+		sort.Slice(cp, func(i, j int) bool {
+			return cp[i].Volume > cp[j].Volume
+		})
+		return cp
+	}
+	return m.filteredByCategory()
 }
 
 func (m MarketsModel) View() string {
@@ -364,16 +405,33 @@ func (m MarketsModel) viewList() string {
 		return lipgloss.JoinVertical(lipgloss.Left, " ", renderPanel("Markets", sb.String(), m.width, true))
 	}
 
-	// Tag filter row
-	tagLabel := "All"
-	for _, tg := range m.tags {
-		if tg.Slug == m.activeTag {
-			tagLabel = tg.Label
-			break
-		}
+	// Mode toggle + status
+	modeLabel := "TRENDING"
+	if m.viewMode == viewCategories {
+		modeLabel = "BY CATEGORY"
 	}
-	filterLine := fmt.Sprintf("  Filter: [%s]  f/F cycle  Space select  b/n batch buy", StyleAccent.Render(tagLabel))
-	sb.WriteString("\n" + filterLine + "\n")
+	statusSuffix := ""
+	if m.syncing {
+		statusSuffix = " (syncing...)"
+	} else if m.totalCount > 0 {
+		statusSuffix = fmt.Sprintf(" (%d total)", m.totalCount)
+	}
+	modeLine := fmt.Sprintf("  Mode: [%s]  t toggle%s",
+		StyleAccent.Render(modeLabel), StyleMuted.Render(statusSuffix))
+	sb.WriteString("\n" + modeLine + "\n")
+
+	if m.viewMode == viewCategories {
+		tagLabel := "All"
+		for _, tg := range m.tags {
+			if tg.Slug == m.activeTag {
+				tagLabel = tg.Label
+				break
+			}
+		}
+		filterLine := fmt.Sprintf("  Filter: [%s]  f/F cycle  Space select  b/n batch buy",
+			StyleAccent.Render(tagLabel))
+		sb.WriteString(filterLine + "\n")
+	}
 
 	// Selection / batch status bar
 	if len(m.selected) > 0 {
@@ -427,11 +485,15 @@ func (m MarketsModel) viewList() string {
 		}
 	}
 
-	listPanel := renderPanel("Markets", sb.String(), m.width, true)
+	panelTitle := "Markets — TRENDING"
+	if m.viewMode == viewCategories {
+		panelTitle = "Markets — BY CATEGORY"
+	}
+	listPanel := renderPanel(panelTitle, sb.String(), m.width, true)
 
 	helpPanel := ""
 	if len(m.selected) == 0 {
-		helpPanel = renderHelpPanel("Enter detail   Space select   f/F filter   ↑↓/jk navigate", m.width)
+		helpPanel = renderHelpPanel("Enter detail   Space select   f/F filter   t mode   ↑↓/jk navigate", m.width)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, " ", listPanel, " ", helpPanel)
