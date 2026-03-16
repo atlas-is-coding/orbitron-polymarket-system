@@ -1,10 +1,21 @@
 <template>
   <header class="topbar">
+    <!-- Logo -->
+    <div class="brand">
+      <span class="brand-glyph">◈</span>
+      <span class="brand-name">POLYTRADE</span>
+    </div>
+
     <!-- Live metrics ticker -->
     <div class="metrics-strip">
       <div class="metric-chip">
         <span class="metric-key">BAL</span>
         <span class="metric-val num-glow">${{ fmt2(overview.balance) }}</span>
+      </div>
+      <div class="metric-sep">│</div>
+      <div class="metric-chip">
+        <span class="metric-key">P&amp;L</span>
+        <span class="metric-val" :class="pnlClass">{{ pnlSign }}${{ fmt2(Math.abs(pnl)) }}</span>
       </div>
       <div class="metric-sep">│</div>
       <div class="metric-chip">
@@ -54,6 +65,10 @@ const { overview, connected } = storeToRefs(app)
 
 const currentLang = ref(locale.value)
 
+const pnl = computed(() => +(overview.value.pnl ?? overview.value.pnl_usd ?? 0))
+const pnlClass = computed(() => pnl.value >= 0 ? 'pnl-pos' : 'pnl-neg')
+const pnlSign = computed(() => pnl.value >= 0 ? '+' : '-')
+
 const shortAddr = computed(() => {
   const w = overview.value.wallet
   if (!w) return '—'
@@ -69,14 +84,33 @@ function logout() { auth.logout(); router.push('/login') }
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0 1rem;
-  height: var(--topbar-h);
-  background: var(--bg-sidebar);
+  height: var(--header-h);
+  background: rgba(255,255,255,0.02);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 100;
   gap: 1rem;
+}
+
+/* Logo */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.brand-glyph {
+  font-size: 1rem;
+  color: var(--accent-bright);
+  text-shadow: 0 0 14px rgba(124,58,237,0.60);
+}
+.brand-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--accent-bright);
+  line-height: 1;
 }
 
 /* Metrics strip */
@@ -92,12 +126,12 @@ function logout() { auth.logout(); router.push('/login') }
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0 0.5rem;
+  padding: 0 0.45rem;
   white-space: nowrap;
 }
 
 .metric-key {
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.10em;
@@ -105,7 +139,7 @@ function logout() { auth.logout(); router.push('/login') }
 }
 
 .metric-val {
-  font-size: 0.90rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -116,15 +150,18 @@ function logout() { auth.logout(); router.push('/login') }
   text-shadow: 0 0 10px rgba(251,191,36,0.35);
 }
 
+.pnl-pos { color: var(--success); text-shadow: 0 0 8px rgba(16,217,148,0.30); }
+.pnl-neg { color: var(--danger);  text-shadow: 0 0 8px rgba(248,113,113,0.25); }
+
 .addr-val {
   color: var(--text-secondary);
-  font-size: 0.94rem;
+  font-size: 0.88rem;
 }
 
 .metric-sep {
   color: var(--border);
-  font-size: 0.90rem;
-  padding: 0 0.1rem;
+  font-size: 0.84rem;
+  padding: 0 0.05rem;
   user-select: none;
 }
 
@@ -141,16 +178,15 @@ function logout() { auth.logout(); router.push('/login') }
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.30rem 0.70rem;
+  padding: 0.22rem 0.55rem;
   border-radius: 2px;
   border: 1px solid var(--border);
-  font-size: 1.00rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.10em;
 }
-
-.ws-pill--on  { border-color: rgba(16,217,148,0.35); color: var(--success); background: rgba(16,217,148,0.06); }
-.ws-pill--off { border-color: rgba(245,158,11,0.35);  color: var(--warning); background: rgba(245,158,11,0.06); }
+.ws-pill--on  { border-color: rgba(52,211,153,0.35); color: var(--success); background: rgba(52,211,153,0.06); }
+.ws-pill--off { border-color: rgba(251,191,36,0.35);  color: var(--warning); background: rgba(251,191,36,0.06); }
 
 .ws-dot {
   width: 5px; height: 5px;
@@ -162,12 +198,12 @@ function logout() { auth.logout(); router.push('/login') }
 
 /* Language select */
 .lang-select {
-  background: var(--bg-hover);
+  background: rgba(255,255,255,0.04);
   border: 1px solid var(--border);
   color: var(--text-secondary);
   border-radius: var(--radius);
-  padding: 0.2rem 0.4rem;
-  font-size: 0.92rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.82rem;
   font-family: var(--font-mono);
   cursor: pointer;
   outline: none;
@@ -181,8 +217,8 @@ function logout() { auth.logout(); router.push('/login') }
   border: 1px solid var(--border);
   color: var(--text-secondary);
   border-radius: var(--radius);
-  padding: 0.2rem 0.5rem;
-  font-size: 0.96rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.90rem;
   cursor: pointer;
   line-height: 1;
   transition: all var(--transition);
@@ -194,7 +230,8 @@ function logout() { auth.logout(); router.push('/login') }
 }
 
 @media (max-width: 640px) {
-  .metric-chip:nth-child(n+5) { display: none; }
-  .metric-sep:nth-child(n+4) { display: none; }
+  .brand-name { display: none; }
+  .metric-chip:nth-child(n+7) { display: none; }
+  .metric-sep:nth-child(n+6) { display: none; }
 }
 </style>
