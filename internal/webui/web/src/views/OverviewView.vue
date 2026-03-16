@@ -208,7 +208,7 @@ function initChart() {
     handleScale: false,
   })
   series = chart.addLineSeries({
-    color: '#00c8ff',
+    color: '#a78bfa',
     lineWidth: 2,
     priceLineVisible: false,
     lastValueVisible: true,
@@ -243,7 +243,7 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
   inset: 0;
   background: repeating-linear-gradient(
     0deg, transparent, transparent 3px,
-    rgba(0,200,255,0.012) 3px, rgba(0,200,255,0.012) 6px
+    rgba(124,58,237,0.012) 3px, rgba(124,58,237,0.012) 6px
   );
   pointer-events: none;
 }
@@ -257,7 +257,7 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
   animation-fill-mode: forwards;
 }
 
-.bl-1 { font-size: 1.05rem; font-weight: 700; color: var(--accent-bright); text-shadow: 0 0 10px rgba(0,200,255,0.4); animation-delay: 0.1s; }
+.bl-1 { font-size: 1.05rem; font-weight: 700; color: var(--accent-bright); text-shadow: 0 0 10px rgba(124,58,237,0.4); animation-delay: 0.1s; }
 .bl-2 { color: var(--text-muted); font-size: 0.94rem; animation-delay: 0.45s; }
 .bl-3 { color: var(--text-secondary); animation-delay: 0.75s; }
 .bl-4 { animation-delay: 1.05s; }
@@ -275,7 +275,7 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-top: 2px solid rgba(0, 200, 255, 0.25);
+  border-top: 2px solid rgba(124, 58, 237, 0.25);
   border-radius: var(--radius);
   padding: 0.9rem 1rem;
   transition: border-top-color var(--transition);
@@ -327,7 +327,7 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
   text-transform: uppercase;
   letter-spacing: 0.10em;
   color: var(--accent);
-  background: rgba(0, 200, 255, 0.03);
+  background: rgba(124, 58, 237, 0.03);
 }
 
 .ph-right { color: var(--text-secondary); font-size: 0.90rem; }
@@ -419,10 +419,10 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
   padding: 0.6rem 1.2rem; text-align: left; font-size: 1.00rem;
   text-transform: uppercase; letter-spacing: 0.10em;
   color: var(--text-secondary); border-bottom: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.03);
+  background: rgba(124, 58, 237, 0.03);
 }
 .data-table td { padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border-subtle); }
-.data-table tr:nth-child(even) td { background: rgba(0,200,255,0.02); }
+.data-table tr:nth-child(even) td { background: rgba(124,58,237,0.02); }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg-hover) !important; }
 

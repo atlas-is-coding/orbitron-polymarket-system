@@ -122,9 +122,9 @@ async function submit() {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0, 200, 255, 0.05) 0%, transparent 70%),
-    linear-gradient(rgba(0, 200, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 200, 255, 0.03) 1px, transparent 1px);
+    radial-gradient(ellipse 60% 60% at 50% 50%, rgba(124, 58, 237, 0.05) 0%, transparent 70%),
+    linear-gradient(rgba(124, 58, 237, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.03) 1px, transparent 1px);
   background-size: 100% 100%, 32px 32px, 32px 32px;
 }
 
@@ -149,7 +149,10 @@ async function submit() {
   border: 1px solid var(--border);
   border-top: 2px solid var(--accent);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(0, 200, 255, 0.10);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(124, 58, 237, 0.10);
   animation: fadeSlideUp 0.35s ease both;
   overflow: hidden;
 }
@@ -175,8 +178,8 @@ async function submit() {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 200, 255, 0.012) 2px,
-    rgba(0, 200, 255, 0.012) 4px
+    rgba(124, 58, 237, 0.012) 2px,
+    rgba(124, 58, 237, 0.012) 4px
   );
   pointer-events: none;
   z-index: 1;
@@ -188,7 +191,7 @@ async function submit() {
   align-items: center;
   gap: 0.75rem;
   padding: 0.55rem 1rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 2;
@@ -255,7 +258,7 @@ async function submit() {
   font-size: 1.08rem;
   font-weight: 700;
   color: var(--accent-bright);
-  text-shadow: 0 0 12px rgba(0, 200, 255, 0.50);
+  text-shadow: 0 0 12px rgba(124, 58, 237, 0.50);
   animation-delay: 0.05s;
 }
 .boot-2 {
@@ -296,7 +299,7 @@ async function submit() {
 
 .prompt-row:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(0, 200, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15);
 }
 
 .prompt-glyph {
