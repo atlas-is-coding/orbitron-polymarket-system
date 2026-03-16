@@ -5,11 +5,35 @@
     <div class="page-header anim-in">
       <div class="header-top">
         <h2 class="view-title">{{ $t('markets.title') }}</h2>
-        <span v-if="!store.loading && sortedMarkets.length" class="market-count">
+        <span v-if="store.totalCount > 0" class="market-count">
+          {{ store.totalCount }} markets total
+        </span>
+        <span v-else-if="!store.loading && sortedMarkets.length" class="market-count">
           {{ sortedMarkets.length }} markets
         </span>
       </div>
-      <div class="search-row">
+
+      <!-- Sync progress bar -->
+      <div v-if="store.syncing" class="sync-bar">
+        <div class="sync-bar-fill" :style="{ width: syncPct + '%' }"></div>
+        <span class="sync-label">
+          Syncing markets... ({{ store.loadProgress.loaded }} / {{ store.loadProgress.total }})
+        </span>
+      </div>
+
+      <!-- View mode toggle -->
+      <div class="mode-toggle">
+        <button
+          :class="['mode-btn', { active: store.viewMode === 'trending' }]"
+          @click="store.setViewMode('trending')"
+        >TRENDING</button>
+        <button
+          :class="['mode-btn', { active: store.viewMode === 'categories' }]"
+          @click="store.setViewMode('categories')"
+        >BY CATEGORY</button>
+      </div>
+
+      <div v-if="store.viewMode === 'categories'" class="search-row">
         <div class="search-wrap">
           <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -33,8 +57,9 @@
       </div>
     </div>
 
-    <!-- Tag filter -->
+    <!-- Tag filter (categories mode only) -->
     <TagFilter
+      v-if="store.viewMode === 'categories'"
       :tags="store.tags"
       :model-value="store.activeTag"
       @update:model-value="store.setTag($event)"
@@ -85,7 +110,6 @@
       @alert="openAlert($event)"
     />
 
-    <!-- Alert dialog -->
     <PriceAlertDialog
       v-if="alertMarket"
       :market="alertMarket"
@@ -93,7 +117,6 @@
       @created="onAlertCreated($event)"
     />
 
-    <!-- Quick buy dialog -->
     <QuickBuyDialog
       v-if="quickBuy.market"
       :market="quickBuy.market"
@@ -102,7 +125,6 @@
       @placed="quickBuy.market = null"
     />
 
-    <!-- Batch buy action bar -->
     <ActionBar
       :count="store.selectedCount"
       :side="store.batchSide"
@@ -129,11 +151,17 @@ const alertMarket = ref(null)
 const quickBuy = reactive({ market: null, side: 'YES' })
 
 onMounted(async () => {
-  await Promise.all([store.fetchTags(), store.fetchMarkets()])
+  await Promise.all([store.fetchTags(), store.fetchTrending(50)])
+  store.fetchStats()
+})
+
+const displayMarkets = computed(() => {
+  if (store.viewMode === 'trending') return store.trending
+  return store.filteredMarkets
 })
 
 const sortedMarkets = computed(() => {
-  const list = [...store.filteredMarkets]
+  const list = [...displayMarkets.value]
   if (sortBy.value === 'volume') {
     list.sort((a, b) => parseFloat(b.volume || 0) - parseFloat(a.volume || 0))
   } else if (sortBy.value === 'liquidity') {
@@ -144,15 +172,15 @@ const sortedMarkets = computed(() => {
   return list
 })
 
+const syncPct = computed(() => {
+  const { loaded, total } = store.loadProgress
+  if (!total) return 0
+  return Math.min(100, Math.round((loaded / total) * 100))
+})
+
 function openAlert(market) { alertMarket.value = market }
-
 function resetFilters() { store.setTag(''); store.search = '' }
-
-function onQuickBuy({ market, side }) {
-  quickBuy.market = market
-  quickBuy.side = side
-}
-
+function onQuickBuy({ market, side }) { quickBuy.market = market; quickBuy.side = side }
 async function onAlertCreated({ conditionId, tokenId, direction, threshold }) {
   try { await store.createAlert(conditionId, tokenId, direction, threshold) }
   catch (e) { console.error('Alert creation failed:', e) }
@@ -246,4 +274,53 @@ async function onAlertCreated({ conditionId, tokenId, direction, threshold }) {
   letter-spacing: 0.08em; cursor: pointer; transition: all var(--transition);
 }
 .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Mode toggle */
+.mode-toggle {
+  display: flex;
+  gap: 0.3rem;
+}
+.mode-btn {
+  padding: 0.3rem 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mode-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 200, 255, 0.07);
+}
+
+/* Sync progress bar */
+.sync-bar {
+  position: relative;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sync-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.sync-label {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 </style>

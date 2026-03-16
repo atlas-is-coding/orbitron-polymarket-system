@@ -4,15 +4,19 @@ import axios from 'axios'
 export const useMarketsStore = defineStore('markets', {
   state: () => ({
     markets: [],
+    trending: [],
     tags: [],
     activeTag: '',
     search: '',
-    sortBy: 'volume',
+    viewMode: 'trending',         // 'trending' | 'categories'
     selectedMarket: null,
     loading: false,
     error: null,
+    totalCount: 0,
+    syncing: false,
+    loadProgress: { loaded: 0, total: 500 },
     // multi-select batch buy
-    selectedMarkets: {},   // conditionId → true
+    selectedMarkets: {},
     batchSide: 'YES',
   }),
   getters: {
@@ -46,11 +50,34 @@ export const useMarketsStore = defineStore('markets', {
         this.loading = false
       }
     },
+    async fetchTrending(limit = 50) {
+      this.loading = true
+      this.error = null
+      try {
+        const { data } = await axios.get(`/api/v1/markets/trending?limit=${limit}`)
+        this.trending = data
+      } catch (e) {
+        this.error = e.message
+      } finally {
+        this.loading = false
+      }
+    },
+    async fetchStats() {
+      try {
+        const { data } = await axios.get('/api/v1/markets/stats')
+        this.totalCount = data.total ?? 0
+      } catch { /* non-fatal */ }
+    },
     async fetchTags() {
       try {
         const { data } = await axios.get('/api/v1/markets/tags')
         this.tags = data
       } catch { /* ignore */ }
+    },
+    setViewMode(mode) {
+      this.viewMode = mode
+      if (mode === 'categories') this.fetchMarkets()
+      else this.fetchTrending()
     },
     selectMarket(market) {
       this.selectedMarket = market
@@ -77,6 +104,15 @@ export const useMarketsStore = defineStore('markets', {
     },
     clearSelection() {
       this.selectedMarkets = {}
+    },
+    // Called from WebSocket handler
+    onMarketsLoading(data) {
+      this.syncing = true
+      this.loadProgress = data
+    },
+    onMarketsReady() {
+      this.syncing = false
+      this.fetchStats()
     },
   }
 })

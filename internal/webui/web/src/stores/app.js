@@ -88,6 +88,12 @@ export const useAppStore = defineStore('app', () => {
         // Server finished a poll cycle — refresh the markets list in the background.
         useMarketsStore().fetchMarkets()
         break
+      case 'markets_loading':
+        useMarketsStore().onMarketsLoading(event.data)
+        break
+      case 'markets_ready':
+        useMarketsStore().onMarketsReady()
+        break
       case 'config_reloaded':
         settingsStale.value = true
         break
