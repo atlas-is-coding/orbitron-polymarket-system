@@ -201,7 +201,7 @@ onMounted(async () => {
   inset: 0;
   background: repeating-linear-gradient(
     0deg, transparent, transparent 2px,
-    rgba(0,200,255,0.01) 2px, rgba(0,200,255,0.01) 4px
+    rgba(124,58,237,0.01) 2px, rgba(124,58,237,0.01) 4px
   );
   pointer-events: none;
   z-index: 10;
@@ -211,7 +211,7 @@ onMounted(async () => {
 .term-chrome {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.6rem 1.2rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -253,7 +253,7 @@ onMounted(async () => {
   align-items: baseline;
   transition: background var(--transition);
 }
-.log-row:hover { background: rgba(0, 200, 255, 0.03); }
+.log-row:hover { background: rgba(124, 58, 237, 0.03); }
 
 .log-ts    { width: 5rem; flex-shrink: 0; color: var(--text-muted); font-size: 0.94rem; }
 .log-level { width: 3rem; flex-shrink: 0; font-weight: 700; font-size: 0.94rem; }
@@ -295,7 +295,7 @@ onMounted(async () => {
   font-family: var(--font-mono);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 2px 12px rgba(0,200,255,0.40);
+  box-shadow: 0 2px 12px rgba(124,58,237,0.40);
   animation: fadeSlideUp 0.15s ease both;
   user-select: none;
   z-index: 20;

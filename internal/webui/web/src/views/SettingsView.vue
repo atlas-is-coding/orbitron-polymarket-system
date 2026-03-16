@@ -468,7 +468,7 @@ async function save(key, value) {
   display: flex; flex-direction: column; gap: 0.5rem;
   transition: border-color var(--transition);
 }
-.setting-card:hover { border-color: rgba(0, 200, 255, 0.30); }
+.setting-card:hover { border-color: rgba(124, 58, 237, 0.30); }
 
 /* Label */
 .setting-label {
@@ -488,7 +488,7 @@ async function save(key, value) {
   outline: none; width: 100%;
   transition: border-color var(--transition);
 }
-.setting-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.12); }
+.setting-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.12); }
 
 select.setting-input { cursor: pointer; }
 
@@ -507,7 +507,7 @@ select.setting-input { cursor: pointer; }
   font-family: var(--font-mono);
   transition: all var(--transition);
 }
-.btn-save:hover { background: var(--accent); color: #000; box-shadow: var(--accent-glow); }
+.btn-save:hover { background: var(--accent); color: #fff; box-shadow: var(--accent-glow); }
 
 /* Toggle */
 .toggle { display: flex; align-items: center; cursor: pointer; }
