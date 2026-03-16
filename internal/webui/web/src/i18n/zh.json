@@ -7,7 +7,8 @@
     "wallets": "钱包",
     "markets": "市场",
     "logs": "日志",
-    "settings": "设置"
+    "settings": "设置",
+    "strategies": "策略"
   },
   "login": {
     "title": "Polytrade Bot",

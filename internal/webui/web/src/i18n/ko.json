@@ -7,7 +7,8 @@
     "wallets": "지갑",
     "markets": "마켓",
     "logs": "로그",
-    "settings": "설정"
+    "settings": "설정",
+    "strategies": "전략"
   },
   "login": {
     "title": "Polytrade Bot",
