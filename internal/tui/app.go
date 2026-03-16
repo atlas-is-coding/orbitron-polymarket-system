@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -406,8 +407,10 @@ func (m AppModel) View() string {
 	if m.updateBanner != "" {
 		banner := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#F5A623")).
+			Background(lipgloss.Color("#2E2005")).
 			Bold(true).
 			Width(m.width).
+			Padding(0, 1).
 			Render(m.updateBanner)
 		parts = append(parts, banner)
 	}
@@ -422,9 +425,21 @@ func (m AppModel) View() string {
 
 func (m AppModel) renderStatusBar() string {
 	clock := m.now.UTC().Format("15:04:05 UTC")
-	live := StyleSuccess.Render("● LIVE")
-	content := fmt.Sprintf("  %s   %s  ", clock, live)
-	return StyleStatusBar.Width(m.width).Render(content)
+	
+	mode := StyleStatusMode.Render(" NORMAL ")
+	live := StyleStatusLive.Render(" ● LIVE ")
+	timeStr := StyleStatusTime.Render(" " + clock + " ")
+
+	left := mode
+	right := timeStr + live
+
+	padWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
+	if padWidth < 0 {
+		padWidth = 0
+	}
+	middle := strings.Repeat(" ", padWidth)
+
+	return StyleStatusBar.Width(m.width).Render(left + middle + right)
 }
 
 func (m AppModel) overlayToast(base string) string {
@@ -448,5 +463,7 @@ func (m AppModel) overlayToast(base string) string {
 	return base + "\n" + lipgloss.NewStyle().
 		Width(m.width).
 		Align(lipgloss.Right).
+		MarginRight(2).
+		MarginBottom(1).
 		Render(toast)
 }
