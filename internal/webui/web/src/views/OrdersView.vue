@@ -215,10 +215,10 @@ async function doCancelAll() {
   padding: 0.6rem 1.2rem; text-align: left; font-size: 1.00rem;
   text-transform: uppercase; letter-spacing: 0.10em;
   color: var(--text-secondary); border-bottom: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.03); white-space: nowrap;
+  background: rgba(124, 58, 237, 0.03); white-space: nowrap;
 }
 .data-table td { padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
-.data-table tr:nth-child(even) td { background: rgba(0,200,255,0.018); }
+.data-table tr:nth-child(even) td { background: rgba(124,58,237,0.018); }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg-hover) !important; }
 
@@ -247,7 +247,7 @@ async function doCancelAll() {
   padding: 0.20rem 0.55rem; border-radius: 1px;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
-.st--accent { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,200,255,0.20); }
+.st--accent { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(124,58,237,0.20); }
 .st--ok     { background: var(--success-dim); color: var(--success); border: 1px solid rgba(16,217,148,0.20); }
 .st--off    { background: var(--badge-bg); color: var(--text-muted); border: 1px solid var(--badge-border); }
 

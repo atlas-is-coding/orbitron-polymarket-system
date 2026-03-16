@@ -127,10 +127,10 @@ onMounted(async () => {
   padding: 0.6rem 1.2rem; text-align: left; font-size: 1.00rem;
   text-transform: uppercase; letter-spacing: 0.10em;
   color: var(--text-secondary); border-bottom: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.03); white-space: nowrap;
+  background: rgba(124, 58, 237, 0.03); white-space: nowrap;
 }
 .data-table td { padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
-.data-table tr:nth-child(even) td { background: rgba(0,200,255,0.018); }
+.data-table tr:nth-child(even) td { background: rgba(124,58,237,0.018); }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg-hover) !important; }
 
@@ -167,7 +167,7 @@ onMounted(async () => {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.55rem 1rem;
   border-top: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.02);
+  background: rgba(124, 58, 237, 0.02);
 }
 .sf-item { display: flex; align-items: center; gap: 0.45rem; }
 .sf-label { font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.10em; color: var(--text-secondary); }
