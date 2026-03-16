@@ -211,7 +211,7 @@ async function onAlertCreated({ conditionId, tokenId, direction, threshold }) {
   outline: none; transition: border-color var(--transition);
 }
 .search-input::placeholder { color: var(--text-muted); }
-.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.12); }
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.12); }
 .search-clear {
   position: absolute; right: 0.6rem;
   background: none; border: none; color: var(--text-muted);
@@ -240,7 +240,7 @@ async function onAlertCreated({ conditionId, tokenId, direction, threshold }) {
 .skeleton-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-top: 2px solid rgba(0,200,255,0.15);
+  border-top: 2px solid rgba(124,58,237,0.15);
   border-radius: var(--radius);
   padding: 1rem;
   display: flex; flex-direction: column; gap: 0.65rem;
@@ -297,7 +297,7 @@ async function onAlertCreated({ conditionId, tokenId, direction, threshold }) {
 .mode-btn.active {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(0, 200, 255, 0.07);
+  background: rgba(124, 58, 237, 0.07);
 }
 
 /* Sync progress bar */

@@ -139,7 +139,7 @@ async function doExecute() {
   background: var(--bg-secondary);
   border: 1px solid var(--accent); border-radius: var(--radius);
   padding: 0.6rem 1rem;
-  box-shadow: var(--shadow-lg), 0 0 24px rgba(0,200,255,0.15);
+  box-shadow: var(--shadow-lg), 0 0 24px rgba(124,58,237,0.15);
   z-index: 200;
   white-space: nowrap;
   min-width: 560px;

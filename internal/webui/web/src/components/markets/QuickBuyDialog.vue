@@ -246,7 +246,7 @@ async function doPlace() {
   border: 1px solid transparent;
 }
 .wallet-row:hover { background: var(--bg-hover); }
-.wallet-row--checked { background: var(--accent-dim); border-color: rgba(0,200,255,0.22); }
+.wallet-row--checked { background: var(--accent-dim); border-color: rgba(124,58,237,0.22); }
 .wallet-cb { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 .wallet-name { flex: 1; font-size: 0.90rem; color: var(--text-primary); font-family: var(--font-mono); }
 .wallet-bal { font-size: 0.88rem; color: var(--text-muted); font-family: var(--font-mono); }

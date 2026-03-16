@@ -188,7 +188,7 @@ async function doPlace() {
   border: 1px solid var(--border); border-top: 2px solid var(--accent);
   border-radius: var(--radius);
   width: 460px; max-width: 96vw;
-  box-shadow: var(--shadow-lg), var(--shadow-cyan);
+  box-shadow: var(--shadow-lg);
   animation: fadeSlideUp 0.18s ease both;
   overflow: hidden; display: flex; flex-direction: column;
 }
@@ -197,7 +197,7 @@ async function doPlace() {
 .dialog-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.65rem 1rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
 }
 .dialog-title { font-size: 1.00rem; font-weight: 700; letter-spacing: 0.12em; color: var(--accent); }
@@ -235,7 +235,7 @@ async function doPlace() {
   font-family: var(--font-mono); font-size: 0.96rem; outline: none;
   transition: border-color var(--transition); width: 100%;
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.12); }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.12); }
 .field-input::placeholder { color: var(--text-muted); }
 select.field-input { cursor: pointer; }
 
@@ -253,7 +253,7 @@ select.field-input { cursor: pointer; }
   border: 1px solid transparent;
 }
 .wallet-row:hover { background: var(--bg-hover); }
-.wallet-row--checked { background: var(--accent-dim); border-color: rgba(0,200,255,0.22); }
+.wallet-row--checked { background: var(--accent-dim); border-color: rgba(124,58,237,0.22); }
 .wallet-cb { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 .wallet-name { flex: 1; font-size: 0.92rem; color: var(--text-primary); font-family: var(--font-mono); }
 .wallet-bal { font-size: 0.90rem; color: var(--text-muted); font-family: var(--font-mono); flex-shrink: 0; }
@@ -291,7 +291,7 @@ select.field-input { cursor: pointer; }
   display: flex; gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.02);
+  background: rgba(124, 58, 237, 0.02);
 }
 .btn-ghost {
   background: none; border: 1px solid var(--border); color: var(--text-secondary);

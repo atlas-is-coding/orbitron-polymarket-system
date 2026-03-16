@@ -195,7 +195,7 @@ function shortUrl(url) {
   inset: 0;
   background: repeating-linear-gradient(
     0deg, transparent, transparent 2px,
-    rgba(0,200,255,0.008) 2px, rgba(0,200,255,0.008) 4px
+    rgba(124,58,237,0.008) 2px, rgba(124,58,237,0.008) 4px
   );
   pointer-events: none;
   z-index: 0;
@@ -205,7 +205,7 @@ function shortUrl(url) {
 .panel-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.7rem 1.25rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 5;
   backdrop-filter: blur(8px);
@@ -238,7 +238,7 @@ function shortUrl(url) {
   font-size: 0.86rem; font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; padding: 0.20rem 0.55rem; border-radius: 1px;
 }
-.badge--cat  { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,200,255,0.22); }
+.badge--cat  { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(124,58,237,0.22); }
 .badge--risk { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,77,106,0.22); }
 .badge--multi { background: var(--price-dim); color: var(--price); border: 1px solid rgba(245,158,11,0.22); }
 .badge--date { background: var(--bg-hover); color: var(--text-muted); border: 1px solid var(--border); }

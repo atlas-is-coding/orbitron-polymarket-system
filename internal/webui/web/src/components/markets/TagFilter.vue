@@ -85,7 +85,7 @@ const allTags = computed(() => [
 }
 
 .tag-pill:hover:not(.active) {
-  border-color: rgba(0, 200, 255, 0.40);
+  border-color: rgba(124, 58, 237, 0.40);
   color: var(--accent);
 }
 

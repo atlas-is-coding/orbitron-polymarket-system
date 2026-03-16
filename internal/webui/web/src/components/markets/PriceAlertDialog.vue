@@ -144,7 +144,7 @@ function submit() {
   border-top: 2px solid var(--accent);
   border-radius: var(--radius);
   width: 420px; max-width: 95vw;
-  box-shadow: var(--shadow-lg), var(--shadow-cyan);
+  box-shadow: var(--shadow-lg);
   animation: fadeSlideUp 0.18s ease both;
   overflow: hidden;
   display: flex; flex-direction: column;
@@ -154,7 +154,7 @@ function submit() {
 .dialog-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.65rem 1rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
 }
 .dialog-title {
@@ -228,7 +228,7 @@ function submit() {
   font-family: var(--font-mono); font-size: 1.00rem;
   transition: border-color var(--transition);
 }
-.threshold-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.15); }
+.threshold-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.15); }
 .threshold-suffix {
   position: absolute; right: 0.65rem;
   font-size: 0.86rem; color: var(--text-secondary); pointer-events: none;
@@ -254,7 +254,7 @@ function submit() {
   display: flex; gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--border);
-  background: rgba(0, 200, 255, 0.02);
+  background: rgba(124, 58, 237, 0.02);
 }
 .btn-primary {
   flex: 1; padding: 0.5rem;
