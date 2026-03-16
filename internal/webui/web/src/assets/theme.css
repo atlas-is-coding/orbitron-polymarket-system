@@ -1,43 +1,42 @@
 /* ============================================================
-   NEXUS TERMINAL — Polytrade Bot
-   Aesthetic: Bloomberg × Cyberpunk Financial Console
+   GLASS NOIR — Polytrade Bot
+   Aesthetic: Glassmorphism × Dark Finance
    Font: IBM Plex Mono — technical precision
-   Accent: Electric Cyan + Amber price data
+   Accent: Violet #7c3aed / Lavender #a78bfa
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 /* ── Variables ──────────────────────────────────────────── */
 :root {
-  /* Backgrounds — deep obsidian */
-  --bg-primary:    #05080f;
-  --bg-secondary:  #090d18;
-  --bg-card:       #0c1120;
-  --bg-hover:      #101828;
-  --bg-input:      #070b14;
-  --bg-overlay:    rgba(3, 5, 12, 0.88);
-  --bg-sidebar:    #060a14;
-  --bg-stripe:     rgba(0, 200, 255, 0.025);
+  /* Backgrounds — glass noir */
+  --bg-primary:    #07070f;
+  --bg-secondary:  rgba(255, 255, 255, 0.02);
+  --bg-card:       rgba(255, 255, 255, 0.03);
+  --bg-hover:      rgba(255, 255, 255, 0.05);
+  --bg-input:      rgba(0, 0, 0, 0.30);
+  --bg-overlay:    rgba(0, 0, 0, 0.65);
+  --bg-stripe:     rgba(124, 58, 237, 0.025);
 
   /* Borders */
-  --border:        #162035;
-  --border-focus:  #00c8ff;
-  --border-subtle: #0e1a2a;
-  --border-accent: #00c8ff;
+  --border:        rgba(255, 255, 255, 0.06);
+  --border-focus:  #7c3aed;
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-accent: rgba(124, 58, 237, 0.25);
 
   /* Text */
-  --text-primary:   #d8e8ff;
-  --text-secondary: #3d6080;
-  --text-muted:     #1e3350;
-  --text-inverse:   #05080f;
-  --text-bright:    #eef6ff;
+  --text-primary:   rgba(255, 255, 255, 0.90);
+  --text-secondary: rgba(255, 255, 255, 0.45);
+  --text-muted:     rgba(255, 255, 255, 0.20);
+  --text-inverse:   #07070f;
+  --text-bright:    #ffffff;
 
-  /* Primary accent — Electric Cyan */
-  --accent:        #00c8ff;
-  --accent-bright: #40d9ff;
-  --accent-hover:  #00b4e8;
-  --accent-dim:    rgba(0, 200, 255, 0.10);
-  --accent-glow:   0 0 18px rgba(0, 200, 255, 0.30);
+  /* Primary accent — Violet */
+  --accent:        #7c3aed;
+  --accent-bright: #a78bfa;
+  --accent-hover:  #6d28d9;
+  --accent-dim:    rgba(124, 58, 237, 0.12);
+  --accent-glow:   0 0 20px rgba(124, 58, 237, 0.3);
 
   /* Price accent — Amber (financial data) */
   --price:         #f59e0b;
@@ -52,18 +51,17 @@
   --warning-dim: rgba(245, 158, 11, 0.10);
   --danger:      #ff4d6a;
   --danger-dim:  rgba(255, 77, 106, 0.10);
-  --info:        #00c8ff;
-  --info-dim:    rgba(0, 200, 255, 0.10);
+  --info:        #7c3aed;
+  --info-dim:    rgba(124, 58, 237, 0.12);
 
   /* Badge */
-  --badge-bg:     #0e1a2a;
-  --badge-border: #162035;
+  --badge-bg:     rgba(255, 255, 255, 0.04);
+  --badge-border: rgba(255, 255, 255, 0.06);
 
   /* Elevation */
   --shadow-sm: 0 1px 6px rgba(0, 0, 0, 0.60);
   --shadow:    0 4px 28px rgba(0, 0, 0, 0.70);
   --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.80);
-  --shadow-cyan: 0 0 24px rgba(0, 200, 255, 0.15);
 
   /* Shape — angular, almost square */
   --radius-sm: 2px;
@@ -80,12 +78,13 @@
   --transition-slow: 260ms ease;
 
   /* Layout */
-  --sidebar-w: 280px;
-  --topbar-h:  62px;
+  --header-h:  40px;
+  --tabs-h:    34px;
+  --topbar-h:  74px;
 
   /* Scrollbar */
-  --scrollbar-track: #05080f;
-  --scrollbar-thumb: #162035;
+  --scrollbar-track: #07070f;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.10);
 }
 
 /* ── Base reset ─────────────────────────────────────────── */
@@ -104,11 +103,11 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background-color: var(--bg-primary);
-  /* Fine grid pattern — IBM 3270 terminal inspiration */
   background-image:
-    linear-gradient(rgba(0, 200, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 200, 255, 0.025) 1px, transparent 1px);
-  background-size: 40px 40px;
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(124, 58, 237, 0.12) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 20% 60%, rgba(167, 139, 250, 0.04) 0%, transparent 35%);
+  background-attachment: fixed;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────── */
@@ -118,7 +117,7 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* ── Selection ──────────────────────────────────────────── */
-::selection { background: rgba(0, 200, 255, 0.20); color: var(--accent-bright); }
+::selection { background: rgba(124, 58, 237, 0.25); color: var(--accent-bright); }
 
 /* ── Focus ring ─────────────────────────────────────────── */
 :focus-visible {
@@ -243,7 +242,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.10em;
   color: var(--accent);
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
 }
 
 /* ── Table base ─────────────────────────────────────────── */
@@ -261,7 +260,7 @@ body {
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  background: rgba(0, 200, 255, 0.03);
+  background: rgba(124, 58, 237, 0.03);
 }
 .data-table td {
   padding: 0.55rem 1.1rem;
@@ -282,10 +281,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.badge--accent { background: var(--accent-dim);   color: var(--accent); border: 1px solid rgba(0,200,255,0.20); }
-.badge--ok     { background: var(--success-dim);  color: var(--success); border: 1px solid rgba(16,217,148,0.20); }
-.badge--warn   { background: var(--warning-dim);  color: var(--warning); border: 1px solid rgba(245,158,11,0.20); }
-.badge--danger { background: var(--danger-dim);   color: var(--danger); border: 1px solid rgba(255,77,106,0.20); }
+.badge--accent { background: var(--accent-dim);   color: var(--accent); border: 1px solid rgba(124, 58, 237, 0.22); }
+.badge--ok     { background: var(--success-dim);  color: var(--success); border: 1px solid rgba(16, 217, 148, 0.20); }
+.badge--warn   { background: var(--warning-dim);  color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.20); }
+.badge--danger { background: var(--danger-dim);   color: var(--danger); border: 1px solid rgba(255, 77, 106, 0.20); }
 .badge--off    { background: var(--badge-bg);     color: var(--text-muted); border: 1px solid var(--badge-border); }
 
 /* ── Button base ────────────────────────────────────────── */
@@ -324,7 +323,7 @@ body {
   outline: none;
   transition: border-color var(--transition);
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.15); }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15); }
 .field-input::placeholder { color: var(--text-muted); }
 
 select.field-input { cursor: pointer; }
@@ -366,7 +365,7 @@ select.field-input { cursor: pointer; }
   border-radius: var(--radius);
   padding: 1.5rem;
   min-width: 320px;
-  box-shadow: var(--shadow-lg), var(--shadow-cyan);
+  box-shadow: var(--shadow-lg);
   animation: fadeSlideUp 0.18s ease both;
 }
 .dialog-title {
@@ -445,8 +444,8 @@ select.field-input { cursor: pointer; }
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 200, 255, 0.015) 2px,
-    rgba(0, 200, 255, 0.015) 4px
+    rgba(124, 58, 237, 0.015) 2px,
+    rgba(124, 58, 237, 0.015) 4px
   );
   pointer-events: none;
   border-radius: inherit;
