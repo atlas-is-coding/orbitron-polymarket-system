@@ -235,7 +235,7 @@ async function doAdd() {
 .trader-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-top: 2px solid rgba(0, 200, 255, 0.30);
+  border-top: 2px solid rgba(124, 58, 237, 0.30);
   border-radius: var(--radius);
   padding: 1rem;
   display: flex; flex-direction: column; gap: 0.65rem;
@@ -252,7 +252,7 @@ async function doAdd() {
 .card-badges { display: flex; align-items: center; gap: 0.3rem; }
 .alloc-badge {
   font-size: 1.00rem; font-weight: 700; padding: 0.10rem 0.35rem; border-radius: 1px;
-  background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,200,255,0.20);
+  background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(124,58,237,0.20);
 }
 .max-badge {
   font-size: 1.00rem; font-weight: 700; padding: 0.10rem 0.35rem; border-radius: 1px;
@@ -301,7 +301,7 @@ async function doAdd() {
 .term-chrome {
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.4rem 1rem;
-  background: rgba(0, 200, 255, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -322,7 +322,7 @@ async function doAdd() {
   transition: background var(--transition);
 }
 .trade-line:last-child { border-bottom: none; }
-.trade-line:hover { background: rgba(0, 200, 255, 0.03); }
+.trade-line:hover { background: rgba(124, 58, 237, 0.03); }
 .trade-idx { color: var(--text-muted); font-size: 0.94rem; flex-shrink: 0; width: 1.5rem; text-align: right; }
 .trade-sep { color: var(--border); user-select: none; }
 .trade-text { color: var(--text-secondary); }
@@ -351,7 +351,7 @@ async function doAdd() {
   border-radius: var(--radius); color: var(--text-primary); font-family: var(--font-mono);
   font-size: 0.96rem; outline: none; transition: border-color var(--transition);
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.15); }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.15); }
 
 .dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 .btn-ghost {

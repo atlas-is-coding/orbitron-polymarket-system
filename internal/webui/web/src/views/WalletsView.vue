@@ -247,10 +247,10 @@ async function doAddWallet() {
   padding: 0.6rem 1.2rem; text-align: left; font-size: 1.00rem;
   text-transform: uppercase; letter-spacing: 0.10em; color: var(--text-secondary);
   border-bottom: 1px solid var(--border); white-space: nowrap;
-  background: rgba(0, 200, 255, 0.03);
+  background: rgba(124, 58, 237, 0.03);
 }
 .data-table td { padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
-.data-table tr:nth-child(even) td { background: rgba(0,200,255,0.018); }
+.data-table tr:nth-child(even) td { background: rgba(124,58,237,0.018); }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg-hover) !important; }
 
@@ -303,7 +303,7 @@ async function doAddWallet() {
   border-radius: var(--radius); color: var(--text-primary); font-family: var(--font-mono);
   font-size: 0.96rem; outline: none; transition: border-color var(--transition);
 }
-.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,200,255,0.15); }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.15); }
 .field-hint { font-size: 0.90rem; color: var(--text-muted); }
 
 .dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
