@@ -145,6 +145,12 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 
 	case tui.MarketsUpdatedMsg:
 		h.broadcast(WsEvent{Type: "markets_updated", Data: map[string]int{"count": len(m.Markets)}})
+	case tui.MarketsLoadingMsg:
+		h.broadcast(WsEvent{Type: "markets_loading", Data: map[string]int{
+			"loaded": m.Loaded, "total": m.Total,
+		}})
+	case tui.MarketsReadyMsg:
+		h.broadcast(WsEvent{Type: "markets_ready", Data: nil})
 
 	case tui.HealthSnapshotMsg:
 		state.SetHealth(m.Snapshot)

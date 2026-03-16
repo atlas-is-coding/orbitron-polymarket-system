@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,8 @@ type MarketsProvider interface {
 	GetMarket(conditionID string) (gamma.Market, bool)
 	Tags() []gamma.Tag
 	AddAlert(rule markets.AlertRule) string
+	GetTrending(limit int) []gamma.Market
+	TotalCount() int
 }
 
 // OrderPlacer places a limit order for a given wallet.
@@ -672,6 +675,19 @@ func (s *Server) handleGetHealth(w http.ResponseWriter, _ *http.Request) {
 // handleMarketsList handles GET /api/v1/markets?tag=crypto&limit=50&offset=0
 func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
 	tag := r.URL.Query().Get("tag")
+	limit := 0
+	offset := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if n, err := strconv.Atoi(o); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
 	var result []gamma.Market
 	if s.mkts != nil {
 		result = s.mkts.GetByTag(tag)
@@ -679,6 +695,16 @@ func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
 	if result == nil {
 		result = []gamma.Market{}
 	}
+
+	// Apply offset/limit in-handler
+	if offset > len(result) {
+		offset = len(result)
+	}
+	result = result[offset:]
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -694,10 +720,41 @@ func (s *Server) handleMarketsTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tags)
 }
 
+// handleMarketsTrending handles GET /api/v1/markets/trending?limit=N
+func (s *Server) handleMarketsTrending(w http.ResponseWriter, r *http.Request) {
+	if s.mkts == nil {
+		writeJSON(w, http.StatusOK, []gamma.Market{})
+		return
+	}
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	result := s.mkts.GetTrending(limit)
+	if result == nil {
+		result = []gamma.Market{}
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleMarketsStats handles GET /api/v1/markets/stats
+func (s *Server) handleMarketsStats(w http.ResponseWriter, r *http.Request) {
+	total := 0
+	if s.mkts != nil {
+		total = s.mkts.TotalCount()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total":   total,
+		"syncing": false,
+	})
+}
+
 // handleMarketDetail handles GET /api/v1/markets/{conditionID}
 func (s *Server) handleMarketDetail(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/v1/markets/")
-	if id == "" || id == "tags" {
+	if id == "" || id == "tags" || id == "trending" || id == "stats" {
 		writeError(w, http.StatusBadRequest, "missing conditionID")
 		return
 	}

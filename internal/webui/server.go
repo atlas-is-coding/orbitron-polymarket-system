@@ -187,8 +187,10 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}))
 
-	// Markets — order matters: tags before the wildcard path
+	// Markets — order matters: exact paths before the wildcard subtree
 	mux.HandleFunc("/api/v1/markets/tags", s.jwtMiddleware(s.handleMarketsTags))
+	mux.HandleFunc("/api/v1/markets/trending", s.jwtMiddleware(s.handleMarketsTrending))
+	mux.HandleFunc("/api/v1/markets/stats", s.jwtMiddleware(s.handleMarketsStats))
 	mux.HandleFunc("/api/v1/markets/", s.jwtMiddleware(s.handleMarketDetail))
 	mux.HandleFunc("/api/v1/markets", s.jwtMiddleware(s.handleMarketsList))
 	mux.HandleFunc("/api/v1/alerts", s.jwtMiddleware(s.handleCreateAlert))
