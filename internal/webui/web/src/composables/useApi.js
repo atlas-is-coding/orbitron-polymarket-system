@@ -63,11 +63,19 @@ export function useApi() {
     return (await axios.get('/api/v1/markets/tags')).data
   }
 
+  async function startStrategy(key, walletIds = []) {
+    return (await axios.post(`/api/v1/strategies/${key}/start`, { wallet_ids: walletIds })).data
+  }
+  async function stopStrategy(key) {
+    return (await axios.post(`/api/v1/strategies/${key}/stop`)).data
+  }
+
   return {
     getOverview, getOrders, getPositions, getLogs,
     getCopytrading, getSettings, cancelOrder, cancelAll,
     postSettings, addTrader, removeTrader, toggleTrader,
     getWallets, toggleWallet, renameWallet, removeWallet, addWallet,
-    editTrader, placeOrder, getMarkets, getMarketTags
+    editTrader, placeOrder, getMarkets, getMarketTags,
+    startStrategy, stopStrategy
   }
 }

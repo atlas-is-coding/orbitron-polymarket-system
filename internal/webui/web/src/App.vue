@@ -1,12 +1,10 @@
 <template>
   <div v-if="auth.isAuthenticated" class="app-layout">
-    <AppTopbar />
-    <div class="app-body">
-      <AppSidebar />
-      <main class="app-content">
-        <RouterView />
-      </main>
-    </div>
+    <AppHeader />
+    <AppTabs />
+    <main class="app-content">
+      <RouterView />
+    </main>
     <ToastContainer />
   </div>
   <RouterView v-else />
@@ -16,8 +14,8 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocket } from '@/composables/useWebSocket'
-import AppTopbar from '@/components/AppHeader.vue'
-import AppSidebar from '@/components/AppSidebar.vue'
+import AppHeader from '@/components/AppHeader.vue'
+import AppTabs from '@/components/AppTabs.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 
 const auth = useAuthStore()
@@ -44,16 +42,12 @@ html, body { height: 100%; }
   height: 100%;
   overflow: hidden;
 }
-.app-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-}
+
 .app-content {
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
   background: var(--bg-primary);
+  min-height: 0;
 }
 </style>

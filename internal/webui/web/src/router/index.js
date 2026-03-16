@@ -52,7 +52,12 @@ const routes = [
     path: '/settings',
     name: 'settings',
     component: () => import('@/views/SettingsView.vue')
-  }
+  },
+  {
+    path: '/strategies',
+    name: 'strategies',
+    component: () => import('@/views/StrategiesView.vue')
+  },
 ]
 
 const router = createRouter({
