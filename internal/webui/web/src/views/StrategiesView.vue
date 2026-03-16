@@ -1,305 +1,127 @@
 <template>
   <div class="view">
     <div class="page-header anim-in">
-      <div class="header-top">
-        <h2 class="view-title">{{ $t('nav.strategies') }}</h2>
-      </div>
+      <h2 class="view-title">{{ $t('nav.strategies') }}</h2>
+      <p class="view-sub">Configure and launch automated trading strategies</p>
     </div>
 
-    <!-- Strategies Grid -->
+    <!-- Strategy Cards Grid -->
     <div class="strategies-grid">
-      <!-- Arbitrage -->
-      <div class="strategy-card anim-in">
+      <div
+        v-for="(s, i) in strategies"
+        :key="s.key"
+        class="strategy-card anim-in"
+        :style="{ animationDelay: i * 60 + 'ms' }"
+      >
         <div class="sc-header">
           <div class="sc-title">
-            <span class="sc-icon">⟿</span>
-            <h3>{{ $t('settings.sectionArbitrage') }}</h3>
+            <span class="sc-icon">{{ s.icon }}</span>
+            <h3>{{ $t(s.nameKey) }}</h3>
           </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.arbitrageEnabled" @change="save('trading.strategies.arbitrage.enabled', form.arbitrageEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
+          <span class="sc-badge" :class="form[s.enabledField] ? 'sc-badge--on' : 'sc-badge--off'">
+            {{ form[s.enabledField] ? 'ON' : 'OFF' }}
+          </span>
         </div>
         <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.minProfitUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.arbitrageMinProfit" step="0.1" />
-              <button class="btn-save" @click="save('trading.strategies.arbitrage.min_profit_usd', form.arbitrageMinProfit)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.arbitrageMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.arbitrage.max_position_usd', form.arbitrageMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.monitorInterval') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.arbitragePoll" step="1000" />
-              <button class="btn-save" @click="save('trading.strategies.arbitrage.poll_interval_ms', form.arbitragePoll)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.arbitrageExec" @change="save('trading.strategies.arbitrage.execute_orders', form.arbitrageExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
+          <p class="sc-fields-count">{{ s.fields.length }} parameters</p>
         </div>
-      </div>
-
-      <!-- Market Making -->
-      <div class="strategy-card anim-in" style="animation-delay: 60ms;">
-        <div class="sc-header">
-          <div class="sc-title">
-            <span class="sc-icon">⟷</span>
-            <h3>{{ $t('settings.sectionMarketMaking') }}</h3>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.mmEnabled" @change="save('trading.strategies.market_making.enabled', form.mmEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.spreadPct') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.mmSpread" step="0.1" />
-              <button class="btn-save" @click="save('trading.strategies.market_making.spread_pct', form.mmSpread)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.mmMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.market_making.max_position_usd', form.mmMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.rebalanceIntervalSec') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.mmRebalance" step="5" />
-              <button class="btn-save" @click="save('trading.strategies.market_making.rebalance_interval_sec', form.mmRebalance)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.minLiquidityUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.mmMinLiq" step="1000" />
-              <button class="btn-save" @click="save('trading.strategies.market_making.min_liquidity_usd', form.mmMinLiq)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.mmExec" @change="save('trading.strategies.market_making.execute_orders', form.mmExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Positive EV -->
-      <div class="strategy-card anim-in" style="animation-delay: 120ms;">
-        <div class="sc-header">
-          <div class="sc-title">
-            <span class="sc-icon">📈</span>
-            <h3>{{ $t('settings.sectionPositiveEv') }}</h3>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.pevEnabled" @change="save('trading.strategies.positive_ev.enabled', form.pevEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.minEdgePct') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.pevMinEdge" step="0.1" />
-              <button class="btn-save" @click="save('trading.strategies.positive_ev.min_edge_pct', form.pevMinEdge)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.minLiquidityUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.pevMinLiq" step="1000" />
-              <button class="btn-save" @click="save('trading.strategies.positive_ev.min_liquidity_usd', form.pevMinLiq)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.pevMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.positive_ev.max_position_usd', form.pevMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.monitorInterval') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.pevPoll" step="5000" />
-              <button class="btn-save" @click="save('trading.strategies.positive_ev.poll_interval_ms', form.pevPoll)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.pevExec" @change="save('trading.strategies.positive_ev.execute_orders', form.pevExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Riskless Rate -->
-      <div class="strategy-card anim-in" style="animation-delay: 180ms;">
-        <div class="sc-header">
-          <div class="sc-title">
-            <span class="sc-icon">🛡</span>
-            <h3>{{ $t('settings.sectionRisklessRate') }}</h3>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.risklessEnabled" @change="save('trading.strategies.riskless_rate.enabled', form.risklessEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.minDurationDays') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.risklessMinDur" step="1" />
-              <button class="btn-save" @click="save('trading.strategies.riskless_rate.min_duration_days', form.risklessMinDur)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxNoPrice') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.risklessMaxNo" step="0.01" />
-              <button class="btn-save" @click="save('trading.strategies.riskless_rate.max_no_price', form.risklessMaxNo)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.risklessMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.riskless_rate.max_position_usd', form.risklessMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.monitorInterval') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.risklessPoll" step="5000" />
-              <button class="btn-save" @click="save('trading.strategies.riskless_rate.poll_interval_ms', form.risklessPoll)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.risklessExec" @change="save('trading.strategies.riskless_rate.execute_orders', form.risklessExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Fade Chaos -->
-      <div class="strategy-card anim-in" style="animation-delay: 240ms;">
-        <div class="sc-header">
-          <div class="sc-title">
-            <span class="sc-icon">🌪</span>
-            <h3>{{ $t('settings.sectionFadeChaos') }}</h3>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.fadeEnabled" @change="save('trading.strategies.fade_chaos.enabled', form.fadeEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.spikeThresholdPct') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.fadeSpike" step="1" />
-              <button class="btn-save" @click="save('trading.strategies.fade_chaos.spike_threshold_pct', form.fadeSpike)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.cooldownSec') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.fadeCooldown" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.fade_chaos.cooldown_sec', form.fadeCooldown)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.fadeMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.fade_chaos.max_position_usd', form.fadeMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.monitorInterval') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.fadePoll" step="5000" />
-              <button class="btn-save" @click="save('trading.strategies.fade_chaos.poll_interval_ms', form.fadePoll)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.fadeExec" @change="save('trading.strategies.fade_chaos.execute_orders', form.fadeExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Cross Market -->
-      <div class="strategy-card anim-in" style="animation-delay: 300ms;">
-        <div class="sc-header">
-          <div class="sc-title">
-            <span class="sc-icon">⎔</span>
-            <h3>{{ $t('settings.sectionCrossMarket') }}</h3>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.crossEnabled" @change="save('trading.strategies.cross_market.enabled', form.crossEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="sc-body">
-          <div class="sc-field">
-            <label>{{ $t('settings.minDivergencePct') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.crossMinDiv" step="0.1" />
-              <button class="btn-save" @click="save('trading.strategies.cross_market.min_divergence_pct', form.crossMinDiv)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.maxPositionUsd') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.crossMaxPos" step="10" />
-              <button class="btn-save" @click="save('trading.strategies.cross_market.max_position_usd', form.crossMaxPos)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field">
-            <label>{{ $t('settings.monitorInterval') }}</label>
-            <div class="input-row">
-              <input type="number" class="setting-input" v-model.number="form.crossPoll" step="5000" />
-              <button class="btn-save" @click="save('trading.strategies.cross_market.poll_interval_ms', form.crossPoll)">✓</button>
-            </div>
-          </div>
-          <div class="sc-field flex-row">
-            <label>{{ $t('settings.executeOrders') }}</label>
-            <label class="toggle toggle-sm">
-              <input type="checkbox" v-model="form.crossExec" @change="save('trading.strategies.cross_market.execute_orders', form.crossExec)" />
-              <span class="toggle-track"><span class="toggle-thumb" /></span>
-            </label>
-          </div>
+        <div class="sc-footer">
+          <button class="btn-configure" @click="openDrawer(s.key)">CONFIGURE</button>
         </div>
       </div>
     </div>
+
+    <!-- Drawer Backdrop -->
+    <Transition name="fade-backdrop">
+      <div v-if="activeKey" class="drawer-backdrop" @click="closeDrawer" />
+    </Transition>
+
+    <!-- Right Drawer -->
+    <Transition name="slide-drawer">
+      <div v-if="activeKey && activeStrategy" class="drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">
+            <span class="drawer-icon">{{ activeStrategy.icon }}</span>
+            <span>{{ $t(activeStrategy.nameKey) }}</span>
+          </div>
+          <button class="drawer-close" @click="closeDrawer">✕</button>
+        </div>
+
+        <div class="drawer-body">
+          <!-- Enabled toggle -->
+          <div class="drawer-section">
+            <div class="drawer-row-toggle">
+              <span class="drawer-label">{{ $t('settings.tradingEnabled') }}</span>
+              <label class="toggle">
+                <input type="checkbox"
+                  :checked="form[activeStrategy.enabledField]"
+                  @change="form[activeStrategy.enabledField] = $event.target.checked; save(activeStrategy.configKey, $event.target.checked)"
+                />
+                <span class="toggle-track"><span class="toggle-thumb" /></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Param fields -->
+          <div class="drawer-section">
+            <div class="drawer-section-title">PARAMETERS</div>
+            <template v-for="f in activeStrategy.fields" :key="f.field">
+              <!-- Number field -->
+              <div v-if="f.type === 'number'" class="drawer-field">
+                <label class="drawer-label">{{ $t(f.label) }}</label>
+                <div class="input-row">
+                  <input type="number" class="setting-input" v-model.number="form[f.field]" :step="f.step" />
+                  <button class="btn-save" @click="save(f.configKey, form[f.field])">✓</button>
+                </div>
+              </div>
+              <!-- Toggle field -->
+              <div v-else-if="f.type === 'toggle'" class="drawer-row-toggle">
+                <span class="drawer-label">{{ $t(f.label) }}</span>
+                <label class="toggle toggle-sm">
+                  <input type="checkbox" v-model="form[f.field]" @change="save(f.configKey, form[f.field])" />
+                  <span class="toggle-track"><span class="toggle-thumb" /></span>
+                </label>
+              </div>
+            </template>
+          </div>
+
+          <!-- Wallet selection -->
+          <div class="drawer-section">
+            <div class="drawer-section-title">WALLETS</div>
+            <div v-if="wallets.length === 0" class="drawer-empty">No wallets configured</div>
+            <div v-else class="wallet-list">
+              <label
+                v-for="w in wallets"
+                :key="w.id"
+                class="wallet-item"
+                :class="{ 'wallet-item--selected': selectedWalletIds.includes(w.id) }"
+              >
+                <input
+                  type="checkbox"
+                  :value="w.id"
+                  v-model="selectedWalletIds"
+                  class="wallet-cb"
+                />
+                <span class="wallet-label">{{ w.label || (w.address ? w.address.slice(0,8) + '…' : w.id) }}</span>
+                <span class="wallet-addr">{{ w.address ? w.address.slice(0,6) + '…' + w.address.slice(-4) : '' }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drawer footer actions -->
+        <div class="drawer-footer">
+          <button
+            class="btn-launch"
+            :disabled="launching"
+            @click="launchStrategy"
+          >
+            <span :class="{ spin: launching }">{{ launching ? '⟳' : '▶ LAUNCH' }}</span>
+          </button>
+          <button class="btn-stop" @click="stopStrategy">■ STOP</button>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Saved toast -->
     <Transition name="fade">
@@ -309,7 +131,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
@@ -318,6 +140,128 @@ const app = useAppStore()
 const api = useApi()
 const savedMsg = ref(false)
 const { settingsStale } = storeToRefs(app)
+
+// Drawer state
+const activeKey = ref(null)
+const wallets = ref([])
+const selectedWalletIds = ref([])
+const launching = ref(false)
+
+// Strategy definitions (UI-only config)
+const strategies = [
+  {
+    key: 'arbitrage',
+    icon: '⟿',
+    nameKey: 'settings.sectionArbitrage',
+    enabledField: 'arbitrageEnabled',
+    configKey: 'trading.strategies.arbitrage.enabled',
+    fields: [
+      { label: 'settings.minProfitUsd',    field: 'arbitrageMinProfit', configKey: 'trading.strategies.arbitrage.min_profit_usd',   step: 0.1,    type: 'number' },
+      { label: 'settings.maxPositionUsd',  field: 'arbitrageMaxPos',    configKey: 'trading.strategies.arbitrage.max_position_usd', step: 10,     type: 'number' },
+      { label: 'settings.monitorInterval', field: 'arbitragePoll',      configKey: 'trading.strategies.arbitrage.poll_interval_ms', step: 1000,   type: 'number' },
+      { label: 'settings.executeOrders',   field: 'arbitrageExec',      configKey: 'trading.strategies.arbitrage.execute_orders',   type: 'toggle' },
+    ]
+  },
+  {
+    key: 'market_making',
+    icon: '⟷',
+    nameKey: 'settings.sectionMarketMaking',
+    enabledField: 'mmEnabled',
+    configKey: 'trading.strategies.market_making.enabled',
+    fields: [
+      { label: 'settings.spreadPct',          field: 'mmSpread',    configKey: 'trading.strategies.market_making.spread_pct',            step: 0.1,  type: 'number' },
+      { label: 'settings.maxPositionUsd',      field: 'mmMaxPos',    configKey: 'trading.strategies.market_making.max_position_usd',      step: 10,   type: 'number' },
+      { label: 'settings.rebalanceIntervalSec',field: 'mmRebalance', configKey: 'trading.strategies.market_making.rebalance_interval_sec',step: 5,    type: 'number' },
+      { label: 'settings.minLiquidityUsd',     field: 'mmMinLiq',    configKey: 'trading.strategies.market_making.min_liquidity_usd',     step: 1000, type: 'number' },
+      { label: 'settings.executeOrders',       field: 'mmExec',      configKey: 'trading.strategies.market_making.execute_orders',        type: 'toggle' },
+    ]
+  },
+  {
+    key: 'positive_ev',
+    icon: '📈',
+    nameKey: 'settings.sectionPositiveEv',
+    enabledField: 'pevEnabled',
+    configKey: 'trading.strategies.positive_ev.enabled',
+    fields: [
+      { label: 'settings.minEdgePct',     field: 'pevMinEdge', configKey: 'trading.strategies.positive_ev.min_edge_pct',        step: 0.1,  type: 'number' },
+      { label: 'settings.minLiquidityUsd',field: 'pevMinLiq',  configKey: 'trading.strategies.positive_ev.min_liquidity_usd',   step: 1000, type: 'number' },
+      { label: 'settings.maxPositionUsd', field: 'pevMaxPos',  configKey: 'trading.strategies.positive_ev.max_position_usd',    step: 10,   type: 'number' },
+      { label: 'settings.monitorInterval',field: 'pevPoll',    configKey: 'trading.strategies.positive_ev.poll_interval_ms',    step: 5000, type: 'number' },
+      { label: 'settings.executeOrders',  field: 'pevExec',    configKey: 'trading.strategies.positive_ev.execute_orders',      type: 'toggle' },
+    ]
+  },
+  {
+    key: 'riskless_rate',
+    icon: '🛡',
+    nameKey: 'settings.sectionRisklessRate',
+    enabledField: 'risklessEnabled',
+    configKey: 'trading.strategies.riskless_rate.enabled',
+    fields: [
+      { label: 'settings.minDurationDays',field: 'risklessMinDur', configKey: 'trading.strategies.riskless_rate.min_duration_days', step: 1,    type: 'number' },
+      { label: 'settings.maxNoPrice',     field: 'risklessMaxNo',  configKey: 'trading.strategies.riskless_rate.max_no_price',      step: 0.01, type: 'number' },
+      { label: 'settings.maxPositionUsd', field: 'risklessMaxPos', configKey: 'trading.strategies.riskless_rate.max_position_usd',  step: 10,   type: 'number' },
+      { label: 'settings.monitorInterval',field: 'risklessPoll',   configKey: 'trading.strategies.riskless_rate.poll_interval_ms',  step: 5000, type: 'number' },
+      { label: 'settings.executeOrders',  field: 'risklessExec',   configKey: 'trading.strategies.riskless_rate.execute_orders',    type: 'toggle' },
+    ]
+  },
+  {
+    key: 'fade_chaos',
+    icon: '🌪',
+    nameKey: 'settings.sectionFadeChaos',
+    enabledField: 'fadeEnabled',
+    configKey: 'trading.strategies.fade_chaos.enabled',
+    fields: [
+      { label: 'settings.spikeThresholdPct',field: 'fadeSpike',    configKey: 'trading.strategies.fade_chaos.spike_threshold_pct', step: 1,    type: 'number' },
+      { label: 'settings.cooldownSec',       field: 'fadeCooldown', configKey: 'trading.strategies.fade_chaos.cooldown_sec',        step: 10,   type: 'number' },
+      { label: 'settings.maxPositionUsd',    field: 'fadeMaxPos',   configKey: 'trading.strategies.fade_chaos.max_position_usd',    step: 10,   type: 'number' },
+      { label: 'settings.monitorInterval',   field: 'fadePoll',     configKey: 'trading.strategies.fade_chaos.poll_interval_ms',    step: 5000, type: 'number' },
+      { label: 'settings.executeOrders',     field: 'fadeExec',     configKey: 'trading.strategies.fade_chaos.execute_orders',      type: 'toggle' },
+    ]
+  },
+  {
+    key: 'cross_market',
+    icon: '⎔',
+    nameKey: 'settings.sectionCrossMarket',
+    enabledField: 'crossEnabled',
+    configKey: 'trading.strategies.cross_market.enabled',
+    fields: [
+      { label: 'settings.minDivergencePct',field: 'crossMinDiv', configKey: 'trading.strategies.cross_market.min_divergence_pct', step: 0.1, type: 'number' },
+      { label: 'settings.maxPositionUsd',  field: 'crossMaxPos', configKey: 'trading.strategies.cross_market.max_position_usd',  step: 10,  type: 'number' },
+      { label: 'settings.monitorInterval', field: 'crossPoll',   configKey: 'trading.strategies.cross_market.poll_interval_ms',  step: 5000,type: 'number' },
+      { label: 'settings.executeOrders',   field: 'crossExec',   configKey: 'trading.strategies.cross_market.execute_orders',    type: 'toggle' },
+    ]
+  },
+]
+
+const activeStrategy = computed(() => strategies.find(s => s.key === activeKey.value))
+
+function openDrawer(key) {
+  activeKey.value = key
+  selectedWalletIds.value = []
+}
+function closeDrawer() { activeKey.value = null }
+
+async function loadWallets() {
+  try { wallets.value = await api.getWallets() } catch {}
+}
+
+async function launchStrategy() {
+  if (!activeKey.value) return
+  launching.value = true
+  try {
+    await api.startStrategy(activeKey.value, selectedWalletIds.value)
+    savedMsg.value = true; setTimeout(() => { savedMsg.value = false }, 2000)
+  } catch {}
+  launching.value = false
+}
+
+async function stopStrategy() {
+  if (!activeKey.value) return
+  try {
+    await api.stopStrategy(activeKey.value)
+    savedMsg.value = true; setTimeout(() => { savedMsg.value = false }, 2000)
+  } catch {}
+}
 
 watch(settingsStale, async (stale) => {
   if (!stale) return
@@ -336,6 +280,7 @@ const form = reactive({
 
 onMounted(async () => {
   try { const s = await api.getSettings(); app.settings = s; applySettings(s) } catch {}
+  await loadWallets()
 })
 
 function applySettings(s) {
@@ -394,15 +339,15 @@ async function save(key, value) {
 <style scoped>
 .view { display: flex; flex-direction: column; gap: 1.5rem; position: relative; padding-bottom: 2rem; }
 
-.page-header { display: flex; flex-direction: column; gap: 1rem; }
-.header-top { display: flex; align-items: center; justify-content: space-between; }
-.view-title { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-bright); text-transform: uppercase; }
+.page-header { }
+.view-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright); }
+.view-sub { font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem; }
 
-/* Strategies Grid */
+/* Grid */
 .strategies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
 }
 
 /* Strategy Card */
@@ -411,132 +356,237 @@ async function save(key, value) {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
-  border-top: 3px solid rgba(157,0,255,0.4);
+  border-top: 2px solid rgba(124,58,237,0.30);
   border-radius: var(--radius-lg);
   display: flex; flex-direction: column;
   transition: all var(--transition-slow);
-  box-shadow: var(--shadow-sm);
-  position: relative;
   overflow: hidden;
+  position: relative;
 }
-
-.strategy-card:hover {
-  border-top-color: var(--accent-bright);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.5), 0 0 24px rgba(157,0,255,0.15);
-}
-
 .strategy-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 100px;
-  background: radial-gradient(circle at 50% 0%, rgba(157,0,255,0.1) 0%, transparent 70%);
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 80px;
+  background: radial-gradient(circle at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 70%);
   pointer-events: none;
+}
+.strategy-card:hover {
+  border-top-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(124,58,237,0.12);
 }
 
 .sc-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1.25rem 1.25rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 1rem 1.25rem 0.75rem;
   position: relative; z-index: 1;
 }
+.sc-title { display: flex; align-items: center; gap: 0.6rem; }
+.sc-icon { font-size: 1.3rem; color: var(--accent-bright); }
+.sc-title h3 { margin: 0; font-size: 0.90rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-bright); }
 
-.sc-title {
-  display: flex; align-items: center; gap: 0.75rem;
+.sc-badge {
+  font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em;
+  padding: 0.15rem 0.5rem; border-radius: 2px;
+}
+.sc-badge--on  { background: rgba(52,211,153,0.12); color: var(--success); border: 1px solid rgba(52,211,153,0.25); }
+.sc-badge--off { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--border); }
+
+.sc-body { padding: 0 1.25rem 0.75rem; position: relative; z-index: 1; }
+.sc-fields-count { font-size: 0.80rem; color: var(--text-secondary); }
+
+.sc-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+  position: relative; z-index: 1;
+}
+.btn-configure {
+  width: 100%;
+  padding: 0.45rem 0;
+  background: rgba(124,58,237,0.08);
+  border: 1px solid rgba(124,58,237,0.30);
+  border-radius: var(--radius);
+  color: var(--accent-bright);
+  font-size: 0.84rem; font-weight: 700; letter-spacing: 0.10em;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-configure:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: var(--accent-glow);
 }
 
-.sc-icon {
-  font-size: 1.4rem; color: var(--accent-bright);
-  text-shadow: var(--accent-glow);
+/* Drawer Backdrop */
+.drawer-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(2px);
+  z-index: 49;
 }
 
-.sc-title h3 {
-  margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.1em;
+/* Drawer */
+.drawer {
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  background: #0d0b1a;
+  border-left: 1px solid rgba(124,58,237,0.25);
+  display: flex; flex-direction: column;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(124,58,237,0.06);
+  flex-shrink: 0;
+}
+.drawer-title {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 0.90rem; font-weight: 700; letter-spacing: 0.10em;
   text-transform: uppercase; color: var(--text-bright);
 }
-
-.sc-body {
-  padding: 1.25rem;
-  display: flex; flex-direction: column; gap: 1rem;
-  position: relative; z-index: 1;
-}
-
-.sc-field {
-  display: flex; flex-direction: column; gap: 0.4rem;
-}
-
-.sc-field.flex-row {
-  flex-direction: row; align-items: center; justify-content: space-between;
-  background: rgba(0,0,0,0.2); padding: 0.75rem 1rem; border-radius: var(--radius);
-  border: 1px dashed var(--border-subtle);
-  margin-top: 0.5rem;
-}
-
-.sc-field label {
-  font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.1em; color: var(--text-secondary);
-}
-
-.input-row { display: flex; gap: 0.5rem; }
-
-.setting-input {
-  flex: 1;
-  background: rgba(0,0,0,0.4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem; font-family: var(--font-mono);
-  outline: none; transition: all var(--transition);
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
-}
-.setting-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), inset 0 2px 6px rgba(0,0,0,0.3); }
-
-.btn-save {
-  background: rgba(157,0,255,0.1);
-  border: 1px solid rgba(157,0,255,0.3);
-  color: var(--accent-bright);
-  border-radius: var(--radius);
-  width: 40px;
-  font-size: 1.1rem; font-weight: 700;
+.drawer-icon { font-size: 1.2rem; color: var(--accent-bright); }
+.drawer-close {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); border-radius: var(--radius);
+  width: 28px; height: 28px; font-size: 0.80rem;
   cursor: pointer; transition: all var(--transition);
   display: flex; align-items: center; justify-content: center;
 }
-.btn-save:hover { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--accent-glow); }
+.drawer-close:hover { border-color: var(--danger); color: var(--danger); }
+
+.drawer-body {
+  flex: 1; overflow-y: auto;
+  padding: 1rem 1.25rem;
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+
+.drawer-section { display: flex; flex-direction: column; gap: 0.75rem; }
+.drawer-section-title {
+  font-size: 0.76rem; font-weight: 700; letter-spacing: 0.12em;
+  color: var(--accent); text-transform: uppercase;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-field { display: flex; flex-direction: column; gap: 0.35rem; }
+.drawer-label { font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
+
+.drawer-row-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.2);
+  padding: 0.6rem 0.85rem; border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+.input-row { display: flex; gap: 0.4rem; }
+.setting-input {
+  flex: 1; background: rgba(0,0,0,0.35);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 0.4rem 0.65rem; font-size: 0.90rem; font-family: var(--font-mono);
+  outline: none; transition: border-color var(--transition);
+}
+.setting-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.15); }
+
+.btn-save {
+  background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.30);
+  color: var(--accent-bright); border-radius: var(--radius);
+  width: 36px; font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: all var(--transition);
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-save:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Wallet list */
+.drawer-empty { font-size: 0.84rem; color: var(--text-muted); text-align: center; padding: 0.75rem; }
+.wallet-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.wallet-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem; border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer; transition: all var(--transition);
+}
+.wallet-item:hover { border-color: rgba(124,58,237,0.30); background: rgba(124,58,237,0.05); }
+.wallet-item--selected { border-color: var(--accent); background: rgba(124,58,237,0.10); }
+.wallet-cb { accent-color: var(--accent); cursor: pointer; }
+.wallet-label { flex: 1; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
+.wallet-addr { font-size: 0.80rem; color: var(--text-muted); font-family: var(--font-mono); }
 
 /* Toggle */
 .toggle { display: flex; align-items: center; cursor: pointer; }
 .toggle input { display: none; }
 .toggle-track {
-  width: 44px; height: 24px;
-  background: var(--bg-input);
+  width: 44px; height: 24px; background: rgba(255,255,255,0.08);
   border-radius: 12px; position: relative;
   transition: all var(--transition);
   border: 1px solid var(--border);
 }
-.toggle input:checked ~ .toggle-track { background: var(--accent); border-color: var(--accent-bright); box-shadow: inset 0 0 8px rgba(0,0,0,0.3); }
+.toggle input:checked ~ .toggle-track { background: var(--accent); border-color: var(--accent-bright); }
 .toggle-thumb {
   position: absolute; width: 18px; height: 18px;
   background: var(--text-muted); border-radius: 50%;
   top: 2px; left: 2px; transition: all var(--transition);
 }
-.toggle input:checked ~ .toggle-track .toggle-thumb { left: 22px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
-
+.toggle input:checked ~ .toggle-track .toggle-thumb { left: 22px; background: #fff; }
 .toggle-sm .toggle-track { width: 36px; height: 20px; }
 .toggle-sm .toggle-thumb { width: 14px; height: 14px; top: 2px; left: 2px; }
 .toggle-sm input:checked ~ .toggle-track .toggle-thumb { left: 18px; }
 
+/* Drawer footer */
+.drawer-footer {
+  display: flex; gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.2);
+}
+.btn-launch {
+  flex: 1; padding: 0.55rem;
+  background: var(--accent); border: none;
+  border-radius: var(--radius); color: #fff;
+  font-size: 0.88rem; font-weight: 700; letter-spacing: 0.10em;
+  font-family: var(--font-mono); cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-launch:hover:not(:disabled) { background: var(--accent-hover); box-shadow: var(--accent-glow); }
+.btn-launch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-stop {
+  padding: 0.55rem 1rem;
+  background: var(--danger-dim); border: 1px solid var(--danger);
+  border-radius: var(--radius); color: var(--danger);
+  font-size: 0.88rem; font-weight: 700; letter-spacing: 0.10em;
+  font-family: var(--font-mono); cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-stop:hover { background: var(--danger); color: #fff; }
+
 /* Saved toast */
 .saved-toast {
-  position: fixed;
-  bottom: 2rem; right: 2rem;
-  background: var(--success);
-  color: #000;
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-lg);
-  font-size: 0.95rem; font-weight: 800;
-  box-shadow: 0 4px 20px rgba(0, 255, 157, 0.4);
-  font-family: var(--font-mono); letter-spacing: 0.1em;
+  position: fixed; bottom: 2rem; right: 2rem;
+  background: var(--success); color: #000;
+  padding: 0.6rem 1.2rem; border-radius: var(--radius-lg);
+  font-size: 0.90rem; font-weight: 800;
+  box-shadow: 0 4px 20px rgba(52,211,153,0.35);
+  font-family: var(--font-mono); letter-spacing: 0.08em;
   z-index: 1000;
 }
 .fade-enter-active { animation: fadeSlideUp 0.2s ease both; }
 .fade-leave-active { animation: fadeSlideUp 0.2s ease reverse both; }
+
+/* Transitions */
+.fade-backdrop-enter-active, .fade-backdrop-leave-active { transition: opacity 0.25s ease; }
+.fade-backdrop-enter-from, .fade-backdrop-leave-to { opacity: 0; }
+
+.slide-drawer-enter-active, .slide-drawer-leave-active { transition: transform 0.3s ease; }
+.slide-drawer-enter-from, .slide-drawer-leave-to { transform: translateX(100%); }
 </style>
