@@ -80,7 +80,7 @@
   /* Layout */
   --header-h:  40px;
   --tabs-h:    34px;
-  --topbar-h:  74px;
+  --topbar-h:  calc(var(--header-h) + var(--tabs-h)); /* 74px */
 
   /* Scrollbar */
   --scrollbar-track: #07070f;
