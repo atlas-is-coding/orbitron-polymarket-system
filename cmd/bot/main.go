@@ -29,6 +29,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/monitor"
 	"github.com/atlasdev/orbitron/internal/notify"
 	telegramNotify "github.com/atlasdev/orbitron/internal/notify/telegram"
+	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/storage/sqlite"
 	"github.com/atlasdev/orbitron/internal/telegrambot"
 	"github.com/atlasdev/orbitron/internal/trading"
@@ -471,12 +472,18 @@ func run() error {
 		mon.WithStore(db)
 	}
 
+	// --- Markets Cache ---
+	var mktCache storage.MarketCacheStore
+	if db != nil {
+		mktCache = db
+	}
+
 	// --- Markets Service ---
 	var marketsService *markets.Service
 	if bus != nil || cfg.WebUI.Enabled {
-		marketsService = markets.NewService(gammaClient, bus, nil).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, bus, mktCache).WithLogger(&log)
 	} else {
-		marketsService = markets.NewService(gammaClient, nil, nil).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, nil, mktCache).WithLogger(&log)
 	}
 
 	// --- Health Service ---
