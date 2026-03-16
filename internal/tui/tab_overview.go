@@ -164,22 +164,22 @@ func (m OverviewModel) renderHealthBlock() string {
 		if svc.Error != "" {
 			errStr = " " + StyleError.Render(svc.Error)
 		}
-		fmt.Fprintf(&sb, "  %s %-14s %s%s\n", dot, svc.Name, lat, errStr)
+		fmt.Fprintf(&sb, "   %s %-16s %s%s\n", dot, svc.Name, lat, errStr)
 	}
 
 	if m.health.Geo != nil {
 		geo := m.health.Geo
 		if geo.Blocked {
 			geoStr := StyleError.Render(fmt.Sprintf("⚠ %s %s (%s)", t.OverviewGeoBlocked, geo.Country, geo.IP))
-			fmt.Fprintf(&sb, "  %s %-14s %s\n", StyleError.Render("○"), "Geoblock", geoStr)
+			fmt.Fprintf(&sb, "   %s %-16s %s\n", StyleError.Render("○"), "Geoblock", geoStr)
 		} else {
 			geoStr := StyleSuccess.Render(fmt.Sprintf("%s %s", t.OverviewGeoAllowed, geo.Country))
-			fmt.Fprintf(&sb, "  %s %-14s %s\n", StyleSuccess.Render("●"), "Geoblock", geoStr)
+			fmt.Fprintf(&sb, "   %s %-16s %s\n", StyleSuccess.Render("●"), "Geoblock", geoStr)
 		}
 	}
 
 	age := int(time.Since(m.health.UpdatedAt).Seconds())
-	sb.WriteString("\n  " + StyleMuted.Render(fmt.Sprintf(t.OverviewHealthUpdated, age)) + "\n")
+	sb.WriteString("\n   " + StyleMuted.Render(fmt.Sprintf(t.OverviewHealthUpdated, age)) + "\n")
 	return sb.String()
 }
 
@@ -191,14 +191,14 @@ func (m OverviewModel) View() string {
 	var leftContent strings.Builder
 	for _, s := range m.subsystems {
 		dot := StyleSuccess.Render("●")
-		name := StyleFgDim.Render(fmt.Sprintf("%-22s", s.Name))
+		name := StyleFgDim.Render(fmt.Sprintf("%-20s", s.Name))
 		status := StyleSuccess.Render(t.OverviewActive)
 		if !s.Active {
 			dot = StyleMuted.Render("○")
-			name = StyleMuted.Render(fmt.Sprintf("%-22s", s.Name))
+			name = StyleMuted.Render(fmt.Sprintf("%-20s", s.Name))
 			status = StyleMuted.Render(t.OverviewInactive)
 		}
-		fmt.Fprintf(&leftContent, "  %s %s %s\n", dot, name, status)
+		fmt.Fprintf(&leftContent, "   %s %s %s\n", dot, name, status)
 	}
 	leftPanel := renderPanel(t.OverviewSubsystems, leftContent.String(), half, false)
 
@@ -214,11 +214,11 @@ func (m OverviewModel) View() string {
 	}
 
 	var rightContent strings.Builder
-	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewBalance)), val(fmt.Sprintf("$%.2f", m.balance)))
-	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewOpenOrders)), StyleBold.Render(fmt.Sprintf("%d", m.openOrders)))
-	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewPositions)), StyleBold.Render(fmt.Sprintf("%d", m.positions)))
-	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewPnLToday)), pnlStr)
-	fmt.Fprintf(&rightContent, "  %s  %s\n", label(fmt.Sprintf("%-22s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
+	fmt.Fprintf(&rightContent, "   %s  %s\n", label(fmt.Sprintf("%-24s", t.OverviewBalance)), val(fmt.Sprintf("$%.2f", m.balance)))
+	fmt.Fprintf(&rightContent, "   %s  %s\n", label(fmt.Sprintf("%-24s", t.OverviewOpenOrders)), StyleBold.Render(fmt.Sprintf("%d", m.openOrders)))
+	fmt.Fprintf(&rightContent, "   %s  %s\n", label(fmt.Sprintf("%-24s", t.OverviewPositions)), StyleBold.Render(fmt.Sprintf("%d", m.positions)))
+	fmt.Fprintf(&rightContent, "   %s  %s\n", label(fmt.Sprintf("%-24s", t.OverviewPnLToday)), pnlStr)
+	fmt.Fprintf(&rightContent, "   %s  %s\n", label(fmt.Sprintf("%-24s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
 	rightPanel := renderPanel(t.OverviewStats, rightContent.String(), half, true)
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, " ", rightPanel)
@@ -252,7 +252,7 @@ func (m OverviewModel) View() string {
 	}
 
 	var walletsContent strings.Builder
-	fmt.Fprintf(&walletsContent, "  %s %s  │  %s %s  │  %s %d/%d\n\n",
+	fmt.Fprintf(&walletsContent, "   %s %s  │  %s %s  │  %s %d/%d\n\n",
 		label(t.OverviewTotalBalance+":"), val(fmt.Sprintf("$%.2f", totalBal)),
 		label(t.OverviewTotalPnL+":"), totalPnLStr,
 		label(t.OverviewActiveWallets+":"), activeCount, len(m.wallets),
@@ -262,9 +262,9 @@ func (m OverviewModel) View() string {
 	if colW < 12 {
 		colW = 12
 	}
-	hdr := StyleFgDim.Bold(true).Render(fmt.Sprintf("  %-*s  %-14s  %-14s  %s", colW, "LABEL", "BALANCE", "P&L", "STATUS"))
+	hdr := StyleFgDim.Bold(true).Render(fmt.Sprintf("   %-*s  %-14s  %-14s  %s", colW, "LABEL", "BALANCE", "P&L", "STATUS"))
 	walletsContent.WriteString(hdr + "\n")
-	walletsContent.WriteString(StyleMuted.Render("  "+strings.Repeat("─", m.width-8)) + "\n")
+	walletsContent.WriteString(StyleMuted.Render("   "+strings.Repeat("─", m.width-10)) + "\n")
 
 	for _, w := range m.wallets {
 		lbl := w.label
@@ -282,7 +282,7 @@ func (m OverviewModel) View() string {
 		if w.enabled {
 			statusStr = StyleSuccess.Render("● ON")
 		}
-		fmt.Fprintf(&walletsContent, "  %-*s  %-14s  %-14s  %s\n", colW, lbl, balStr, wPnLStr, statusStr)
+		fmt.Fprintf(&walletsContent, "   %-*s  %-14s  %-14s  %s\n", colW, lbl, balStr, wPnLStr, statusStr)
 	}
 
 	walletsPanel := renderPanel(t.OverviewWallets, walletsContent.String(), m.width, false)
