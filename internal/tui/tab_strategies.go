@@ -118,7 +118,7 @@ func (m StrategiesModel) View() string {
 	}
 
 	tablePanel := renderPanel("", content, m.width, true)
-	helpPanel := renderHelpPanel("↑↓ navigate   Space start/stop   w cycle wallet", m.width)
+	helpPanel := renderHelpPanel("[↑↓] navigate   [Space] start/stop   [w] cycle wallet", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, " ", helpPanel)
 }
 

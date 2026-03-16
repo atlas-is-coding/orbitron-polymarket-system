@@ -160,6 +160,6 @@ func (m LogsModel) View() string {
 	}
 
 	logsPanel := renderPanel("Logs", m.viewport.View(), m.width, true)
-	helpPanel := renderHelpPanel("ctrl+f freeze   t/d/i/w/e filter   ↑↓ scroll"+freeze+filter, m.width)
+	helpPanel := renderHelpPanel("[ctrl+f] freeze   [t/d/i/w/e] filter   [↑↓] scroll"+freeze+filter, m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", logsPanel, " ", helpPanel)
 }

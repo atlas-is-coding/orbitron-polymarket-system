@@ -193,9 +193,9 @@ func (m TradingModel) View() string {
 	posLabel := fmt.Sprintf(" p: %s ", t.TabPositions)
 	var subTabLine string
 	if m.subTab == SubTabOrders {
-		subTabLine = StyleSubTabActive.Render(ordersLabel) + "  " + StyleSubTabInactive.Render(posLabel)
+		subTabLine = StyleSubTabActive.Render(ordersLabel) + " " + StyleSubTabInactive.Render(posLabel)
 	} else {
-		subTabLine = StyleSubTabInactive.Render(ordersLabel) + "  " + StyleSubTabActive.Render(posLabel)
+		subTabLine = StyleSubTabInactive.Render(ordersLabel) + " " + StyleSubTabActive.Render(posLabel)
 	}
 
 	// ── Content + help ──────────────────────────────────────────────────────
@@ -207,17 +207,17 @@ func (m TradingModel) View() string {
 		} else {
 			content = m.orders.View()
 		}
-		helpKeys = "↑↓ navigate   x cancel order   ctrl+x cancel all   o/p switch"
+		helpKeys = "[↑↓] navigate   [x] cancel order   [ctrl+x] cancel all   [o/p] switch"
 	} else {
 		if len(m.positions.Rows()) == 0 {
 			content = renderEmptyState("◈", t.PosEmpty, "", m.width)
 		} else {
 			content = m.positions.View()
 		}
-		helpKeys = "↑↓ navigate   o/p switch"
+		helpKeys = "[↑↓] navigate   [o/p] switch"
 	}
 
 	tablePanel := renderPanel("", content, m.width, true)
 	helpPanel := renderHelpPanel(helpKeys, m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, " ", subTabLine, " ", tablePanel, " ", helpPanel)
+	return lipgloss.JoinVertical(lipgloss.Left, " " + subTabLine, " ", tablePanel, " ", helpPanel)
 }

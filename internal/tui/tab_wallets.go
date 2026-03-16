@@ -397,7 +397,7 @@ func (m WalletsModel) viewTable() string {
 		content = "\n" + m.walletsTable.View()
 	}
 	tablePanel := renderPanel("Wallets", content, m.width, true)
-	helpPanel := renderHelpPanel("↑↓ navigate   a add   e edit   d delete   Space toggle   Enter details", m.width)
+	helpPanel := renderHelpPanel("[↑↓] navigate   [a] add   [e] edit   [d] delete   [Space] toggle   [Enter] details", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, " ", helpPanel)
 }
 

@@ -370,7 +370,7 @@ func (m CopytradingModel) viewTable() string {
 	}
 	tradesPanel := renderPanel(t.CopyRecentTrades, tradesContent.String(), m.width, false)
 
-	helpPanel := renderHelpPanel("↑↓ navigate   a add   e edit   d delete   Space toggle", m.width)
+	helpPanel := renderHelpPanel("[↑↓] navigate   [a] add   [e] edit   [d] delete   [Space] toggle", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", tradersPanel, " ", tradesPanel, " ", helpPanel)
 }
 
@@ -390,7 +390,7 @@ func (m CopytradingModel) viewForm(title string) string {
 	}
 	sb.WriteString("\n")
 	formPanel := renderPanel(title, sb.String(), m.width, true)
-	helpPanel := renderHelpPanel("Enter save   Tab next field   esc cancel", m.width)
+	helpPanel := renderHelpPanel("[Enter] save   [Tab] next field   [esc] cancel", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", formPanel, " ", helpPanel)
 }
 

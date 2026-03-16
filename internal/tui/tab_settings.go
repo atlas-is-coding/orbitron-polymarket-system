@@ -789,13 +789,12 @@ func (m SettingsModel) View() string {
 		} else {
 			sectionBar.WriteString(StyleSubTabInactive.Render(" " + s + " "))
 		}
-		sectionBar.WriteString("  ")
+		sectionBar.WriteString(" ")
 	}
 
 	// ── Left: fields list ───────────────────────────────────────────────────
 	idxs := m.sectionIndexes(m.activeSection)
 	var leftLines []string
-	leftLines = append(leftLines, "")
 	for _, idx := range idxs {
 		f := m.fields[idx]
 		mod := ""
@@ -821,7 +820,6 @@ func (m SettingsModel) View() string {
 
 	// ── Right: tooltip ──────────────────────────────────────────────────────
 	var tipLines []string
-	tipLines = append(tipLines, "")
 	if m.cursor >= 0 && m.cursor < len(m.fields) {
 		f := m.fields[m.cursor]
 		tipLines = append(tipLines, "   "+StyleGlow.Render(f.Label()))

@@ -439,9 +439,9 @@ func (m MarketsModel) viewList() string {
 		if m.batchMode {
 			sb.WriteString("\n" + StyleFieldActive.Render(status+" · Batch "+m.batchSide) + "\n")
 			sb.WriteString(fmt.Sprintf("  Size per market ($): %s\n", m.batchSize.View()))
-			sb.WriteString("  " + StyleMuted.Render("Enter execute   esc cancel") + "\n")
+			sb.WriteString("  " + StyleMuted.Render("[Enter] execute   [esc] cancel") + "\n")
 		} else {
-			sb.WriteString("\n" + StyleFieldActive.Render(status+" · b Buy YES   n Buy NO   esc clear") + "\n")
+			sb.WriteString("\n" + StyleFieldActive.Render(status+" · [b] Buy YES   [n] Buy NO   [esc] clear") + "\n")
 		}
 	}
 	sb.WriteString("\n")
@@ -493,7 +493,7 @@ func (m MarketsModel) viewList() string {
 
 	helpPanel := ""
 	if len(m.selected) == 0 {
-		helpPanel = renderHelpPanel("Enter detail   Space select   f/F filter   t mode   ↑↓/jk navigate", m.width)
+		helpPanel = renderHelpPanel("[Enter] detail   [Space] select   [f/F] filter   [t] mode   [↑↓/jk] navigate", m.width)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, " ", listPanel, " ", helpPanel)
@@ -529,7 +529,7 @@ func (m MarketsModel) viewDetail() string {
 	sb.WriteString("  " + StyleMuted.Render("Wallet: "+walletLabel) + "\n\n")
 
 	detailPanel := renderPanel("Market Detail", sb.String(), m.width, true)
-	helpPanel := renderHelpPanel("b Buy YES   s Buy NO   esc back   (price auto-filled)", m.width)
+	helpPanel := renderHelpPanel("[b] Buy YES   [s] Buy NO   [esc] back   (price auto-filled)", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", detailPanel, " ", helpPanel)
 }
 
@@ -567,7 +567,7 @@ func (m MarketsModel) viewOrder() string {
 	}
 
 	orderPanel := renderPanel("Place Order", sb.String(), m.width, true)
-	helpPanel := renderHelpPanel("Tab switch field   Enter submit   esc cancel", m.width)
+	helpPanel := renderHelpPanel("[Tab] switch field   [Enter] submit   [esc] cancel", m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", orderPanel, " ", helpPanel)
 }
 
