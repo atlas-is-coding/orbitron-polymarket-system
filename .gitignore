@@ -9,11 +9,23 @@ GEMINI.md
 .gemini/
 ,gemini/
 
-# Build artifacts
+# Tests (requested for removal)
+**/*_test.go
+**/mock_test.go
+
+# AI / Workflow artifacts
+.superpowers/
+image.png
+THREADS.md
+
+# Build & Dev artifacts
 bot
 *.exe
 tmp/
 dist/
+tools.go
+?_*
+bot.log
 
 # Data & Logs
 data/
@@ -33,3 +45,4 @@ internal/webui/web/node_modules/
 .idea/
 .DS_Store
 .worktrees/
+CHANGELOG.md
