@@ -77,17 +77,31 @@ export const useAppStore = defineStore('app', () => {
         logs.value = (event.data.logs || []).reverse()
         break
       case 'overview':
-        overview.value = event.data;
-        if (event.data.orders) orders.value = event.data.orders;
-        if (event.data.positions) positions.value = event.data.positions;
-        if (event.data.strategies) {
-          strategies.value = (event.data.strategies || []).map(s => ({
+        {
+          const data = event.data;
+          const mappedStrategies = (data.strategies || []).map(s => ({
             name: s.name || s.Name,
             status: s.status || s.Status,
             wallet_id: s.wallet_id || s.WalletID,
             wallet_label: s.wallet_label || s.WalletLabel,
             details: s.details || s.Details,
-          }))
+          }));
+          
+          overview.value = {
+            ...overview.value,
+            balance: data.balance ?? overview.value.balance,
+            pnl: data.pnl ?? overview.value.pnl,
+            subsystems: data.subsystems || overview.value.subsystems,
+            wallet: data.wallet || overview.value.wallet,
+            wallet_address: data.wallet_address || overview.value.wallet_address,
+            orders: data.orders || overview.value.orders,
+            positions: data.positions || overview.value.positions,
+            strategies: mappedStrategies
+          };
+          
+          if (data.orders) orders.value = data.orders;
+          if (data.positions) positions.value = data.positions;
+          strategies.value = mappedStrategies;
         }
         break
       case 'balance':

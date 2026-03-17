@@ -137,14 +137,30 @@ func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
 	}
 	sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
 
+	wallets := snap["wallets"].([]tui.WalletStatsMsg)
+	var primaryAddr, primaryID string
+	for _, wl := range wallets {
+		if wl.Primary {
+			primaryAddr = wl.Address
+			primaryID = wl.ID
+			break
+		}
+	}
+	if primaryAddr == "" && len(wallets) > 0 {
+		primaryAddr = wallets[0].Address
+		primaryID = wallets[0].ID
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"balance":    snap["balance"],
-		"pnl":        snap["pnl"],
-		"subsystems": subsArr,
-		"orders":     snap["orders"],
-		"positions":  snap["positions"],
-		"strategies": snap["strategies"],
-		"wallets":    snap["wallets"],
+		"balance":        snap["balance"],
+		"pnl":            snap["pnl"],
+		"wallet":         primaryID,
+		"wallet_address": primaryAddr,
+		"subsystems":     subsArr,
+		"orders":         snap["orders"],
+		"positions":      snap["positions"],
+		"strategies":     snap["strategies"],
+		"wallets":        snap["wallets"],
 	})
 }
 

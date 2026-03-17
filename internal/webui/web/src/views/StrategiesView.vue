@@ -246,7 +246,7 @@ const displayStrategies = computed(() => {
       label: meta ? app.$t(meta.nameKey) : s.name,
       icon: meta ? meta.icon : '◈',
       details: s.details,
-      walletLabel: s.wallet_label
+      walletLabel: s.wallet_label || '—'
     }
   })
 })
