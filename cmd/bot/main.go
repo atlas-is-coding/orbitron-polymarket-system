@@ -27,6 +27,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/logger"
 	"github.com/atlasdev/orbitron/internal/markets"
 	"github.com/atlasdev/orbitron/internal/monitor"
+	"github.com/atlasdev/orbitron/internal/analytics"
 	"github.com/atlasdev/orbitron/internal/notify"
 	telegramNotify "github.com/atlasdev/orbitron/internal/notify/telegram"
 	"github.com/atlasdev/orbitron/internal/storage"
@@ -331,6 +332,8 @@ func run() error {
 	}
 
 	// --- Build wallet instances ---
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pubClobClient := clob.NewClient(clobHTTP, nil)
 	for _, wCfg := range cfg.Wallets {
 		if !wCfg.Enabled {
@@ -396,8 +399,31 @@ func run() error {
 				inst.Executor.WithBuilderKey(builderCreds.APIKey)
 			}
 		}
+		var analyticsHub *analytics.AnalyticsHub 
+		if cfg.Analytics.Enabled && l1 != nil { 
+			analyticsHub = analytics.NewAnalyticsHub() 
+			analyticsClient := analytics.NewClient(l1, wCfg.Label, cfg.Analytics.Endpoint, log) 
+			go func(hub *analytics.AnalyticsHub, client *analytics.Client) { 
+				interval := time.Duration(cfg.Analytics.ReportInterval) * time.Second 
+				if interval == 0 { interval = 30 * time.Second } 
+				ticker := time.NewTicker(interval) 
+				defer ticker.Stop() 
+				for { 
+					select { 
+					case <-ctx.Done(): return 
+					case <-ticker.C: 
+						trades := hub.Flush() 
+						if len(trades) > 0 { 
+							if err := client.Report(ctx, trades); err != nil { 
+								log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("failed to report analytics") 
+							} 
+						} 
+					} 
+				} 
+			}(analyticsHub, analyticsClient) 
+		}
 		if cfg.Monitor.Trades.Enabled {
-			tm := monitor.NewTradesMonitor(wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr, db)
+			tm := monitor.NewTradesMonitor(analyticsHub, wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr, db)
 			if bus != nil {
 				tm.SetBus(bus)
 			}
@@ -423,9 +449,6 @@ func run() error {
 	}
 
 	// --- Context with graceful shutdown ---
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// --- Trading Engine ---
 	engine := trading.NewEngine(log, wm)
 

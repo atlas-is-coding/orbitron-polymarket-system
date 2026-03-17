@@ -35,7 +35,7 @@ func TestTradesMonitor_SinglePoll(t *testing.T) {
 		TradesLimit:    10,
 	}
 
-	tm := monitor.NewTradesMonitor(clobClient, dataClient, &notify.NoopNotifier{}, cfg, zerolog.Nop())
+	tm := monitor.NewTradesMonitor(nil, clobClient, dataClient, &notify.NoopNotifier{}, cfg, zerolog.Nop())
 
 	bus := tui.NewEventBus()
 	tap := bus.Tap()

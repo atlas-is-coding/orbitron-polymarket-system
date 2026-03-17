@@ -3,9 +3,11 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/atlasdev/orbitron/internal/analytics"
 	"github.com/atlasdev/orbitron/internal/api/clob"
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/config"
@@ -15,34 +17,28 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TradesMonitor отслеживает активные ордера, сделки и позиции пользователя.
-// Периодически опрашивает CLOB и Data API, кэширует результаты,
-// генерирует алерты при изменениях и предоставляет методы для управления ордерами.
 type TradesMonitor struct {
-	clobClient *clob.Client
-	dataClient *data.Client
-	notifier   notify.Notifier
-	cfg        *config.TradesMonitorConfig
-	logger     zerolog.Logger
-	address    string // wallet EOA address for Data API queries
+	analyticsHub *analytics.AnalyticsHub
+	clobClient   *clob.Client
+	dataClient   *data.Client
+	notifier     notify.Notifier
+	cfg          *config.TradesMonitorConfig
+	logger       zerolog.Logger
+	address      string
 
 	mu        sync.RWMutex
 	orders    []clob.Order
 	trades    []clob.Trade
 	positions []clob.Position
 
-	// Множество ID ордеров из предыдущего цикла (для детекта новых/закрытых)
 	prevOrderIDs map[string]struct{}
-	// Множество ID сделок из предыдущего цикла (для детекта новых исполнений)
 	prevTradeIDs map[string]struct{}
 
-	// bus — опциональный EventBus для push-снимков данных подписчикам (TUI, Telegram Bot)
 	bus *tui.EventBus
 }
 
-// NewTradesMonitor создаёт TradesMonitor.
-// db may be nil; it is accepted for future persistence but not used currently.
 func NewTradesMonitor(
+	analyticsHub *analytics.AnalyticsHub,
 	clobClient *clob.Client,
 	dataClient *data.Client,
 	notifier notify.Notifier,
@@ -52,6 +48,7 @@ func NewTradesMonitor(
 	db ...interface{},
 ) *TradesMonitor {
 	return &TradesMonitor{
+		analyticsHub: analyticsHub,
 		clobClient:   clobClient,
 		dataClient:   dataClient,
 		notifier:     notifier,
@@ -63,21 +60,16 @@ func NewTradesMonitor(
 	}
 }
 
-// SetBus подключает EventBus для рассылки снимков данных после каждого poll.
-// Вызывать до Run(). Передача nil отключает рассылку.
 func (tm *TradesMonitor) SetBus(bus *tui.EventBus) {
 	tm.bus = bus
 }
 
-// Run запускает мониторинг. Блокирует до отмены ctx.
 func (tm *TradesMonitor) Run(ctx context.Context) error {
 	interval := time.Duration(tm.cfg.PollIntervalMs) * time.Millisecond
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	tm.logger.Info().Dur("interval", interval).Msg(i18n.T().LogTradesMonitorStarted)
-
-	// Первый цикл сразу при запуске
 	tm.poll(ctx)
 
 	for {
@@ -90,7 +82,6 @@ func (tm *TradesMonitor) Run(ctx context.Context) error {
 	}
 }
 
-// poll выполняет один цикл опроса API.
 func (tm *TradesMonitor) poll(ctx context.Context) {
 	tm.pollOrders(ctx)
 	tm.pollTrades(ctx)
@@ -99,9 +90,6 @@ func (tm *TradesMonitor) poll(ctx context.Context) {
 	}
 }
 
-// pollOrders обновляет список открытых ордеров и генерирует алерты.
-// Использует GET /data/orders (py-clob-client ORDERS="/data/orders"),
-// так как GET /orders поддерживает только POST/DELETE.
 func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	resp, err := tm.clobClient.GetDataOrders(clob.OrdersFilter{
 		MakerAddress: tm.address,
@@ -119,13 +107,10 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 		newOrderIDs[o.ID] = struct{}{}
 	}
 
-	// Детект отменённых/исполненных ордеров (были в prevOrderIDs, нет в новых)
 	for id := range tm.prevOrderIDs {
 		if _, ok := newOrderIDs[id]; !ok {
 			tm.logger.Info().Str("order_id", id).Msg(i18n.T().LogOrderClosed)
 			go func(orderID string) {
-				// Используем независимый контекст с таймаутом, а не родительский ctx.
-				// Родительский ctx отменяется при shutdown до завершения HTTP-запроса к Telegram.
 				notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				msg := fmt.Sprintf(i18n.T().TgOrderClosed, orderID)
@@ -136,7 +121,6 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 		}
 	}
 
-	// Детект новых ордеров (есть в новых, не было в prevOrderIDs)
 	if len(tm.prevOrderIDs) > 0 {
 		for _, o := range resp.Data {
 			if _, ok := tm.prevOrderIDs[o.ID]; !ok {
@@ -176,7 +160,6 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	}
 }
 
-// pollTrades обновляет список сделок и генерирует алерты о новых исполнениях.
 func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 	filter := clob.TradesFilter{Limit: tm.cfg.TradesLimit}
 	resp, err := tm.clobClient.GetTrades(filter)
@@ -191,7 +174,6 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 		newTradeIDs[t.ID] = struct{}{}
 	}
 
-	// Новые исполненные сделки
 	if len(tm.prevTradeIDs) > 0 {
 		for _, t := range resp.Data {
 			if _, ok := tm.prevTradeIDs[t.ID]; !ok {
@@ -201,6 +183,23 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 					Str("price", t.Price).
 					Str("size", t.Size).
 					Msg(i18n.T().LogTradeExecuted)
+				
+				if tm.analyticsHub != nil {
+					p, _ := strconv.ParseFloat(t.Price, 64)
+					s, _ := strconv.ParseFloat(t.Size, 64)
+					tm.analyticsHub.RecordTrade(analytics.TradeReport{
+						ID:        t.ID,
+						MarketID:  t.AssetID,
+						AssetID:   t.AssetID,
+						Side:      string(t.Side),
+						Price:     p,
+						Size:      s,
+						Volume:    p * s,
+						Strategy:  "unknown",
+						Timestamp: t.Timestamp,
+					})
+				}
+
 				go func(trade clob.Trade) {
 					notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 					defer cancel()
@@ -221,8 +220,6 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 	tm.logger.Debug().Int("count", len(resp.Data)).Msg("trades updated")
 }
 
-// pollPositions fetches current open positions from the Data API (public, by address).
-// CLOB GET /positions returns 404 — Data API is the correct source for position data.
 func (tm *TradesMonitor) pollPositions(_ context.Context) {
 	if tm.address == "" {
 		return
@@ -237,7 +234,6 @@ func (tm *TradesMonitor) pollPositions(_ context.Context) {
 		return
 	}
 
-	// Map data.Position → clob.Position for internal storage.
 	positions := make([]clob.Position, 0, len(dataPositions))
 	for _, p := range dataPositions {
 		positions = append(positions, clob.Position{
@@ -276,9 +272,6 @@ func (tm *TradesMonitor) pollPositions(_ context.Context) {
 	}
 }
 
-// --- Методы для чтения кэша ---
-
-// GetOrders возвращает кэшированный список открытых ордеров.
 func (tm *TradesMonitor) GetOrders() []clob.Order {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -287,7 +280,6 @@ func (tm *TradesMonitor) GetOrders() []clob.Order {
 	return result
 }
 
-// GetTrades возвращает кэшированный список последних сделок.
 func (tm *TradesMonitor) GetTrades() []clob.Trade {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -296,7 +288,6 @@ func (tm *TradesMonitor) GetTrades() []clob.Trade {
 	return result
 }
 
-// GetPositions возвращает кэшированные текущие позиции.
 func (tm *TradesMonitor) GetPositions() []clob.Position {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -305,11 +296,7 @@ func (tm *TradesMonitor) GetPositions() []clob.Position {
 	return result
 }
 
-// --- Методы взаимодействия с ордерами ---
-
-// CancelOrder отменяет ордер по ID.
 func (tm *TradesMonitor) CancelOrder(orderID string) error {
-	tm.logger.Info().Str("order_id", orderID).Msg("canceling order")
 	resp, err := tm.clobClient.CancelOrder(orderID)
 	if err != nil {
 		return fmt.Errorf("trades-monitor: CancelOrder: %w", err)
@@ -317,48 +304,33 @@ func (tm *TradesMonitor) CancelOrder(orderID string) error {
 	if !resp.Canceled {
 		return fmt.Errorf("trades-monitor: CancelOrder: order %s not canceled", orderID)
 	}
-	tm.logger.Info().Str("order_id", orderID).Msg("order canceled")
 	return nil
 }
 
-// CancelOrders отменяет несколько ордеров по ID.
 func (tm *TradesMonitor) CancelOrders(orderIDs []string) error {
-	tm.logger.Info().Strs("order_ids", orderIDs).Msg("canceling orders")
 	_, err := tm.clobClient.CancelOrders(orderIDs)
 	if err != nil {
 		return fmt.Errorf("trades-monitor: CancelOrders: %w", err)
 	}
-	tm.logger.Info().Int("count", len(orderIDs)).Msg("orders canceled")
 	return nil
 }
 
-// CancelAllOrders отменяет все открытые ордера пользователя.
 func (tm *TradesMonitor) CancelAllOrders() error {
-	tm.logger.Info().Msg("canceling all orders")
 	_, err := tm.clobClient.CancelAllOrders()
 	if err != nil {
 		return fmt.Errorf("trades-monitor: CancelAllOrders: %w", err)
 	}
-	tm.logger.Info().Msg("all orders canceled")
 	return nil
 }
 
-// CancelMarketOrders отменяет все открытые ордера на конкретном рынке.
-// marketID = condition_id, assetID = token_id (один из двух обязателен).
 func (tm *TradesMonitor) CancelMarketOrders(marketID, assetID string) error {
-	tm.logger.Info().Str("market", marketID).Str("asset", assetID).Msg("canceling market orders")
 	_, err := tm.clobClient.CancelMarketOrders(marketID, assetID)
 	if err != nil {
 		return fmt.Errorf("trades-monitor: CancelMarketOrders: %w", err)
 	}
-	tm.logger.Info().Str("market", marketID).Msg("market orders canceled")
 	return nil
 }
 
-// --- Методы для получения данных из Data API ---
-
-// GetDataPositions возвращает позиции пользователя из Data API (по адресу кошелька).
-// Обогащённые данные: P&L, названия рынков, slug и т.д.
 func (tm *TradesMonitor) GetDataPositions(walletAddress string) ([]data.Position, error) {
 	return tm.dataClient.GetPositions(data.PositionsParams{
 		User:  walletAddress,
@@ -366,7 +338,6 @@ func (tm *TradesMonitor) GetDataPositions(walletAddress string) ([]data.Position
 	})
 }
 
-// GetDataTrades возвращает историю сделок из Data API (по адресу кошелька).
 func (tm *TradesMonitor) GetDataTrades(walletAddress string, limit int) ([]data.Trade, error) {
 	if limit <= 0 {
 		limit = 50
@@ -377,7 +348,6 @@ func (tm *TradesMonitor) GetDataTrades(walletAddress string, limit int) ([]data.
 	})
 }
 
-// GetMarketTrades возвращает публичную историю сделок на рынке по token_id.
 func (tm *TradesMonitor) GetMarketTrades(tokenID string, limit int) ([]clob.Trade, error) {
 	resp, err := tm.clobClient.GetMarketTrades(tokenID, limit)
 	if err != nil {

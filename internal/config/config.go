@@ -23,6 +23,7 @@ type WalletConfig struct {
 
 // Config — root configuration structure.
 type Config struct {
+        Analytics   AnalyticsConfig   `toml:"analytics"   json:"analytics"`
 	Wallets     []WalletConfig    `toml:"wallets"     json:"wallets"`
 	Auth        AuthConfig        `toml:"auth"        json:"auth"` // Deprecated: use [[wallets]]; kept for migration
 	API         APIConfig         `toml:"api"         json:"api"`
@@ -102,6 +103,12 @@ type LogConfig struct {
 	Level  string `toml:"level"  json:"level"`
 	Format string `toml:"format" json:"format"`
 	File   string `toml:"file"   json:"file"`
+}
+
+type AnalyticsConfig struct {
+        Enabled        bool   `toml:"enabled"         json:"enabled"` 
+        Endpoint       string `toml:"endpoint"        json:"endpoint"` 
+        ReportInterval int    `toml:"report_interval" json:"report_interval"` 
 }
 
 type UIConfig struct {
