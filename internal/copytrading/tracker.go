@@ -18,8 +18,8 @@ import (
 // Каждый трекер работает в отдельной горутине.
 type TraderTracker struct {
 	trader       config.TraderConfig
-	dataClient   *data.Client
-	executor     *OrderExecutor
+	dataClient   DataClient
+	executor     OrderExecutorInterface
 	sizer        *SizeCalculator
 	store        storage.CopyTradeStore
 	notifier     notify.Notifier
@@ -33,8 +33,8 @@ type TraderTracker struct {
 // NewTraderTracker создаёт трекер для одного трейдера.
 func NewTraderTracker(
 	trader config.TraderConfig,
-	dataClient *data.Client,
-	executor *OrderExecutor,
+	dataClient DataClient,
+	executor OrderExecutorInterface,
 	store storage.CopyTradeStore,
 	notifier notify.Notifier,
 	getMyBalance func() (float64, error),

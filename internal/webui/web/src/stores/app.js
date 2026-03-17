@@ -50,14 +50,19 @@ export const useAppStore = defineStore('app', () => {
 
         orders.value = event.data.orders || []
         positions.value = event.data.positions || []
+        
         // Map strategies for consistency
-        strategies.value = (event.data.strategies || []).map(s => ({
-          name: s.name || s.Name,
-          status: s.status || s.Status,
-          wallet_id: s.wallet_id || s.WalletID,
-          wallet_label: s.wallet_label || s.WalletLabel,
-          details: s.details || s.Details,
-        }))
+        {
+          const mapped = (event.data.strategies || []).map(s => ({
+            name: s.name || s.Name,
+            status: s.status || s.Status,
+            wallet_id: s.wallet_id || s.WalletID,
+            wallet_label: s.wallet_label || s.WalletLabel || s.Label || '',
+            wallet_address: s.wallet_address || s.WalletAddress || '',
+            details: s.details || s.Details || '',
+          }))
+          strategies.value = mapped
+        }
 
         {
           const all = Object.values(walletsMap.value)
@@ -76,6 +81,7 @@ export const useAppStore = defineStore('app', () => {
         }
         logs.value = (event.data.logs || []).reverse()
         break
+
       case 'overview':
         {
           const data = event.data;
@@ -83,9 +89,11 @@ export const useAppStore = defineStore('app', () => {
             name: s.name || s.Name,
             status: s.status || s.Status,
             wallet_id: s.wallet_id || s.WalletID,
-            wallet_label: s.wallet_label || s.WalletLabel,
-            details: s.details || s.Details,
+            wallet_label: s.wallet_label || s.WalletLabel || s.Label || '',
+            wallet_address: s.wallet_address || s.WalletAddress || '',
+            details: s.details || s.Details || '',
           }));
+          strategies.value = mappedStrategies
           
           overview.value = {
             ...overview.value,
@@ -101,12 +109,13 @@ export const useAppStore = defineStore('app', () => {
           
           if (data.orders) orders.value = data.orders;
           if (data.positions) positions.value = data.positions;
-          strategies.value = mappedStrategies;
         }
         break
+
       case 'balance':
         overview.value = { ...overview.value, balance: event.data.usdc }
         break
+
       case 'subsystem': {
         const subs = overview.value.subsystems || []
         const idx = subs.findIndex(s => s.name === event.data.name)
@@ -119,20 +128,28 @@ export const useAppStore = defineStore('app', () => {
         }
         break
       }
+
       case 'orders':      orders.value = event.data; break
       case 'positions':   positions.value = event.data; break
-      case 'strategies':
-        strategies.value = (event.data || []).map(s => ({
+
+      case 'strategies': {
+        const mapped = (event.data || []).map(s => ({
           name: s.name || s.Name,
           status: s.status || s.Status,
           wallet_id: s.wallet_id || s.WalletID,
-          wallet_label: s.wallet_label || s.WalletLabel,
-          details: s.details || s.Details,
+          wallet_label: s.wallet_label || s.WalletLabel || s.Label || '',
+          wallet_address: s.wallet_address || s.WalletAddress || '',
+          details: s.details || s.Details || '',
         }))
+        strategies.value = mapped
+        overview.value = { ...overview.value, strategies: mapped }
         break
+      }
+
       case 'log':         logs.value = [event.data, ...logs.value].slice(0, 200); break
       case 'copytrading': copytrading.value = event.data; break
       case 'settings':    settings.value = event.data; break
+
       case 'wallet_added': {
         const w = event.data
         const id = w.id || w.ID
@@ -153,6 +170,7 @@ export const useAppStore = defineStore('app', () => {
         }
         break
       }
+
       case 'wallet_removed': {
         const id = event.data.id || event.data.ID
         const m = { ...walletsMap.value }
@@ -160,6 +178,7 @@ export const useAppStore = defineStore('app', () => {
         walletsMap.value = m
         break
       }
+
       case 'wallet_changed': {
         const id = event.data.id || event.data.ID
         const existing = walletsMap.value[id]
@@ -182,6 +201,7 @@ export const useAppStore = defineStore('app', () => {
         }
         break
       }
+
       case 'wallet_stats': {
         const w = event.data
         const id = w.id || w.ID
@@ -213,6 +233,7 @@ export const useAppStore = defineStore('app', () => {
         }
         break
       }
+
       case 'market_alert':
         toast(
           `🔔 ${event.data.question || event.data.conditionId}: price went ${event.data.direction} ${Number(event.data.threshold).toFixed(3)} (now ${Number(event.data.currentPrice).toFixed(3)})`,
@@ -220,22 +241,27 @@ export const useAppStore = defineStore('app', () => {
           8000
         )
         break
+
       case 'markets_updated':
-        // Server finished a poll cycle — refresh the markets list in the background.
         useMarketsStore().fetchMarkets()
         break
+
       case 'markets_loading':
         useMarketsStore().onMarketsLoading(event.data)
         break
+
       case 'markets_ready':
         useMarketsStore().onMarketsReady()
         break
+
       case 'config_reloaded':
         settingsStale.value = true
         break
+
       case 'copy_trade':
         copyTrades.value = [event.data.line, ...copyTrades.value].slice(0, 30)
         break
+
       case 'health_updated':
         useHealthStore().applyHealthUpdate(event.data)
         break

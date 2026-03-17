@@ -16,7 +16,7 @@ import (
 
 // RisklessRateStrategy buys NO on long-duration markets with very low YES probability.
 type RisklessRateStrategy struct {
-	gamma    *gamma.Client
+	gamma    GammaClient
 	executor Executor
 	notifier notify.Notifier
 	bus      *tui.EventBus
@@ -27,7 +27,7 @@ type RisklessRateStrategy struct {
 }
 
 func NewRisklessRateStrategy(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	executor Executor,
 	notifier notify.Notifier,
 	bus *tui.EventBus,

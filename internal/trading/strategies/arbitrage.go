@@ -27,7 +27,7 @@ type ArbitrageSignal struct {
 
 // ArbitrageStrategy buys YES+NO when their sum < $1.00.
 type ArbitrageStrategy struct {
-	gamma    *gamma.Client
+	gamma    GammaClient
 	executor Executor // nil = signal-only
 	notifier notify.Notifier
 	bus      *tui.EventBus
@@ -39,7 +39,7 @@ type ArbitrageStrategy struct {
 
 // NewArbitrageStrategy creates the strategy. executor may be nil for signal-only mode.
 func NewArbitrageStrategy(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	executor Executor,
 	notifier notify.Notifier,
 	bus *tui.EventBus,

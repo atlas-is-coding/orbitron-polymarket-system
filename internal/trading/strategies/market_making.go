@@ -17,15 +17,15 @@ import (
 
 // MarketMakingStrategy posts bid+ask limit orders around the midpoint.
 type MarketMakingStrategy struct {
-	gamma    *gamma.Client
-	clob     *clob.Client
-	executor Executor
-	notifier notify.Notifier
-	bus      *tui.EventBus
-	risk     *risk.Manager
-	cfg      config.MarketMakingConfig
-	log      zerolog.Logger
-	done     chan struct{}
+	gamma     GammaClient
+	clob      *clob.Client
+	executor  Executor
+	notifier  notify.Notifier
+	bus       *tui.EventBus
+	risk      *risk.Manager
+	cfg       config.MarketMakingConfig
+	log       zerolog.Logger
+	done      chan struct{}
 	// active orders: tokenID → orderID
 	bidOrders map[string]string
 	askOrders map[string]string
@@ -33,7 +33,7 @@ type MarketMakingStrategy struct {
 
 // NewMarketMakingStrategy creates the strategy.
 func NewMarketMakingStrategy(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	clobClient *clob.Client,
 	executor Executor,
 	notifier notify.Notifier,

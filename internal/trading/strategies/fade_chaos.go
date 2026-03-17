@@ -47,7 +47,7 @@ func (c *CooldownTracker) Record(conditionID string) {
 
 // FadeTheChaosStrategy detects emotional YES price spikes and signals contrarian NO positions.
 type FadeTheChaosStrategy struct {
-	gamma    *gamma.Client
+	gamma    GammaClient
 	executor Executor
 	notifier notify.Notifier
 	bus      *tui.EventBus
@@ -63,7 +63,7 @@ type FadeTheChaosStrategy struct {
 
 // NewFadeTheChaosStrategy creates the strategy.
 func NewFadeTheChaosStrategy(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	executor Executor,
 	notifier notify.Notifier,
 	bus *tui.EventBus,

@@ -203,11 +203,12 @@ type MarketsUpdatedMsg struct {
 
 // StrategyRow represents a single strategy in the strategies table.
 type StrategyRow struct {
-	Name        string `json:"name"`
-	Status      string `json:"status"` // "active" or "stopped"
-	WalletID    string `json:"wallet_id"`
-	WalletLabel string `json:"wallet_label"`
-	Details     string `json:"details"`
+	Name          string `json:"name"`
+	Status        string `json:"status"` // "active" or "stopped"
+	WalletID      string `json:"wallet_id"`
+	WalletLabel   string `json:"wallet_label"`
+	WalletAddress string `json:"wallet_address"`
+	Details       string `json:"details"`
 }
 // StrategiesUpdateMsg carries a fresh snapshot of strategy states.
 type StrategiesUpdateMsg struct {

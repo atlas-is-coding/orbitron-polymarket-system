@@ -401,7 +401,7 @@ func run() error {
 		}
 		var analyticsHub *analytics.AnalyticsHub 
 		if cfg.Analytics.Enabled && l1 != nil { 
-			analyticsHub = analytics.NewAnalyticsHub() 
+			analyticsHub = analytics.NewAnalyticsHub(cfg.Analytics.BatchSize) 
 			analyticsClient := analytics.NewClient(l1, wCfg.Label, cfg.Analytics.Endpoint, log) 
 			go func(hub *analytics.AnalyticsHub, client *analytics.Client) { 
 				interval := time.Duration(cfg.Analytics.ReportInterval) * time.Second 
@@ -411,6 +411,7 @@ func run() error {
 				for { 
 					select { 
 					case <-ctx.Done(): return 
+					case <-hub.Trigger():
 					case <-ticker.C: 
 						trades := hub.Flush() 
 						if len(trades) > 0 { 

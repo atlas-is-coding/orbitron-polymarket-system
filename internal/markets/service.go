@@ -17,9 +17,15 @@ import (
 	"github.com/atlasdev/orbitron/internal/tui"
 )
 
+// GammaClient defines the methods we use from gamma.Client.
+type GammaClient interface {
+	GetMarkets(params gamma.MarketsParams) ([]gamma.Market, error)
+	GetMarket(id string) (*gamma.Market, error)
+}
+
 // Service polls Gamma API for markets and manages price alerts.
 type Service struct {
-	gamma  *gamma.Client
+	gamma  GammaClient
 	bus    *tui.EventBus
 	cache  storage.MarketCacheStore // nil = no persistence
 	log    *zerolog.Logger
@@ -34,7 +40,7 @@ type Service struct {
 }
 
 // NewService creates a Service. Any argument may be nil (for tests or optional features).
-func NewService(gammaClient *gamma.Client, bus *tui.EventBus, cache storage.MarketCacheStore) *Service {
+func NewService(gammaClient GammaClient, bus *tui.EventBus, cache storage.MarketCacheStore) *Service {
 	return &Service{
 		gamma:  gammaClient,
 		bus:    bus,

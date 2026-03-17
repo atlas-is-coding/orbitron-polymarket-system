@@ -24,7 +24,10 @@
         </div>
         <div class="sc-body">
           <p class="sc-fields-count">{{ s.details }}</p>
-          <p v-if="s.walletLabel" class="sc-wallet">Wallet: {{ s.walletLabel }}</p>
+          <div v-if="s.walletLabel" class="sc-wallet-info">
+            <p class="sc-wallet">Wallet: {{ s.walletLabel }}</p>
+            <p v-if="s.wallet_address && s.wallet_address !== '—'" class="sc-addr">{{ s.wallet_address }}</p>
+          </div>
         </div>
         <div class="sc-footer">
           <button class="btn-configure" @click="openDrawer(s.name)">CONFIGURE</button>
@@ -134,12 +137,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
 
 const app = useAppStore()
 const { strategies: storeStrategies, settingsStale } = storeToRefs(app)
 const api = useApi()
+const { t } = useI18n()
 const savedMsg = ref(false)
 
 // Drawer state
@@ -237,27 +242,36 @@ const uiMetadata = [
 const activeUIStrategy = computed(() => uiMetadata.find(s => s.key === activeKey.value))
 
 const displayStrategies = computed(() => {
-  return (storeStrategies.value || []).map(s => {
-    const meta = uiMetadata.find(u => u.key === s.name)
+  return uiMetadata.map(meta => {
+    // Find runtime state from store (if any)
+    const s = (storeStrategies.value || []).find(rs => rs.name === meta.key)
     return {
-      ...s,
-      name: s.name,
-      status: s.status,
-      label: meta ? app.$t(meta.nameKey) : s.name,
-      icon: meta ? meta.icon : '◈',
-      details: s.details,
-      walletLabel: s.wallet_label || '—'
+      name: meta.key,
+      status: s ? s.status : 'off',
+      label: t(meta.nameKey),
+      icon: meta.icon,
+      details: s ? s.details : t('settings.notInitialized'),
+      walletLabel: s ? (s.wallet_label || '—') : '—',
+      wallet_address: s ? (s.wallet_address || '—') : '—'
     }
   })
 })
 
 function openDrawer(key) {
   activeKey.value = key
-  const storeVer = (storeStrategies.value || []).find(s => s.name === key)
-  if (storeVer && storeVer.wallet_id) {
-    selectedWalletIds.value = [storeVer.wallet_id]
+  
+  // 1. Initialise from settings (if available)
+  const st = app.settings?.trading?.strategies?.[key]
+  if (st && Array.isArray(st.wallet_ids)) {
+    selectedWalletIds.value = [...st.wallet_ids]
   } else {
-    selectedWalletIds.value = []
+    // 2. Fallback to runtime state
+    const storeVer = (storeStrategies.value || []).find(s => s.name === key)
+    if (storeVer && storeVer.wallet_id) {
+      selectedWalletIds.value = [storeVer.wallet_id]
+    } else {
+      selectedWalletIds.value = []
+    }
   }
 }
 function closeDrawer() { activeKey.value = null }
@@ -300,13 +314,26 @@ const form = reactive({
 })
 
 onMounted(async () => {
-  try { const s = await api.getSettings(); app.settings = s; applySettings(s) } catch {}
-  try { app.strategies = await api.getStrategies() } catch {}
+  try {
+    let s = await api.getSettings()
+    if (Array.isArray(s)) s = s[0] // handle [ { ... } ]
+    app.settings = s
+    applySettings(s)
+  } catch {}
+  
+  // Only load via REST if store is empty to avoid overwriting WS initial_state
+  if (!app.strategies || app.strategies.length === 0) {
+    try {
+      const s = await api.getStrategies()
+      if (s && s.length > 0) app.strategies = s
+    } catch {}
+  }
   await loadWallets()
 })
 
 function applySettings(s) {
-  const st = s.trading?.strategies || {}
+  if (!s || !s.trading) return
+  const st = s.trading.strategies || {}
   form.arbitrageEnabled = !!st.arbitrage?.enabled
   form.arbitrageMinProfit = st.arbitrage?.min_profit_usd || 0.5
   form.arbitrageMaxPos = st.arbitrage?.max_position_usd || 100
@@ -415,7 +442,9 @@ async function save(key, value) {
 
 .sc-body { padding: 0 1.25rem 0.75rem; position: relative; z-index: 1; }
 .sc-fields-count { font-size: 0.80rem; color: var(--text-secondary); }
-.sc-wallet { font-size: 0.78rem; font-family: var(--font-mono); color: var(--accent-bright); margin-top: 0.2rem; }
+.sc-wallet-info { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.1rem; }
+.sc-wallet { font-size: 0.78rem; font-family: var(--font-mono); color: var(--accent-bright); margin: 0; }
+.sc-addr { font-size: 0.70rem; font-family: var(--font-mono); color: var(--text-muted); word-break: break-all; margin: 0; }
 
 .sc-footer {
   padding: 0.75rem 1.25rem;

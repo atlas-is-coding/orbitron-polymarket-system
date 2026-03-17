@@ -6,9 +6,10 @@ import (
 	"github.com/atlasdev/orbitron/internal/tui"
 )
 
-// WalletProvider is an interface to get wallet labels.
+// WalletProvider is an interface to get wallet labels and addresses.
 type WalletProvider interface {
 	WalletLabel(id string) string
+	WalletAddress(id string) string
 }
 
 // walletAwareStrategy is optionally implemented by strategies that track wallets.
@@ -38,20 +39,34 @@ func GetStrategyRows(engine *Engine, wp WalletProvider) []tui.StrategyRow {
 		}
 
 		var labels []string
+		var addresses []string
 		for _, wid := range wids {
 			if wid == "" {
 				continue
 			}
 			wlabel := wp.WalletLabel(wid)
+			waddr := wp.WalletAddress(wid)
 			if wlabel == "" {
-				wlabel = wid[:min(len(wid), 8)]
+				if waddr != "" {
+					wlabel = waddr[:min(len(waddr), 8)] + "…" + waddr[max(0, len(waddr)-4):]
+				} else {
+					wlabel = wid[:min(len(wid), 8)]
+				}
 			}
 			labels = append(labels, wlabel)
+
+			if waddr != "" {
+				addresses = append(addresses, waddr)
+			}
 		}
 
 		wlabel := "—"
 		if len(labels) > 0 {
 			wlabel = strings.Join(labels, ", ")
+		}
+		waddr := "—"
+		if len(addresses) > 0 {
+			waddr = strings.Join(addresses, ", ")
 		}
 		wid := ""
 		if len(wids) > 0 {
@@ -64,11 +79,12 @@ func GetStrategyRows(engine *Engine, wp WalletProvider) []tui.StrategyRow {
 		}
 
 		rows = append(rows, tui.StrategyRow{
-			Name:        s.Name(),
-			Status:      status,
-			WalletID:    wid,
-			WalletLabel: wlabel,
-			Details:     GetDetails(s),
+			Name:          s.Name(),
+			Status:        status,
+			WalletID:      wid,
+			WalletLabel:   wlabel,
+			WalletAddress: waddr,
+			Details:       GetDetails(s),
 		})
 	}
 

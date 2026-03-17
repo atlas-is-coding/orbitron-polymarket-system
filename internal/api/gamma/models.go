@@ -8,9 +8,9 @@ import (
 	"strconv"
 )
 
-type flexFloat64 float64
+type FlexFloat64 float64
 
-func (f *flexFloat64) UnmarshalJSON(b []byte) error {
+func (f *FlexFloat64) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
 		var s string
 		if err := json.Unmarshal(b, &s); err != nil {
@@ -24,20 +24,20 @@ func (f *flexFloat64) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
-		*f = flexFloat64(v)
+		*f = FlexFloat64(v)
 		return nil
 	}
 	var v float64
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
-	*f = flexFloat64(v)
+	*f = FlexFloat64(v)
 	return nil
 }
 
-type flexStringSlice []string
+type FlexStringSlice []string
 
-func (f *flexStringSlice) UnmarshalJSON(b []byte) error {
+func (f *FlexStringSlice) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
 		var s string
 		if err := json.Unmarshal(b, &s); err != nil {
@@ -50,19 +50,19 @@ func (f *flexStringSlice) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal([]byte(s), &slice); err != nil {
 			return err
 		}
-		*f = flexStringSlice(slice)
+		*f = FlexStringSlice(slice)
 		return nil
 	}
-	
+
 	if string(b) == "null" {
 		return nil
 	}
-	
+
 	var slice []string
 	if err := json.Unmarshal(b, &slice); err != nil {
 		return err
 	}
-	*f = flexStringSlice(slice)
+	*f = FlexStringSlice(slice)
 	return nil
 }
 
@@ -84,15 +84,15 @@ type Market struct {
 	// Дата резолюции
 	EndDateISO  string  `json:"endDateIso"`
 	// Ликвидность (в USDC)
-	Liquidity   flexFloat64 `json:"liquidity"`
+	Liquidity   FlexFloat64 `json:"liquidity"`
 	// Объём (в USDC)
-	Volume      flexFloat64 `json:"volume"`
+	Volume      FlexFloat64 `json:"volume"`
 	// Текущие вероятности YES/NO (от 0 до 1)
-	OutcomePrices flexStringSlice `json:"outcomePrices"`
+	OutcomePrices FlexStringSlice `json:"outcomePrices"`
 	// Названия исходов
-	Outcomes    flexStringSlice `json:"outcomes"`
+	Outcomes    FlexStringSlice `json:"outcomes"`
 	// token_id для каждого исхода
-	ClobTokenIDs flexStringSlice `json:"clobTokenIds"`
+	ClobTokenIDs FlexStringSlice `json:"clobTokenIds"`
 	// Обложка рынка
 	Image       string  `json:"image"`
 	// Ссылка на источник резолюции
@@ -126,14 +126,13 @@ type Event struct {
 	Active      bool     `json:"active"`
 	Closed      bool     `json:"closed"`
 	// Общий объём события
-	Volume      flexFloat64  `json:"volume"`
-	Liquidity   flexFloat64  `json:"liquidity"`
+	Volume      FlexFloat64  `json:"volume"`
+	Liquidity   FlexFloat64  `json:"liquidity"`
 	// Изображение события
 	Image       string   `json:"image"`
 	StartDate   string   `json:"startDate"`
 	EndDate     string   `json:"endDate"`
 }
-
 // MarketsParams — параметры фильтрации для GET /markets
 type MarketsParams struct {
 	// Статус: active, closed

@@ -109,6 +109,7 @@ type AnalyticsConfig struct {
         Enabled        bool   `toml:"enabled"         json:"enabled"` 
         Endpoint       string `toml:"endpoint"        json:"endpoint"` 
         ReportInterval int    `toml:"report_interval" json:"report_interval"` 
+        BatchSize      int    `toml:"batch_size"      json:"batch_size"` 
 }
 
 type UIConfig struct {

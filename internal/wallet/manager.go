@@ -57,14 +57,23 @@ func (m *Manager) AvailableWallets() []string {
 func (m *Manager) AddInactive(cfg config.WalletConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	addr := ""
+	if cfg.PrivateKey != "" {
+		if l1, err := auth.NewL1Signer(cfg.PrivateKey); err == nil {
+			addr = l1.Address()
+		}
+	}
+
 	m.instances = append(m.instances, &WalletInstance{
-		Cfg:   cfg,
-		Stats: &WalletStats{},
+		Cfg:     cfg,
+		Address: addr,
+		Stats:   &WalletStats{},
 	})
 	if m.bus != nil {
 		m.bus.Send(tui.WalletAddedMsg{
 			ID:      cfg.ID,
-			Address: "", // Watch-only or disabled
+			Address: addr,
 			Label:   cfg.Label,
 			Enabled: cfg.Enabled,
 			Primary: cfg.Primary,

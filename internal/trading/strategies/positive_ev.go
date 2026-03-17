@@ -14,9 +14,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// PositiveEVStrategy finds near-resolution markets where YES is mispriced below fair value.
+// PositiveEVStrategy detects markets where our private probability > market price.
 type PositiveEVStrategy struct {
-	gamma    *gamma.Client
+	gamma    GammaClient
 	executor Executor
 	notifier notify.Notifier
 	bus      *tui.EventBus
@@ -28,7 +28,7 @@ type PositiveEVStrategy struct {
 
 // NewPositiveEVStrategy creates the strategy.
 func NewPositiveEVStrategy(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	executor Executor,
 	notifier notify.Notifier,
 	bus *tui.EventBus,
@@ -47,6 +47,7 @@ func NewPositiveEVStrategy(
 		done:     make(chan struct{}),
 	}
 }
+
 
 func (s *PositiveEVStrategy) Name() string { return "positive_ev" }
 

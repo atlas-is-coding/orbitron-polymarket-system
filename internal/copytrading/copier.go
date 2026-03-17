@@ -17,14 +17,25 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// DataClient — интерфейс для получения данных о позициях.
+type DataClient interface {
+	GetPositions(params data.PositionsParams) ([]data.Position, error)
+}
+
+// OrderExecutorInterface — интерфейс для выполнения торговых операций.
+type OrderExecutorInterface interface {
+	Open(assetID string, sizeUSD float64, negRisk bool) (*OpenResult, error)
+	Close(assetID string, sizeShares, avgBuyPrice float64, negRisk bool) (*CloseResult, error)
+}
+
 // CopyTrader — главный оркестратор подсистемы копитрейдинга.
 // Запускает по одному TraderTracker на каждого активного трейдера
 // и перезапускает их при изменении конфига.
 type CopyTrader struct {
 	cfgPath    string
 	getCfg     func() *config.CopytradingConfig
-	dataClient *data.Client
-	executor   *OrderExecutor
+	dataClient DataClient
+	executor   OrderExecutorInterface
 	store      storage.CopyTradeStore
 	notifier   notify.Notifier
 	clobClient *clob.Client
@@ -44,8 +55,8 @@ type CopyTrader struct {
 func NewCopyTrader(
 	cfgPath string,
 	getCfg func() *config.CopytradingConfig,
-	dataClient *data.Client,
-	executor *OrderExecutor,
+	dataClient DataClient,
+	executor OrderExecutorInterface,
 	store storage.CopyTradeStore,
 	notifier notify.Notifier,
 	clobClient *clob.Client,
