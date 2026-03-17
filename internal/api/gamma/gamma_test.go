@@ -28,16 +28,16 @@ func TestGetMarkets_WithLimit(t *testing.T) {
 	assert.LessOrEqual(t, len(markets), 3)
 }
 
-func TestGetMarket_ByConditionID(t *testing.T) {
+func TestGetMarket_ByID(t *testing.T) {
 	client := testutil.NewGammaClient()
 	active := true
 	markets, err := client.GetMarkets(gamma.MarketsParams{Active: &active, Limit: 1})
 	require.NoError(t, err)
 	require.NotEmpty(t, markets)
-	condID := markets[0].ConditionID
-	m, err := client.GetMarket(condID)
+	id := markets[0].ID
+	m, err := client.GetMarket(id)
 	require.NoError(t, err)
-	assert.Equal(t, condID, m.ConditionID)
+	assert.Equal(t, id, m.ID)
 }
 
 func TestGetEvents_ReturnsResults(t *testing.T) {

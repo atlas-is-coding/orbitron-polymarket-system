@@ -287,7 +287,6 @@ var (
 
 	StylePanelTitleActive = lipgloss.NewStyle().
 			Foreground(ColorAccent).
-			Background(ColorSurface2).
 			Bold(true).
 			Padding(0, 1)
 
@@ -295,19 +294,20 @@ var (
 			Foreground(ColorBorder)
 
 	StylePanelActive = lipgloss.NewStyle().
-			Border(BorderThick).
+			Border(BorderRounded).
 			BorderForeground(ColorPrimary).
 			Padding(0, 1)
 
 	StylePanelInactive = lipgloss.NewStyle().
-			Border(BorderNormal).
+			Border(BorderRounded).
 			BorderForeground(ColorBorder).
 			Padding(0, 1)
 
 	StylePanelHelp = lipgloss.NewStyle().
-			Border(BorderNormal).
+			Border(BorderRounded).
 			BorderForeground(ColorBorder).
 			Foreground(ColorMuted).
 			Padding(0, 1)
+
 )
 

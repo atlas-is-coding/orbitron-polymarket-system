@@ -92,17 +92,11 @@ func buildMarketsQuery(p MarketsParams) string {
 	if p.Category != "" {
 		q += "category=" + p.Category + "&"
 	}
-	if p.SortBy != "" {
-		q += "_sort=" + p.SortBy + "&"
-	}
-	if p.SortOrder != "" {
-		q += "_order=" + p.SortOrder + "&"
-	}
 	if p.Limit > 0 {
-		q += "_limit=" + strconv.Itoa(p.Limit) + "&"
+		q += "limit=" + strconv.Itoa(p.Limit) + "&"
 	}
 	if p.Offset > 0 {
-		q += "_offset=" + strconv.Itoa(p.Offset) + "&"
+		q += "offset=" + strconv.Itoa(p.Offset) + "&"
 	}
 	if p.Closed != nil {
 		q += "closed=" + strconv.FormatBool(*p.Closed) + "&"
@@ -126,10 +120,10 @@ func buildEventsQuery(p EventsParams) string {
 		q += "category=" + p.Category + "&"
 	}
 	if p.Limit > 0 {
-		q += "_limit=" + strconv.Itoa(p.Limit) + "&"
+		q += "limit=" + strconv.Itoa(p.Limit) + "&"
 	}
 	if p.Offset > 0 {
-		q += "_offset=" + strconv.Itoa(p.Offset) + "&"
+		q += "offset=" + strconv.Itoa(p.Offset) + "&"
 	}
 	if p.Order != "" {
 		q += "order=" + p.Order + "&"

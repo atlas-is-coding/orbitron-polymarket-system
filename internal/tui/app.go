@@ -41,6 +41,7 @@ type AppModel struct {
 	settings   SettingsModel
 
 	bus     *EventBus
+	nx      *Nexus
 	cfg     *config.Config
 	cfgPath string
 	onSave  func(string)
@@ -57,14 +58,14 @@ type AppModel struct {
 	updateBanner string
 }
 
-// contentWidth returns the usable width for tab content (terminal - sidebar - border).
+// contentWidth returns the usable width for tab content.
 func (m AppModel) contentWidth() int {
-	return max(m.width-sidebarWidth-1, 20)
+	return max(m.width, 20)
 }
 
-// contentHeight returns the usable height for tab content (terminal - status bar).
+// contentHeight returns the usable height for tab content (terminal - top bar - status bar).
 func (m AppModel) contentHeight() int {
-	return max(m.height-1, 10)
+	return max(m.height-topBarHeight-1, 10)
 }
 
 // NewAppModel creates the root app model.
@@ -72,6 +73,7 @@ func NewAppModel(
 	cfg *config.Config,
 	cfgPath string,
 	bus *EventBus,
+	nx *Nexus,
 	width, height int,
 	onSave func(string),
 	tp TradingProvider,
@@ -82,14 +84,15 @@ func NewAppModel(
 	if height == 0 {
 		height = 40
 	}
-	cw := max(width-sidebarWidth-1, 20)
-	ch := max(height-1, 10)
+	cw := max(width, 20)
+	ch := max(height-topBarHeight-1, 10)
 
 	return AppModel{
 		cfg:        cfg,
 		cfgPath:    cfgPath,
 		onSave:     onSave,
 		bus:        bus,
+		nx:         nx,
 		width:      width,
 		height:     height,
 		now:        time.Now(),
@@ -104,6 +107,7 @@ func NewAppModel(
 	}
 }
 
+
 // SetWallet is kept for API compatibility but no longer displays in the UI.
 func (m *AppModel) SetWallet(_ string) {}
 
@@ -112,6 +116,21 @@ func clockTick() tea.Cmd {
 }
 
 func (m AppModel) Init() tea.Cmd {
+	// Initialize models from Nexus snapshot
+	if m.nx != nil {
+		snap := m.nx.Snapshot()
+		m.overview.LoadSnapshot(snap)
+		if strats, ok := snap["strategies"].([]StrategyRow); ok {
+			m.strategies.SetRows(strats)
+			m.trading.SetStrategyRows(strats)
+		}
+		if orders, ok := snap["orders"].([]OrderRow); ok {
+			m.trading.SetOrderRows(orders)
+		}
+		if positions, ok := snap["positions"].([]PositionRow); ok {
+			m.trading.SetPositionRows(positions)
+		}
+	}
 	return tea.Batch(m.bus.WaitForEvent(), clockTick())
 }
 
@@ -392,15 +411,14 @@ func (m AppModel) View() string {
 		content = m.settings.View()
 	}
 
-	sidebar := RenderSidebar(m.activeTab, m.height, m.overview.subsystems)
+	topBar := RenderTopBar(m.activeTab, m.width)
 
-	// Content area fills remaining width, height-1 rows
+	// Content area fills remaining width, height - topBarHeight - status bar
 	contentArea := lipgloss.NewStyle().
 		Width(cw).
 		Height(m.contentHeight()).
 		Render(content)
 
-	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, contentArea)
 	statusBar := m.renderStatusBar()
 
 	var parts []string
@@ -414,7 +432,7 @@ func (m AppModel) View() string {
 			Render(m.updateBanner)
 		parts = append(parts, banner)
 	}
-	parts = append(parts, body, statusBar)
+	parts = append(parts, topBar, contentArea, statusBar)
 	full := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	if m.toast != nil {
@@ -422,6 +440,7 @@ func (m AppModel) View() string {
 	}
 	return full
 }
+
 
 func (m AppModel) renderStatusBar() string {
 	clock := m.now.UTC().Format("15:04:05 UTC")

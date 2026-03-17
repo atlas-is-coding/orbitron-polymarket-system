@@ -50,26 +50,33 @@ type MarketsProvider interface {
 // OrderPlacer places a limit order for a given wallet.
 // Implemented by *wallet.Manager.
 type OrderPlacer interface {
-	PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64) (string, error)
+        PlaceOrder(walletID, tokenID, side, orderType string, price, sizeUSD float64, negRisk bool) (string, error)
+}
+
+// TradingProvider allows starting/stopping strategies.
+type TradingProvider interface {
+        StartStrategy(name string) error
+        StopStrategy(name string) error
+        SetStrategyWallets(name string, walletIDs []string) error
 }
 
 // Server is the Web UI HTTP server.
-// NOTE: Additional fields (log, embed fs wiring) added in server.go (Task 6).
 type Server struct {
 	cfg      *config.Config
 	cfgMu    sync.RWMutex
 	cfgPath  string
 	password string
 	bus      *tui.EventBus
+	nx       *tui.Nexus
 	canceler OrderCanceler
 	wallets  WalletMutator   // may be nil
 	adder    WalletAdder     // may be nil
 	mkts     MarketsProvider // may be nil
 	placer   OrderPlacer     // may be nil
+	trading  TradingProvider // may be nil
 	state    *WebState
 	hub      *hub
 }
-
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -117,26 +124,83 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
-	type subsystemEntry struct {
-		Name   string `json:"name"`
-		Active bool   `json:"active"`
-	}
-	subs := s.state.Subsystems()
-	subsArr := make([]subsystemEntry, 0, len(subs))
-	for name, active := range subs {
-		subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
-	}
-	sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
-	writeJSON(w, http.StatusOK, map[string]any{
-		"balance":    s.state.Balance(),
-		"subsystems": subsArr,
-		"orders":     len(s.state.Orders()),
-		"positions":  len(s.state.Positions()),
-	})
+        type subsystemEntry struct {
+                Name   string `json:"name"`
+                Active bool   `json:"active"`
+        }
+        subs := s.state.Subsystems()
+        subsArr := make([]subsystemEntry, 0, len(subs))
+        for name, active := range subs {
+                subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
+        }
+        sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
+
+        wallets := s.state.Wallets()
+        var totalBal, totalPnL float64
+        var primaryAddr string
+        for _, wl := range wallets {
+                totalBal += wl.BalanceUSD
+                totalPnL += wl.PnLUSD
+                if wl.Primary {
+                        primaryAddr = wl.ID // fallback to ID if we don't have addr here
+                }
+        }
+
+        writeJSON(w, http.StatusOK, map[string]any{
+                "balance":    totalBal,
+                "pnl":        totalPnL,
+                "wallet":     primaryAddr,
+                "subsystems": subsArr,
+                "orders":     s.state.Orders(),
+                "positions":  s.state.Positions(),
+                "strategies": s.state.Strategies(),
+        })
 }
 
-func (s *Server) handleOrders(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.state.Orders())
+func (s *Server) handleStrategies(w http.ResponseWriter, _ *http.Request) {
+        writeJSON(w, http.StatusOK, s.state.Strategies())
+}
+
+func (s *Server) handleStartStrategy(w http.ResponseWriter, r *http.Request) {
+        name := strings.TrimPrefix(r.URL.Path, "/api/v1/strategies/")
+        name = strings.TrimSuffix(name, "/start")
+        var req struct {
+                WalletIDs []string `json:"wallet_ids"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+                writeError(w, http.StatusBadRequest, "bad request")
+                return
+        }
+        if s.trading == nil {
+                writeError(w, http.StatusServiceUnavailable, "trading engine unavailable")
+                return
+        }
+        if err := s.trading.SetStrategyWallets(name, req.WalletIDs); err != nil {
+                writeError(w, http.StatusInternalServerError, err.Error())
+                return
+        }
+        if err := s.trading.StartStrategy(name); err != nil {
+                writeError(w, http.StatusInternalServerError, err.Error())
+                return
+        }
+        writeJSON(w, http.StatusOK, map[string]string{"status": "started"})
+}
+
+func (s *Server) handleStopStrategy(w http.ResponseWriter, r *http.Request) {
+        name := strings.TrimPrefix(r.URL.Path, "/api/v1/strategies/")
+        name = strings.TrimSuffix(name, "/stop")
+        if s.trading == nil {
+                writeError(w, http.StatusServiceUnavailable, "trading engine unavailable")
+                return
+        }
+        if err := s.trading.StopStrategy(name); err != nil {
+                writeError(w, http.StatusInternalServerError, err.Error())
+                return
+        }
+        writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
+}
+
+func (s *Server) handleOrders(w http.ResponseWriter, _ *http.Request) {	writeJSON(w, http.StatusOK, s.state.Orders())
 }
 
 func (s *Server) handlePositions(w http.ResponseWriter, _ *http.Request) {
@@ -256,42 +320,42 @@ func (s *Server) handleCancelAll(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		TokenID   string  `json:"token_id"`
-		Side      string  `json:"side"`
-		OrderType string  `json:"order_type"`
-		Price     float64 `json:"price"`
-		SizeUSD   float64 `json:"size_usd"`
-		WalletID  string  `json:"wallet_id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "bad request")
-		return
-	}
-	if req.Price <= 0 || req.Price >= 1 {
-		writeError(w, http.StatusBadRequest, "price must be between 0.01 and 0.99")
-		return
-	}
-	if req.SizeUSD <= 0 {
-		writeError(w, http.StatusBadRequest, "size_usd must be positive")
-		return
-	}
-	if req.Side != "YES" && req.Side != "NO" {
-		writeError(w, http.StatusBadRequest, "side must be YES or NO")
-		return
-	}
-	if s.placer == nil {
-		writeError(w, http.StatusServiceUnavailable, "order placement unavailable")
-		return
-	}
-	orderID, err := s.placer.PlaceOrder(req.WalletID, req.TokenID, req.Side, req.OrderType, req.Price, req.SizeUSD)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"order_id": orderID})
+        var req struct {
+                TokenID   string  `json:"token_id"`
+                Side      string  `json:"side"`
+                OrderType string  `json:"order_type"`
+                Price     float64 `json:"price"`
+                SizeUSD   float64 `json:"size_usd"`
+                WalletID  string  `json:"wallet_id"`
+                NegRisk   bool    `json:"neg_risk"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+                writeError(w, http.StatusBadRequest, "bad request")
+                return
+        }
+        if req.Price <= 0 || req.Price >= 1 {
+                writeError(w, http.StatusBadRequest, "price must be between 0.01 and 0.99")
+                return
+        }
+        if req.SizeUSD <= 0 {
+                writeError(w, http.StatusBadRequest, "size_usd must be positive")
+                return
+        }
+        if req.Side != "YES" && req.Side != "NO" {
+                writeError(w, http.StatusBadRequest, "side must be YES or NO")
+                return
+        }
+        if s.placer == nil {
+                writeError(w, http.StatusServiceUnavailable, "order placement unavailable")
+                return
+        }
+        orderID, err := s.placer.PlaceOrder(req.WalletID, req.TokenID, req.Side, req.OrderType, req.Price, req.SizeUSD, req.NegRisk)
+        if err != nil {
+                writeError(w, http.StatusInternalServerError, err.Error())
+                return
+        }
+        writeJSON(w, http.StatusOK, map[string]string{"order_id": orderID})
 }
-
 func (s *Server) handleAddTrader(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Address  string  `json:"address"`

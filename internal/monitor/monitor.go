@@ -10,6 +10,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/notify"
+	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/rs/zerolog"
 )
 
@@ -20,6 +21,7 @@ type Monitor struct {
 	cfg      *config.MonitorConfig
 	rules    []Rule
 	logger   zerolog.Logger
+	store    storage.Store
 
 	// Предыдущие состояния рынков для сравнения
 	prevState map[string]*gamma.Market
@@ -40,6 +42,12 @@ func New(
 		logger:    log.With().Str("component", "monitor").Logger(),
 		prevState: make(map[string]*gamma.Market),
 	}
+}
+
+// WithStore добавляет хранилище в монитор
+func (m *Monitor) WithStore(s storage.Store) *Monitor {
+	m.store = s
+	return m
 }
 
 // Run запускает мониторинг. Блокирует до отмены ctx.
@@ -111,7 +119,7 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 			}
 
 		case AlertLowLiquidity:
-			if mkt.Liquidity < rule.Threshold {
+			if float64(mkt.Liquidity) < rule.Threshold {
 				alerts = append(alerts, Alert{
 					Type:    AlertLowLiquidity,
 					Market:  mkt,
@@ -129,8 +137,8 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 			}
 
 		case AlertHighVolume:
-			if mkt.Volume > rule.Threshold {
-				if !hasPrev || prev.Volume <= rule.Threshold {
+			if float64(mkt.Volume) > rule.Threshold {
+				if !hasPrev || float64(prev.Volume) <= rule.Threshold {
 					alerts = append(alerts, Alert{
 						Type:    AlertHighVolume,
 						Market:  mkt,
@@ -147,11 +155,11 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 func formatAlert(t AlertType, mkt *gamma.Market, rule Rule) string {
 	switch t {
 	case AlertLowLiquidity:
-		return "⚠️ Низкая ликвидность: " + mkt.Question + " ($" + fmtFloat(mkt.Liquidity) + ")"
+		return "⚠️ Низкая ликвидность: " + mkt.Question + " ($" + fmtFloat(float64(mkt.Liquidity)) + ")"
 	case AlertMarketClosed:
 		return "🔒 Рынок закрыт: " + mkt.Question
 	case AlertHighVolume:
-		return "📈 Высокий объём: " + mkt.Question + " ($" + fmtFloat(mkt.Volume) + ")"
+		return "📈 Высокий объём: " + mkt.Question + " ($" + fmtFloat(float64(mkt.Volume)) + ")"
 	default:
 		return string(t) + ": " + mkt.Question
 	}

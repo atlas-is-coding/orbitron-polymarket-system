@@ -24,8 +24,8 @@ const (
 	tabCount // sentinel
 )
 
-// sidebarWidth is the fixed width of the left navigation sidebar in chars.
-const sidebarWidth = 24
+// sidebarWidth is removed for horizontal top navigation.
+const topBarHeight = 3
 
 var tabKeys = []string{"1", "2", "3", "4", "5", "6", "7", "8"}
 
@@ -47,69 +47,29 @@ func tabNames() []string {
 // tabIcons are unicode symbol prefixes for each tab.
 var tabIcons = []string{"⊞", "≡", "⚡", "◎", "⇌", "⊛", "▦", "⚙"}
 
-// RenderSidebar renders the left navigation sidebar.
-// height is the full terminal height; the sidebar fills height-1 rows (leaving 1 for status bar).
-func RenderSidebar(active TabID, height int, subsystems []SubsystemStatus) string {
+// RenderTopBar renders the horizontal top navigation bar.
+func RenderTopBar(active TabID, width int) string {
 	names := tabNames()
-	inner := sidebarWidth - 2 // usable width inside padding
-	sep := StyleSidebarSep.Render(strings.Repeat("━", inner))
+	var parts []string
 
-	var sb strings.Builder
-
-	// ── Logo ──────────────────────────────────────────────────────────────
-	sb.WriteString(" " + StyleSidebarLogo.Render("◈ ORBITRON") + "\n")
-	sb.WriteString(" " + StyleSidebarSubtitle.Render(" NEXUS TERM") + "\n")
-	sb.WriteString("\n")
-	sb.WriteString(" " + sep + "\n")
-	sb.WriteString("\n")
-
-	// ── Tabs ──────────────────────────────────────────────────────────────
 	for i, name := range names {
-		label := fmt.Sprintf("%s %s: %s", tabIcons[i], tabKeys[i], name)
+		label := fmt.Sprintf(" %s %s: %s ", tabIcons[i], tabKeys[i], name)
 		if TabID(i) == active {
-			row := fmt.Sprintf(" █ %-*s", inner-3, label)
-			sb.WriteString(StyleSidebarActive.Width(sidebarWidth).Render(row) + "\n")
+			parts = append(parts, StyleTabActive.Render(label))
 		} else {
-			row := fmt.Sprintf("   %-*s", inner-3, label)
-			sb.WriteString(StyleSidebarInactive.Width(sidebarWidth).Render(row) + "\n")
+			parts = append(parts, StyleTabInactive.Render(label))
 		}
 	}
 
-	// ── Spacer ────────────────────────────────────────────────────────────
-	headerRows := 5                   // logo(2) + blank(1) + sep(1) + blank(1)
-	tabRows := len(names)             // one row per tab
-	footerRows := 3 + len(subsystems) // sep(1) + blank(1) + label(1) + dots
-	statusRows := 1
-	used := headerRows + tabRows + footerRows + statusRows
-	available := height - used
-	for i := 0; i < available; i++ {
-		sb.WriteString("\n")
-	}
-
-	// ── Subsystem health ──────────────────────────────────────────────────
-	sb.WriteString(" " + sep + "\n")
-	sb.WriteString("\n")
-	sb.WriteString(" " + StyleSidebarLabel.Render("SUBSYSTEMS") + "\n")
-	for _, s := range subsystems {
-		if s.Active {
-			sb.WriteString(" " + StyleSuccess.Render("●") + " " + StyleFgDim.Render(s.Name) + "\n")
-		} else {
-			sb.WriteString(" " + StyleMuted.Render("○") + " " + StyleMuted.Render(s.Name) + "\n")
-		}
-	}
-
-	sidebarContent := sb.String()
-
-	return lipgloss.NewStyle().
-		Width(sidebarWidth).
-		Background(ColorSurface).
-		BorderRight(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(ColorBorder).
-		Render(sidebarContent)
+	tabs := lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+	
+	// Add a subtle bottom line for the bar
+	line := StyleTabBarLine.Width(width).Render(strings.Repeat("━", width))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, tabs, line)
 }
 
-// renderPanel renders a titled content box with sharp borders.
+// renderPanel renders a minimalist content box.
 func renderPanel(title, content string, width int, active bool) string {
 	panelStyle := StylePanelInactive
 	titleStyle := StylePanelTitle
@@ -118,7 +78,7 @@ func renderPanel(title, content string, width int, active bool) string {
 		titleStyle = StylePanelTitleActive
 	}
 
-	innerW := width - 4 // subtract border(2) + padding(2)
+	innerW := width - 2 // smaller padding for minimalist look
 	if innerW < 1 {
 		innerW = 1
 	}
@@ -126,13 +86,14 @@ func renderPanel(title, content string, width int, active bool) string {
 	var body string
 	if title != "" {
 		header := titleStyle.Render(fmt.Sprintf(" %s ", title))
-		body = header + "\n\n" + content
+		body = header + "\n" + content
 	} else {
 		body = content
 	}
 
 	return panelStyle.Width(innerW).Render(body)
 }
+
 
 // renderHelpPanel renders the contextual keys panel at the bottom of a tab.
 func renderHelpPanel(keys string, width int) string {

@@ -8,25 +8,26 @@
     <!-- Strategy Cards Grid -->
     <div class="strategies-grid">
       <div
-        v-for="(s, i) in strategies"
-        :key="s.key"
+        v-for="(s, i) in displayStrategies"
+        :key="s.name"
         class="strategy-card anim-in"
         :style="{ animationDelay: i * 60 + 'ms' }"
       >
         <div class="sc-header">
           <div class="sc-title">
             <span class="sc-icon">{{ s.icon }}</span>
-            <h3>{{ $t(s.nameKey) }}</h3>
+            <h3>{{ s.label }}</h3>
           </div>
-          <span class="sc-badge" :class="form[s.enabledField] ? 'sc-badge--on' : 'sc-badge--off'">
-            {{ form[s.enabledField] ? 'ON' : 'OFF' }}
+          <span class="sc-badge" :class="s.status === 'active' ? 'sc-badge--on' : 'sc-badge--off'">
+            {{ s.status === 'active' ? 'ON' : 'OFF' }}
           </span>
         </div>
         <div class="sc-body">
-          <p class="sc-fields-count">{{ s.fields.length }} parameters</p>
+          <p class="sc-fields-count">{{ s.details }}</p>
+          <p v-if="s.walletLabel" class="sc-wallet">Wallet: {{ s.walletLabel }}</p>
         </div>
         <div class="sc-footer">
-          <button class="btn-configure" @click="openDrawer(s.key)">CONFIGURE</button>
+          <button class="btn-configure" @click="openDrawer(s.name)">CONFIGURE</button>
         </div>
       </div>
     </div>
@@ -38,11 +39,11 @@
 
     <!-- Right Drawer -->
     <Transition name="slide-drawer">
-      <div v-if="activeKey && activeStrategy" class="drawer">
+      <div v-if="activeKey && activeUIStrategy" class="drawer">
         <div class="drawer-header">
           <div class="drawer-title">
-            <span class="drawer-icon">{{ activeStrategy.icon }}</span>
-            <span>{{ $t(activeStrategy.nameKey) }}</span>
+            <span class="drawer-icon">{{ activeUIStrategy.icon }}</span>
+            <span>{{ $t(activeUIStrategy.nameKey) }}</span>
           </div>
           <button class="drawer-close" @click="closeDrawer">✕</button>
         </div>
@@ -54,8 +55,8 @@
               <span class="drawer-label">{{ $t('settings.tradingEnabled') }}</span>
               <label class="toggle">
                 <input type="checkbox"
-                  :checked="form[activeStrategy.enabledField]"
-                  @change="form[activeStrategy.enabledField] = $event.target.checked; save(activeStrategy.configKey, $event.target.checked)"
+                  :checked="form[activeUIStrategy.enabledField]"
+                  @change="form[activeUIStrategy.enabledField] = $event.target.checked; save(activeUIStrategy.configKey, $event.target.checked)"
                 />
                 <span class="toggle-track"><span class="toggle-thumb" /></span>
               </label>
@@ -65,7 +66,7 @@
           <!-- Param fields -->
           <div class="drawer-section">
             <div class="drawer-section-title">PARAMETERS</div>
-            <template v-for="f in activeStrategy.fields" :key="f.field">
+            <template v-for="f in activeUIStrategy.fields" :key="f.field">
               <!-- Number field -->
               <div v-if="f.type === 'number'" class="drawer-field">
                 <label class="drawer-label">{{ $t(f.label) }}</label>
@@ -137,9 +138,9 @@ import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
 
 const app = useAppStore()
+const { strategies: storeStrategies, settingsStale } = storeToRefs(app)
 const api = useApi()
 const savedMsg = ref(false)
-const { settingsStale } = storeToRefs(app)
 
 // Drawer state
 const activeKey = ref(null)
@@ -147,8 +148,8 @@ const wallets = ref([])
 const selectedWalletIds = ref([])
 const launching = ref(false)
 
-// Strategy definitions (UI-only config)
-const strategies = [
+// UI static metadata
+const uiMetadata = [
   {
     key: 'arbitrage',
     icon: '⟿',
@@ -233,11 +234,30 @@ const strategies = [
   },
 ]
 
-const activeStrategy = computed(() => strategies.find(s => s.key === activeKey.value))
+const activeUIStrategy = computed(() => uiMetadata.find(s => s.key === activeKey.value))
+
+const displayStrategies = computed(() => {
+  return (storeStrategies.value || []).map(s => {
+    const meta = uiMetadata.find(u => u.key === s.Name)
+    return {
+      name: s.Name,
+      status: s.Status,
+      label: meta ? app.$t(meta.nameKey) : s.Name,
+      icon: meta ? meta.icon : '◈',
+      details: s.Details,
+      walletLabel: s.WalletLabel
+    }
+  })
+})
 
 function openDrawer(key) {
   activeKey.value = key
-  selectedWalletIds.value = []
+  const storeVer = (storeStrategies.value || []).find(s => s.Name === key)
+  if (storeVer && storeVer.WalletID) {
+    selectedWalletIds.value = [storeVer.WalletID]
+  } else {
+    selectedWalletIds.value = []
+  }
 }
 function closeDrawer() { activeKey.value = null }
 
@@ -280,6 +300,7 @@ const form = reactive({
 
 onMounted(async () => {
   try { const s = await api.getSettings(); app.settings = s; applySettings(s) } catch {}
+  try { app.strategies = await api.getStrategies() } catch {}
   await loadWallets()
 })
 
@@ -393,6 +414,7 @@ async function save(key, value) {
 
 .sc-body { padding: 0 1.25rem 0.75rem; position: relative; z-index: 1; }
 .sc-fields-count { font-size: 0.80rem; color: var(--text-secondary); }
+.sc-wallet { font-size: 0.78rem; font-family: var(--font-mono); color: var(--accent-bright); margin-top: 0.2rem; }
 
 .sc-footer {
   padding: 0.75rem 1.25rem;

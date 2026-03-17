@@ -255,6 +255,17 @@ func run() error {
 		log.Info().Str("type", cfg.Proxy.Type).Str("addr", cfg.Proxy.Addr).Msg("proxy enabled")
 	}
 
+	// --- Nexus State Manager ---
+	nx := tui.NewNexus()
+	if bus != nil {
+		tap := bus.Tap()
+		go func() {
+			for msg := range tap {
+				nx.Handle(msg)
+			}
+		}()
+	}
+
 	// Load Builder Program credentials (non-fatal: bot runs without them).
 	builderCreds, licenseErr := license.Load()
 	if licenseErr != nil {
@@ -595,7 +606,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, cancelerForWeb, adapter, marketsService, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 	}
 
@@ -612,7 +623,8 @@ func run() error {
 		bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
 
 		// Start TUI
-		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, 0, 0, nil, adapter)
+		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, nx, 0, 0, nil, adapter)
+
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {

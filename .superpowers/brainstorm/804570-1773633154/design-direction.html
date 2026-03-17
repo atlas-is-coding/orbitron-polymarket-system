@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Direction — Polytrade Bot UI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8d8f0;
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 0.85rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #4a6a8a;
+    margin-bottom: 0.5rem;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #2a4060;
+    margin-bottom: 2.5rem;
+    letter-spacing: 0.08em;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .card {
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover { transform: translateY(-4px); }
+  .card.selected { outline: 2px solid #00c8ff; }
+
+  .card-label {
+    text-align: center;
+    padding: 0.75rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── DIRECTION A: REFINED TERMINAL ─────────── */
+  .dir-a {
+    background: #0c1120;
+    border: 1px solid #162035;
+    border-top: 2px solid #00c8ff;
+  }
+  .dir-a .card-label { color: #00c8ff; background: rgba(0,200,255,0.04); border-top: 1px solid #162035; }
+
+  .dir-a .mock {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 420px;
+  }
+
+  .dir-a .topbar {
+    background: #060a14;
+    border: 1px solid #162035;
+    border-radius: 2px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .dir-a .topbar .logo { color: #00c8ff; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2em; }
+  .dir-a .topbar .metrics { display: flex; gap: 0.5rem; margin-left: auto; }
+  .dir-a .topbar .m { font-size: 0.65rem; color: #3d6080; }
+  .dir-a .topbar .m span { color: #fbbf24; }
+
+  .dir-a .layout { display: flex; gap: 0.5rem; flex: 1; }
+
+  .dir-a .sidebar {
+    width: 120px;
+    background: #060a14;
+    border: 1px solid #162035;
+    border-radius: 2px;
+    padding: 0.5rem 0;
+    flex-shrink: 0;
+  }
+  .dir-a .nav-item {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: #3d6080;
+    border-left: 2px solid transparent;
+  }
+  .dir-a .nav-item.active {
+    color: #00c8ff;
+    background: rgba(0,200,255,0.06);
+    border-left-color: #00c8ff;
+  }
+
+  .dir-a .content { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .dir-a .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+  }
+  .dir-a .kpi {
+    background: #0c1120;
+    border: 1px solid #162035;
+    border-top: 2px solid rgba(0,200,255,0.2);
+    border-radius: 2px;
+    padding: 0.4rem 0.5rem;
+  }
+  .dir-a .kpi-l { font-size: 0.55rem; color: #3d6080; text-transform: uppercase; letter-spacing: 0.1em; }
+  .dir-a .kpi-v { font-size: 0.72rem; font-weight: 700; color: #fbbf24; margin-top: 0.15rem; }
+
+  .dir-a .panel {
+    background: #0c1120;
+    border: 1px solid #162035;
+    border-top: 1px solid #00c8ff;
+    border-radius: 2px;
+    flex: 1;
+  }
+  .dir-a .panel-hdr {
+    font-size: 0.58rem;
+    color: #00c8ff;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 0.35rem 0.65rem;
+    border-bottom: 1px solid #162035;
+    background: rgba(0,200,255,0.03);
+  }
+  .dir-a .table-row {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.58rem;
+    border-bottom: 1px solid #0e1a2a;
+  }
+  .dir-a .table-row .col1 { flex: 2; color: #8aabcc; }
+  .dir-a .table-row .col2 { flex: 1; color: #3d6080; }
+  .dir-a .table-row .col3 { flex: 1; color: #10d994; }
+  .dir-a .table-row .col4 { flex: 1; }
+  .dir-a .badge { font-size: 0.52rem; padding: 0.1rem 0.3rem; background: rgba(0,200,255,0.1); color: #00c8ff; border-radius: 1px; }
+
+  /* ── DIRECTION B: DARK FINANCE PRO ──────────── */
+  .dir-b {
+    background: #0d0d0d;
+    border: 1px solid #1a1a1a;
+    border-top: 2px solid #00ff9d;
+  }
+  .dir-b .card-label { color: #00ff9d; background: #0a0a0a; border-top: 1px solid #1a1a1a; }
+
+  .dir-b .mock {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 420px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .dir-b .topbar {
+    background: #141414;
+    border-bottom: 1px solid #222;
+    padding: 0.4rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .dir-b .logo { font-size: 0.7rem; font-weight: 700; color: #fff; letter-spacing: 0.12em; }
+  .dir-b .logo span { color: #00ff9d; }
+  .dir-b .tmetric { font-size: 0.6rem; color: #444; }
+  .dir-b .tmetric span { color: #00ff9d; }
+  .dir-b .ws-dot { width: 5px; height: 5px; background: #00ff9d; border-radius: 50%; margin-left: auto; box-shadow: 0 0 6px #00ff9d; }
+
+  .dir-b .layout { display: flex; gap: 0; flex: 1; }
+
+  .dir-b .sidebar {
+    width: 110px;
+    background: #0a0a0a;
+    border-right: 1px solid #1a1a1a;
+    padding: 0.5rem 0;
+    flex-shrink: 0;
+  }
+  .dir-b .nav-item {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.6rem;
+    color: #333;
+    letter-spacing: 0.04em;
+    border-left: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .dir-b .nav-item.active { color: #00ff9d; border-left-color: #00ff9d; background: rgba(0,255,157,0.04); }
+  .dir-b .nav-icon { font-size: 0.62rem; opacity: 0.7; }
+
+  .dir-b .content { flex: 1; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .dir-b .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; }
+  .dir-b .kpi { background: #0f0f0f; border: 1px solid #1a1a1a; padding: 0.4rem 0.5rem; border-radius: 2px; }
+  .dir-b .kpi-l { font-size: 0.52rem; color: #333; text-transform: uppercase; letter-spacing: 0.1em; }
+  .dir-b .kpi-v { font-size: 0.68rem; font-weight: 700; color: #f5f5f5; margin-top: 0.12rem; }
+  .dir-b .kpi-v.green { color: #00ff9d; }
+  .dir-b .kpi-v.red { color: #ff3355; }
+
+  .dir-b .panel { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 2px; flex: 1; overflow: hidden; }
+  .dir-b .panel-hdr {
+    font-size: 0.56rem; color: #444; text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 0.3rem 0.6rem; border-bottom: 1px solid #1a1a1a; background: #0d0d0d;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .dir-b .panel-hdr .dot { width: 4px; height: 4px; background: #00ff9d; border-radius: 50%; }
+  .dir-b .row {
+    display: flex; gap: 0.5rem; padding: 0.28rem 0.6rem;
+    font-size: 0.56rem; border-bottom: 1px solid #111;
+  }
+  .dir-b .row .c1 { flex: 2; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dir-b .row .c2 { flex: 1; color: #555; }
+  .dir-b .row .c3 { flex: 1; }
+  .dir-b .row .buy { color: #00ff9d; }
+  .dir-b .row .sell { color: #ff3355; }
+  .dir-b .row .price { color: #ffcc00; }
+
+  /* ── DIRECTION C: GLASS NOIR ──────────────── */
+  .dir-c {
+    background: linear-gradient(135deg, #0f0f18 0%, #0a0a12 100%);
+    border: 1px solid rgba(100,60,200,0.2);
+    border-top: 2px solid #7c3aed;
+    position: relative;
+  }
+  .dir-c::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .dir-c .card-label { color: #a78bfa; background: rgba(124,58,237,0.06); border-top: 1px solid rgba(100,60,200,0.2); position: relative; }
+
+  .dir-c .mock {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 420px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .dir-c .topbar {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 3px;
+    backdrop-filter: blur(10px);
+    padding: 0.45rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .dir-c .logo { font-size: 0.68rem; font-weight: 700; color: #e2e8f0; letter-spacing: 0.15em; }
+  .dir-c .logo span { color: #a78bfa; }
+  .dir-c .tmetric { font-size: 0.6rem; color: rgba(255,255,255,0.3); }
+  .dir-c .tmetric span { color: #fbbf24; }
+  .dir-c .ws-pill { margin-left: auto; font-size: 0.55rem; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); color: #a78bfa; padding: 0.12rem 0.4rem; border-radius: 8px; }
+
+  .dir-c .layout { display: flex; gap: 0.5rem; flex: 1; }
+
+  .dir-c .sidebar {
+    width: 110px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 3px;
+    backdrop-filter: blur(10px);
+    padding: 0.4rem 0;
+    flex-shrink: 0;
+  }
+  .dir-c .nav-item {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.25);
+    border-left: 2px solid transparent;
+    display: flex; align-items: center; gap: 0.35rem;
+  }
+  .dir-c .nav-item.active {
+    color: #a78bfa;
+    background: rgba(124,58,237,0.08);
+    border-left-color: #7c3aed;
+  }
+
+  .dir-c .content { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .dir-c .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; }
+  .dir-c .kpi {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 3px;
+    padding: 0.4rem 0.5rem;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+  .dir-c .kpi::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(124,58,237,0.5), transparent);
+  }
+  .dir-c .kpi-l { font-size: 0.52rem; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .dir-c .kpi-v { font-size: 0.7rem; font-weight: 700; color: #e2e8f0; margin-top: 0.12rem; }
+  .dir-c .kpi-v.purple { color: #a78bfa; }
+  .dir-c .kpi-v.green { color: #34d399; }
+
+  .dir-c .panel {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 3px;
+    backdrop-filter: blur(10px);
+    flex: 1; overflow: hidden;
+    position: relative;
+  }
+  .dir-c .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(124,58,237,0.4), transparent);
+  }
+  .dir-c .panel-hdr {
+    font-size: 0.56rem; color: rgba(167,139,250,0.7); text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 0.3rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(124,58,237,0.04);
+  }
+  .dir-c .row {
+    display: flex; gap: 0.5rem; padding: 0.28rem 0.6rem;
+    font-size: 0.56rem; border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .dir-c .row .c1 { flex: 2; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dir-c .row .c2 { flex: 1; color: rgba(255,255,255,0.25); }
+  .dir-c .row .buy { color: #34d399; }
+  .dir-c .row .sell { color: #f87171; }
+  .dir-c .row .price { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<h1>Polytrade Bot — UI Design Direction</h1>
+<p class="subtitle">Выбери направление дизайна для полного переписывания</p>
+
+<div class="cards">
+
+  <!-- DIRECTION A -->
+  <div class="card dir-a" data-choice="a" onclick="select(this)">
+    <div class="mock">
+      <div class="topbar">
+        <div class="logo">◈ POLYTRADE</div>
+        <div class="metrics">
+          <div class="m">BAL <span>$4,280.00</span></div>
+          <div class="m" style="color:#162035">│</div>
+          <div class="m">ORDERS <span style="color:#d8e8ff">12</span></div>
+          <div class="m" style="color:#162035">│</div>
+          <div class="m">POS <span style="color:#d8e8ff">3</span></div>
+        </div>
+      </div>
+      <div class="layout">
+        <div class="sidebar">
+          <div class="nav-item active">⊞ OVERVIEW</div>
+          <div class="nav-item">≡ ORDERS</div>
+          <div class="nav-item">▣ POSITIONS</div>
+          <div class="nav-item">⇌ COPY</div>
+          <div class="nav-item">◎ WALLETS</div>
+          <div class="nav-item">⊛ MARKETS</div>
+          <div class="nav-item">★ STRATEGIES</div>
+          <div class="nav-item">▦ LOGS</div>
+          <div class="nav-item">✦ SETTINGS</div>
+        </div>
+        <div class="content">
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-l">Balance</div><div class="kpi-v">$4,280</div></div>
+            <div class="kpi"><div class="kpi-l">Orders</div><div class="kpi-v" style="color:#d8e8ff">12</div></div>
+            <div class="kpi"><div class="kpi-l">P&L</div><div class="kpi-v" style="color:#10d994">+$82</div></div>
+            <div class="kpi"><div class="kpi-l">Systems</div><div class="kpi-v" style="color:#d8e8ff">5/7</div></div>
+          </div>
+          <div class="panel" style="flex:1">
+            <div class="panel-hdr">OPEN ORDERS</div>
+            <div class="table-row">
+              <div class="col1">Will BTC hit $100k?</div>
+              <div class="col2">BUY</div>
+              <div class="col3">$0.72</div>
+              <div class="col4"><span class="badge">LIVE</span></div>
+            </div>
+            <div class="table-row">
+              <div class="col1">2024 US Election</div>
+              <div class="col2">SELL</div>
+              <div class="col3">$0.31</div>
+              <div class="col4"><span class="badge">LIVE</span></div>
+            </div>
+            <div class="table-row">
+              <div class="col1">Fed rate cut June?</div>
+              <div class="col2">BUY</div>
+              <div class="col3">$0.55</div>
+              <div class="col4"><span class="badge">LIVE</span></div>
+            </div>
+          </div>
+          <div class="panel" style="flex: none; padding: 0.5rem 0.65rem;">
+            <div style="font-size:0.55rem; color:#3d6080; display:flex; gap:0.4rem; align-items:center;">
+              <span style="display:inline-block;width:5px;height:5px;background:#10d994;border-radius:50%;box-shadow:0 0 4px #10d994"></span>
+              <span>CONNECTED</span>
+              <span style="margin-left:auto; color:#1e3350">127.0.0.1:8080</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">A — Refined Terminal<br><span style="font-size:0.65rem;opacity:0.6">IBM Plex Mono · Electric Cyan · Sharp edges</span></div>
+  </div>
+
+  <!-- DIRECTION B -->
+  <div class="card dir-b" data-choice="b" onclick="select(this)">
+    <div class="mock">
+      <div class="topbar">
+        <div class="logo">POLY<span>TRADE</span></div>
+        <div class="tmetric">BAL <span>$4,280.00</span></div>
+        <div class="tmetric">P&L <span>+82.40</span></div>
+        <div class="ws-dot"></div>
+      </div>
+      <div class="layout">
+        <div class="sidebar">
+          <div class="nav-item active"><span class="nav-icon">◈</span>OVERVIEW</div>
+          <div class="nav-item"><span class="nav-icon">≡</span>ORDERS</div>
+          <div class="nav-item"><span class="nav-icon">▣</span>POSITIONS</div>
+          <div class="nav-item"><span class="nav-icon">⇌</span>COPY</div>
+          <div class="nav-item"><span class="nav-icon">◎</span>WALLETS</div>
+          <div class="nav-item"><span class="nav-icon">⊛</span>MARKETS</div>
+          <div class="nav-item"><span class="nav-icon">★</span>STRATEGIES</div>
+          <div class="nav-item"><span class="nav-icon">▦</span>LOGS</div>
+          <div class="nav-item"><span class="nav-icon">✦</span>SETTINGS</div>
+        </div>
+        <div class="content">
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-l">Balance</div><div class="kpi-v">$4,280</div></div>
+            <div class="kpi"><div class="kpi-l">Orders</div><div class="kpi-v">12</div></div>
+            <div class="kpi"><div class="kpi-l">P&L</div><div class="kpi-v green">+$82</div></div>
+            <div class="kpi"><div class="kpi-l">Systems</div><div class="kpi-v red">5/7</div></div>
+          </div>
+          <div class="panel" style="flex:1">
+            <div class="panel-hdr"><div class="dot"></div>OPEN ORDERS</div>
+            <div class="row"><div class="c1">Will BTC hit $100k?</div><div class="c2 buy">BUY</div><div class="c3 price">$0.72</div></div>
+            <div class="row"><div class="c1">2024 US Election</div><div class="c2 sell">SELL</div><div class="c3 price">$0.31</div></div>
+            <div class="row"><div class="c1">Fed rate cut June?</div><div class="c2 buy">BUY</div><div class="c3 price">$0.55</div></div>
+            <div class="row"><div class="c1">Crypto market bull?</div><div class="c2 sell">SELL</div><div class="c3 price">$0.44</div></div>
+          </div>
+          <div style="background:#0f0f0f; border:1px solid #1a1a1a; border-radius:2px; padding:0.4rem 0.6rem; display:flex; align-items:center; gap:0.4rem;">
+            <div style="display:flex;gap:0.25rem">
+              <div style="width:7px;height:7px;background:#ff5f57;border-radius:50%"></div>
+              <div style="width:7px;height:7px;background:#ffbd2e;border-radius:50%"></div>
+              <div style="width:7px;height:7px;background:#28ca41;border-radius:50%"></div>
+            </div>
+            <span style="font-size:0.55rem;color:#333">TRADE FEED</span>
+            <span style="font-size:0.55rem;color:#1a1a1a;margin-left:auto">$ _</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">B — Dark Finance Pro<br><span style="font-size:0.65rem;opacity:0.6">Terminal green · Dense data · Bloomberg Pro</span></div>
+  </div>
+
+  <!-- DIRECTION C -->
+  <div class="card dir-c" data-choice="c" onclick="select(this)">
+    <div class="mock">
+      <div class="topbar">
+        <div class="logo">POLY<span>TRADE</span></div>
+        <div class="tmetric">BAL <span>$4,280.00</span></div>
+        <div class="tmetric">P&L <span style="color:#34d399">+$82</span></div>
+        <div class="ws-pill">● LIVE</div>
+      </div>
+      <div class="layout">
+        <div class="sidebar">
+          <div class="nav-item active">◈ OVERVIEW</div>
+          <div class="nav-item">≡ ORDERS</div>
+          <div class="nav-item">▣ POSITIONS</div>
+          <div class="nav-item">⇌ COPY</div>
+          <div class="nav-item">◎ WALLETS</div>
+          <div class="nav-item">⊛ MARKETS</div>
+          <div class="nav-item">★ STRATEGIES</div>
+          <div class="nav-item">▦ LOGS</div>
+          <div class="nav-item">✦ SETTINGS</div>
+        </div>
+        <div class="content">
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-l">Balance</div><div class="kpi-v">$4,280</div></div>
+            <div class="kpi"><div class="kpi-l">Orders</div><div class="kpi-v purple">12</div></div>
+            <div class="kpi"><div class="kpi-l">P&L</div><div class="kpi-v green">+$82</div></div>
+            <div class="kpi"><div class="kpi-l">Systems</div><div class="kpi-v">5/7</div></div>
+          </div>
+          <div class="panel" style="flex:1">
+            <div class="panel-hdr">OPEN ORDERS</div>
+            <div class="row"><div class="c1">Will BTC hit $100k?</div><div class="c2 buy">BUY</div><div class="price">$0.72</div></div>
+            <div class="row"><div class="c1">2024 US Election</div><div class="c2 sell">SELL</div><div class="price">$0.31</div></div>
+            <div class="row"><div class="c1">Fed rate cut June?</div><div class="c2 buy">BUY</div><div class="price">$0.55</div></div>
+            <div class="row"><div class="c1">Crypto market bull?</div><div class="c2 sell">SELL</div><div class="price">$0.44</div></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:3px;padding:0.4rem 0.6rem;">
+            <span style="font-size:0.55rem;color:rgba(167,139,250,0.5)">SUBSYSTEMS — 5/7 ONLINE</span>
+            <div style="display:flex;gap:0.25rem;margin-top:0.3rem">
+              <div style="height:3px;flex:1;background:#7c3aed;border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:#7c3aed;border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:#7c3aed;border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:#7c3aed;border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:#7c3aed;border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:rgba(255,255,255,0.08);border-radius:1px"></div>
+              <div style="height:3px;flex:1;background:rgba(255,255,255,0.08);border-radius:1px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">C — Glass Noir<br><span style="font-size:0.65rem;opacity:0.6">Purple accent · Glassmorphism · Gradient borders</span></div>
+  </div>
+
+</div>
+
+<div style="text-align:center;margin-top:2rem;font-size:0.72rem;color:#2a4060;letter-spacing:0.08em">
+  Кликни на карточку чтобы выбрать, или напиши ответ в терминале
+</div>
+
+<script>
+function select(el) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  const text = el.querySelector('.card-label').textContent.trim();
+
+  // Record selection event
+  if (window.__companion) {
+    window.__companion.recordEvent({ type: 'click', choice, text });
+  }
+}
+</script>
+
+</body>
+</html>

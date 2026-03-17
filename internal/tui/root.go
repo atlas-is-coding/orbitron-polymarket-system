@@ -11,6 +11,7 @@ import (
 type RootModel struct {
 	splash     SplashModel
 	app        AppModel
+	nx         *Nexus
 	showSplash bool
 }
 
@@ -19,13 +20,15 @@ func NewRootModel(
 	cfg *config.Config,
 	cfgPath string,
 	bus *EventBus,
+	nx *Nexus,
 	width, height int,
 	onSave func(string),
 	tp TradingProvider,
 ) RootModel {
 	return RootModel{
 		splash:     NewSplashModel(width, height),
-		app:        NewAppModel(cfg, cfgPath, bus, width, height, onSave, tp),
+		app:        NewAppModel(cfg, cfgPath, bus, nx, width, height, onSave, tp),
+		nx:         nx,
 		showSplash: true,
 	}
 }

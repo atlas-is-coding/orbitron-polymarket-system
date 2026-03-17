@@ -3,6 +3,69 @@
 // Gamma API предоставляет метаданные рынков, событий и не требует аутентификации.
 package gamma
 
+import (
+	"encoding/json"
+	"strconv"
+)
+
+type flexFloat64 float64
+
+func (f *flexFloat64) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		if s == "" {
+			*f = 0
+			return nil
+		}
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return err
+		}
+		*f = flexFloat64(v)
+		return nil
+	}
+	var v float64
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	*f = flexFloat64(v)
+	return nil
+}
+
+type flexStringSlice []string
+
+func (f *flexStringSlice) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		if s == "" {
+			return nil
+		}
+		var slice []string
+		if err := json.Unmarshal([]byte(s), &slice); err != nil {
+			return err
+		}
+		*f = flexStringSlice(slice)
+		return nil
+	}
+	
+	if string(b) == "null" {
+		return nil
+	}
+	
+	var slice []string
+	if err := json.Unmarshal(b, &slice); err != nil {
+		return err
+	}
+	*f = flexStringSlice(slice)
+	return nil
+}
+
 // Market — расширенные метаданные рынка из Gamma API.
 type Market struct {
 	ID          string  `json:"id"`
@@ -21,15 +84,15 @@ type Market struct {
 	// Дата резолюции
 	EndDateISO  string  `json:"endDateIso"`
 	// Ликвидность (в USDC)
-	Liquidity   float64 `json:"liquidity"`
+	Liquidity   flexFloat64 `json:"liquidity"`
 	// Объём (в USDC)
-	Volume      float64 `json:"volume"`
+	Volume      flexFloat64 `json:"volume"`
 	// Текущие вероятности YES/NO (от 0 до 1)
-	OutcomePrices []string `json:"outcomePrices"`
+	OutcomePrices flexStringSlice `json:"outcomePrices"`
 	// Названия исходов
-	Outcomes    []string `json:"outcomes"`
+	Outcomes    flexStringSlice `json:"outcomes"`
 	// token_id для каждого исхода
-	ClobTokenIDs []string `json:"clobTokenIds"`
+	ClobTokenIDs flexStringSlice `json:"clobTokenIds"`
 	// Обложка рынка
 	Image       string  `json:"image"`
 	// Ссылка на источник резолюции
@@ -63,8 +126,8 @@ type Event struct {
 	Active      bool     `json:"active"`
 	Closed      bool     `json:"closed"`
 	// Общий объём события
-	Volume      float64  `json:"volume"`
-	Liquidity   float64  `json:"liquidity"`
+	Volume      flexFloat64  `json:"volume"`
+	Liquidity   flexFloat64  `json:"liquidity"`
 	// Изображение события
 	Image       string   `json:"image"`
 	StartDate   string   `json:"startDate"`

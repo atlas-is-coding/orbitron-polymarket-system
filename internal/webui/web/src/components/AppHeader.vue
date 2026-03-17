@@ -20,12 +20,12 @@
       <div class="metric-sep">│</div>
       <div class="metric-chip">
         <span class="metric-key">ORDERS</span>
-        <span class="metric-val">{{ overview.orders ?? 0 }}</span>
+        <span class="metric-val">{{ overview.orders?.length ?? 0 }}</span>
       </div>
       <div class="metric-sep">│</div>
       <div class="metric-chip">
         <span class="metric-key">POS</span>
-        <span class="metric-val">{{ overview.positions ?? 0 }}</span>
+        <span class="metric-val">{{ overview.positions?.length ?? 0 }}</span>
       </div>
       <div class="metric-sep">│</div>
       <div class="metric-chip">
@@ -75,7 +75,10 @@ const shortAddr = computed(() => {
   return w.slice(0, 6) + '…' + w.slice(-4)
 })
 
-function fmt2(n) { return (+(n || 0)).toFixed(2) }
+function fmt2(n) {
+  if (n === null || n === undefined || isNaN(n)) return '---'
+  return (+(n || 0)).toFixed(2)
+}
 function changeLang() { locale.value = currentLang.value; localStorage.setItem('lang', currentLang.value) }
 function logout() { auth.logout(); router.push('/login') }
 </script>

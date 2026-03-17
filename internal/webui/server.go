@@ -23,9 +23,12 @@ func New(
 	cfg *config.Config,
 	cfgPath string,
 	bus *tui.EventBus,
+	nx *tui.Nexus,
 	canceler OrderCanceler,
 	wallets WalletMutator,
 	mkts MarketsProvider,
+	placer OrderPlacer,
+	trading TradingProvider,
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -33,16 +36,18 @@ func New(
 		cfgPath:  cfgPath,
 		password: cfg.WebUI.JWTSecret,
 		bus:      bus,
+		nx:       nx,
 		canceler: canceler,
 		wallets:  wallets,
 		mkts:     mkts,
+		placer:   placer,
+		trading:  trading,
 		state:    newWebState(),
 		hub:      newHub(),
 	}
 	s.state.SetConfig(cfg)
 	return s
 }
-
 // recoverMiddleware catches handler panics and returns a JSON 500 error instead
 // of resetting the TCP connection (which browsers report as "Network Error").
 func (s *Server) recoverMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -61,7 +66,7 @@ func (s *Server) recoverMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) Run(ctx context.Context) error {
 	// Subscribe to EventBus
 	tap := s.bus.Tap()
-	go s.hub.consume(ctx, tap, s.state)
+	go s.hub.consume(ctx, tap, s.nx, s.state)
 
 	mux := http.NewServeMux()
 
@@ -103,8 +108,21 @@ func (s *Server) Run(ctx context.Context) error {
 	// Protected: overview, orders, positions, logs
 	mux.HandleFunc("/api/v1/overview", s.jwtMiddleware(s.handleOverview))
 	mux.HandleFunc("/api/v1/positions", s.jwtMiddleware(s.handlePositions))
+	mux.HandleFunc("/api/v1/strategies", s.jwtMiddleware(s.handleStrategies))
+	mux.HandleFunc("/api/v1/strategies/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	        path := r.URL.Path
+	        switch {
+	        case strings.HasSuffix(path, "/start"):
+	                s.handleStartStrategy(w, r)
+	        case strings.HasSuffix(path, "/stop"):
+	                s.handleStopStrategy(w, r)
+	        default:
+	                writeError(w, http.StatusNotFound, "not found")
+	        }
+	}))
 	mux.HandleFunc("/api/v1/logs", s.jwtMiddleware(s.handleLogs))
-
+	// Initial subsystem status for Web UI itself
+	s.state.SetSubsystem("Web UI", true)
 	// Orders: GET list / POST place / DELETE all — and DELETE single by path suffix
 	mux.HandleFunc("/api/v1/orders", s.jwtMiddleware(s.recoverMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -197,9 +215,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// WebSocket
 	mux.HandleFunc("/ws", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		s.hub.serveWS(w, r, r.RemoteAddr)
+		s.hub.serveWS(w, r, s.nx, s.state, r.RemoteAddr)
 	}))
-
 	srv := &http.Server{Addr: s.cfg.WebUI.Listen, Handler: mux}
 
 	go func() {

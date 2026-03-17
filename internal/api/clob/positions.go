@@ -83,13 +83,12 @@ func (c *Client) CancelMarketOrders(marketID, assetID string) (*CancelOrderRespo
 }
 
 // GetMarketTrades возвращает публичную историю сделок для токена (GET /trades?token_id=...).
-// Не требует авторизации.
 func (c *Client) GetMarketTrades(tokenID string, limit int) (*TradesResponse, error) {
 	path := "/trades?token_id=" + tokenID
 	if limit > 0 {
 		path += "&limit=" + strconv.Itoa(limit)
 	}
-	resp, err := c.publicGet(path)
+	resp, err := c.privateGet(path)
 	if err != nil {
 		return nil, fmt.Errorf("clob: GetMarketTrades: %w", err)
 	}

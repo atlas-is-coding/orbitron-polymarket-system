@@ -31,79 +31,94 @@ type WalletEntry struct {
 
 // WebState is a thread-safe snapshot of bot data for the web panel.
 type WebState struct {
-	mu         sync.RWMutex
-	balance    float64
-	orders     []tui.OrderRow
-	positions  []tui.PositionRow
-	traders    []tui.TraderRow
-	logs       []LogEntry
-	subsystems map[string]bool
-	wallets    map[string]*WalletEntry
-	cfg        *config.Config
-	health     health.HealthSnapshot
+        mu         sync.RWMutex
+        balance    float64
+        orders     []tui.OrderRow
+        positions  []tui.PositionRow
+        traders    []tui.TraderRow
+        strategies []tui.StrategyRow
+        logs       []LogEntry
+        subsystems map[string]bool
+        wallets    map[string]*WalletEntry
+        cfg        *config.Config
+        health     health.HealthSnapshot
 }
 
 func newWebState() *WebState {
-	return &WebState{
-		subsystems: make(map[string]bool),
-		wallets:    make(map[string]*WalletEntry),
-	}
+        return &WebState{
+                subsystems: make(map[string]bool),
+                wallets:    make(map[string]*WalletEntry),
+                strategies: make([]tui.StrategyRow, 0),
+        }
 }
 
 func (s *WebState) SetBalance(v float64) {
-	s.mu.Lock()
-	s.balance = v
-	s.mu.Unlock()
+        s.mu.Lock()
+        s.balance = v
+        s.mu.Unlock()
 }
 
 func (s *WebState) Balance() float64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.balance
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        return s.balance
 }
 
 func (s *WebState) SetOrders(rows []tui.OrderRow) {
-	s.mu.Lock()
-	s.orders = rows
-	s.mu.Unlock()
+        s.mu.Lock()
+        s.orders = rows
+        s.mu.Unlock()
 }
 
 func (s *WebState) Orders() []tui.OrderRow {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	cp := make([]tui.OrderRow, len(s.orders))
-	copy(cp, s.orders)
-	return cp
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        cp := make([]tui.OrderRow, len(s.orders))
+        copy(cp, s.orders)
+        return cp
 }
 
 func (s *WebState) SetPositions(rows []tui.PositionRow) {
-	s.mu.Lock()
-	s.positions = rows
-	s.mu.Unlock()
+        s.mu.Lock()
+        s.positions = rows
+        s.mu.Unlock()
 }
 
 func (s *WebState) Positions() []tui.PositionRow {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	cp := make([]tui.PositionRow, len(s.positions))
-	copy(cp, s.positions)
-	return cp
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        cp := make([]tui.PositionRow, len(s.positions))
+        copy(cp, s.positions)
+        return cp
 }
 
 func (s *WebState) SetTraders(rows []tui.TraderRow) {
-	s.mu.Lock()
-	s.traders = rows
-	s.mu.Unlock()
+        s.mu.Lock()
+        s.traders = rows
+        s.mu.Unlock()
 }
 
 func (s *WebState) Traders() []tui.TraderRow {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	cp := make([]tui.TraderRow, len(s.traders))
-	copy(cp, s.traders)
-	return cp
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        cp := make([]tui.TraderRow, len(s.traders))
+        copy(cp, s.traders)
+        return cp
 }
 
+func (s *WebState) SetStrategies(rows []tui.StrategyRow) {
+        s.mu.Lock()
+        s.strategies = rows
+        s.mu.Unlock()
+}
+
+func (s *WebState) Strategies() []tui.StrategyRow {
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        cp := make([]tui.StrategyRow, len(s.strategies))
+        copy(cp, s.strategies)
+        return cp
+}
 func (s *WebState) AddLog(level, msg string) {
 	s.mu.Lock()
 	s.logs = append(s.logs, LogEntry{Level: level, Message: msg})

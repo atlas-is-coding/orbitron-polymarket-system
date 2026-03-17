@@ -17,8 +17,8 @@ func TestBuildMarketsQuery_Order(t *testing.T) {
 	if !strings.Contains(q, "ascending=false") {
 		t.Errorf("expected ascending=false in %q", q)
 	}
-	if !strings.Contains(q, "_limit=100") {
-		t.Errorf("expected _limit=100 in %q", q)
+	if !strings.Contains(q, "limit=100") {
+		t.Errorf("expected limit=100 in %q", q)
 	}
 }
 

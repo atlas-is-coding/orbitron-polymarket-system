@@ -142,8 +142,8 @@ const api = useApi()
 const healthStore = useHealthStore()
 
 const wallets = computed(() => Object.values(walletsMap.value))
-const totalBalance = computed(() => wallets.value.reduce((s, w) => s + (w.balance_usd || 0), 0))
-const totalPnL = computed(() => wallets.value.reduce((s, w) => s + (w.pnl_usd || 0), 0))
+const totalBalance = computed(() => overview.value.balance || 0)
+const totalPnL = computed(() => overview.value.pnl || 0)
 const activeWallets = computed(() => wallets.value.filter(w => w.enabled).length)
 const activeCount = computed(() => overview.value.subsystems?.filter(s => s.active).length ?? 0)
 
@@ -153,13 +153,16 @@ let chart = null
 let series = null
 const pnlHistory = []
 
-function fmt2(n) { return (+(n || 0)).toFixed(2) }
+function fmt2(n) {
+  if (n === null || n === undefined || isNaN(n)) return '---'
+  return (+(n || 0)).toFixed(2)
+}
 
 const kpis = computed(() => [
   { label: overview.value.wallet ? 'WALLET' : 'WALLET', value: overview.value.wallet ? overview.value.wallet.slice(0,10)+'…' : '—', cls: 'mono-sm', sub: null },
   { label: 'BALANCE',   value: '$' + fmt2(overview.value.balance), cls: 'num-glow' },
-  { label: 'OPEN ORDERS',  value: overview.value.orders ?? 0, cls: 'val-neutral' },
-  { label: 'POSITIONS', value: overview.value.positions ?? 0, cls: 'val-neutral' },
+  { label: 'OPEN ORDERS',  value: overview.value.orders?.length ?? 0, cls: 'val-neutral' },
+  { label: 'POSITIONS', value: overview.value.positions?.length ?? 0, cls: 'val-neutral' },
   { label: 'SUBSYSTEMS', value: activeCount.value + '/' + (overview.value.subsystems?.length ?? 0), cls: 'val-neutral', sub: 'online' },
 ])
 

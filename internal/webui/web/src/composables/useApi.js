@@ -5,6 +5,7 @@ export function useApi() {
   async function getOrders()     { return (await axios.get('/api/v1/orders')).data }
   async function getPositions()  { return (await axios.get('/api/v1/positions')).data }
   async function getLogs()       { return (await axios.get('/api/v1/logs')).data }
+  async function getStrategies() { return (await axios.get('/api/v1/strategies')).data }
   async function getCopytrading(){ return (await axios.get('/api/v1/copytrading')).data }
   async function getSettings()   { return (await axios.get('/api/v1/settings')).data }
 

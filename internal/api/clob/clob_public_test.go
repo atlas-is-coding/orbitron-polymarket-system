@@ -46,7 +46,20 @@ func getFirstTokenID(t *testing.T) string {
 	page, err := client.GetMarkets("")
 	require.NoError(t, err)
 	require.NotEmpty(t, page.Data)
-	require.NotEmpty(t, page.Data[0].Tokens)
+
+	// Try first 10 markets to find one that has an orderbook
+	for i := 0; i < len(page.Data) && i < 10; i++ {
+		m := page.Data[i]
+		if len(m.Tokens) == 0 {
+			continue
+		}
+		tokenID := m.Tokens[0].TokenID
+		_, err := client.GetOrderBook(tokenID)
+		if err == nil {
+			return tokenID
+		}
+	}
+
 	return page.Data[0].Tokens[0].TokenID
 }
 

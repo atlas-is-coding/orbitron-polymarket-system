@@ -4,7 +4,7 @@ import "fmt"
 
 // GetOrderBook возвращает книгу ордеров для токена по token_id.
 func (c *Client) GetOrderBook(tokenID string) (*OrderBook, error) {
-	resp, err := c.publicGet("/order-book/" + tokenID)
+	resp, err := c.publicGet("/book?token_id=" + tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("clob: GetOrderBook: %w", err)
 	}

@@ -64,6 +64,15 @@ type CircuitBreakerMsg struct {
 	Reason       string
 }
 
+// Priority defines the importance of a message.
+type Priority int
+
+const (
+	PriorityLow Priority = iota
+	PriorityMedium
+	PriorityHigh
+)
+
 // EventBus bridges bot goroutines to the Bubble Tea loop.
 // Supports multiple subscribers via Tap(); the primary channel is
 // used by the TUI via WaitForEvent().
@@ -80,19 +89,36 @@ func NewEventBus() *EventBus {
 
 // Send enqueues a message to the TUI channel and all tap subscribers (non-blocking; drops if full).
 func (b *EventBus) Send(msg tea.Msg) {
-	select {
-	case b.ch <- msg:
-	default:
-	}
-	b.mu.Lock()
-	for _, tap := range b.taps {
+	b.SendPriority(msg, PriorityMedium)
+}
+
+// SendPriority enqueues a message with specified priority.
+// PriorityHigh messages block until they are enqueued to ensure delivery.
+// Other priorities are non-blocking and may be dropped if buffers are full.
+func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
+	if p == PriorityHigh {
+		b.ch <- msg
+	} else {
 		select {
-		case tap <- msg:
+		case b.ch <- msg:
 		default:
 		}
 	}
-	b.mu.Unlock()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, tap := range b.taps {
+		if p == PriorityHigh {
+			tap <- msg
+		} else {
+			select {
+			case tap <- msg:
+			default:
+			}
+		}
+	}
 }
+
 
 // Tap creates a new subscriber channel that receives a copy of every future Send() call.
 // The caller is responsible for draining the channel to prevent blocking.

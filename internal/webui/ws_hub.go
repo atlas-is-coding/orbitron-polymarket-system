@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -60,7 +61,7 @@ func (h *hub) broadcast(ev WsEvent) {
 
 // consume reads from EventBus tap channel and broadcasts to WS clients,
 // also updating state snapshot.
-func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, state *WebState) {
+func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, nx *tui.Nexus, state *WebState) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,6 +70,7 @@ func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, state *WebState) 
 			if !ok {
 				return
 			}
+			nx.Handle(msg)
 			h.handleMsg(msg, state)
 		}
 	}
@@ -91,6 +93,12 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 	case tui.SubsystemStatusMsg:
 		state.SetSubsystem(m.Name, m.Active)
 		h.broadcast(WsEvent{Type: "subsystem", Data: map[string]any{"name": m.Name, "active": m.Active}})
+	case tui.StrategiesUpdateMsg:
+		state.SetStrategies(m.Rows)
+		h.broadcast(WsEvent{Type: "strategies", Data: m.Rows})
+	case tui.HealthSnapshotMsg:
+		state.SetHealth(m.Snapshot)
+		h.broadcast(WsEvent{Type: "health_updated", Data: m.Snapshot})
 	case tui.ConfigReloadedMsg:
 		if m.Config != nil {
 			state.SetConfig(m.Config)
@@ -152,10 +160,6 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 	case tui.MarketsReadyMsg:
 		h.broadcast(WsEvent{Type: "markets_ready", Data: nil})
 
-	case tui.HealthSnapshotMsg:
-		state.SetHealth(m.Snapshot)
-		h.broadcast(WsEvent{Type: "health_updated", Data: m.Snapshot})
-
 	case tui.MarketAlertMsg:
 		h.broadcast(WsEvent{Type: "market_alert", Data: map[string]any{
 			"conditionId":  m.ConditionID,
@@ -170,7 +174,7 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 }
 
 // serveWS handles a WebSocket upgrade and pumps messages to the client.
-func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, clientID string) {
+func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, nx *tui.Nexus, state *WebState, clientID string) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -181,6 +185,38 @@ func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, clientID string) {
 	h.register(clientID, ch)
 	defer h.unregister(clientID)
 
+	// Send initial state immediately from Nexus
+	{
+		snap := nx.Snapshot()
+
+		// Adapt subsystems for WebUI format
+		subsMap := snap["subsystems"].(map[string]bool)
+		type subsystemEntry struct {
+			Name   string `json:"name"`
+			Active bool   `json:"active"`
+		}
+		subsArr := make([]subsystemEntry, 0, len(subsMap))
+		for name, active := range subsMap {
+			subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
+		}
+		sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
+
+		initEv := WsEvent{
+			Type: "initial_state",
+			Data: map[string]any{
+				"balance":    snap["balance"],
+				"pnl":        snap["pnl"],
+				"subsystems": subsArr,
+				"orders":     snap["orders"],
+				"positions":  snap["positions"],
+				"strategies": snap["strategies"],
+				"wallets":    snap["wallets"],
+				"logs":       state.Logs(),
+			},
+		}
+		raw, _ := json.Marshal(initEv)
+		_ = conn.WriteMessage(websocket.TextMessage, raw)
+	}
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
