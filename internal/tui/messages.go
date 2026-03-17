@@ -23,13 +23,12 @@ type BotEventMsg struct {
 
 // SubsystemStatusMsg updates the running/stopped state of a subsystem.
 type SubsystemStatusMsg struct {
-	Name   string
-	Active bool
+	Name   string `json:"name"`
+	Active bool   `json:"active"`
 }
-
 // BalanceMsg carries the current USDC balance.
 type BalanceMsg struct {
-	USDC float64
+	USDC float64 `json:"usdc"`
 }
 
 // LanguageChangedMsg is sent when the user switches the UI language.
@@ -37,14 +36,12 @@ type LanguageChangedMsg struct{}
 
 // OrdersUpdateMsg carries a fresh snapshot of open orders from TradesMonitor.
 type OrdersUpdateMsg struct {
-	Rows []OrderRow
+	Rows []OrderRow `json:"rows"`
 }
-
 // PositionsUpdateMsg carries a fresh snapshot of positions from TradesMonitor.
 type PositionsUpdateMsg struct {
-	Rows []PositionRow
+	Rows []PositionRow `json:"rows"`
 }
-
 // StrategyAlertMsg is published when a trading strategy detects a signal.
 type StrategyAlertMsg struct {
 	Strategy string  // "arbitrage", "market_making", "positive_ev", "riskless_rate", "fade_chaos", "cross_market"
@@ -153,35 +150,38 @@ func (b *EventBus) WaitForEvent() tea.Cmd {
 
 // WalletAddedMsg is sent when a new active wallet is added.
 type WalletAddedMsg struct {
-	ID      string
-	Label   string
-	Enabled bool
-	Primary bool
+	ID      string `json:"id"`
+	Address string `json:"address"`
+	Label   string `json:"label"`
+	Enabled bool   `json:"enabled"`
+	Primary bool   `json:"primary"`
 }
-
 // WalletRemovedMsg is sent when a wallet is removed.
-type WalletRemovedMsg struct{ ID string }
+type WalletRemovedMsg struct {
+	ID string `json:"id"`
+}
 
 // WalletChangedMsg is sent when a wallet's enabled state or primary flag changes.
 type WalletChangedMsg struct {
-	ID      string
-	Enabled bool
-	Primary bool
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+	Primary bool   `json:"primary"`
 }
-
 // WalletStatsMsg carries a statistics snapshot for one wallet.
 type WalletStatsMsg struct {
-	ID          string
-	Label       string
-	Enabled     bool
-	Primary     bool
-	BalanceUSD  float64
-	PnLUSD      float64
-	OpenOrders  int
-	TotalTrades int
+	ID          string  `json:"id"`
+	Address     string  `json:"address"`
+	Label       string  `json:"label"`
+	Enabled     bool    `json:"enabled"`
+	Primary     bool    `json:"primary"`
+	BalanceUSD  float64 `json:"balance_usd"`
+	PnLUSD      float64 `json:"pnl_usd"`
+	OpenOrders  int     `json:"open_orders"`
+	TotalTrades int     `json:"total_trades"`
 }
 
 // ToastMsg displays a short notification overlay.
+
 // Kind: "info" | "success" | "error" | "warning"
 type ToastMsg struct {
 	Text string
@@ -203,18 +203,16 @@ type MarketsUpdatedMsg struct {
 
 // StrategyRow represents a single strategy in the strategies table.
 type StrategyRow struct {
-	Name        string
-	Status      string // "active" or "stopped"
-	WalletID    string
-	WalletLabel string
-	Details     string
+	Name        string `json:"name"`
+	Status      string `json:"status"` // "active" or "stopped"
+	WalletID    string `json:"wallet_id"`
+	WalletLabel string `json:"wallet_label"`
+	Details     string `json:"details"`
 }
-
 // StrategiesUpdateMsg carries a fresh snapshot of strategy states.
 type StrategiesUpdateMsg struct {
-	Rows []StrategyRow
+	Rows []StrategyRow `json:"rows"`
 }
-
 // MarketAlertMsg is published when a price threshold alert triggers.
 type MarketAlertMsg struct {
 	ConditionID  string
@@ -226,7 +224,9 @@ type MarketAlertMsg struct {
 
 // CopytradingTradeMsg is emitted after each successfully executed copy-trade.
 // Line is a human-readable summary: "📈 Opened [label] market (outcome) $size @ price".
-type CopytradingTradeMsg struct{ Line string }
+type CopytradingTradeMsg struct {
+	Line string `json:"line"`
+}
 
 // PlaceOrderMsg requests placement of an order from one or more wallets.
 type PlaceOrderMsg struct {
@@ -248,9 +248,8 @@ type BatchPlaceOrderMsg struct {
 
 // HealthSnapshotMsg is published by health.Service every 60s with latest service statuses.
 type HealthSnapshotMsg struct {
-	Snapshot health.HealthSnapshot
+	Snapshot health.HealthSnapshot `json:"snapshot"`
 }
-
 // UpdateAvailableMsg is published to EventBus when a newer bot version is detected.
 type UpdateAvailableMsg struct {
 	Version      string

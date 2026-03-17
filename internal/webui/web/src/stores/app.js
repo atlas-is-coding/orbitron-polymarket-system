@@ -28,27 +28,67 @@ export const useAppStore = defineStore('app', () => {
   function applyEvent(event) {
     switch (event.type) {
       case 'initial_state':
-        overview.value = {
-          balance: event.data.balance,
-          pnl: event.data.pnl,
-          wallet: event.data.wallet,
-          subsystems: event.data.subsystems,
-        }
-        orders.value = event.data.orders || []
-        positions.value = event.data.positions || []
-        strategies.value = event.data.strategies || []
-        logs.value = (event.data.logs || []).reverse()
+        console.log('[WS] initial_state received:', event.data)
         if (event.data.wallets) {
           const m = {}
-          event.data.wallets.forEach(w => { m[w.id] = w })
+          event.data.wallets.forEach(w => {
+            const id = w.id || w.ID
+            m[id] = {
+              id: id,
+              address: w.address || w.Address || '',
+              label: w.label || w.Label || '',
+              enabled: w.enabled !== undefined ? w.enabled : w.Enabled,
+              primary: w.primary !== undefined ? w.primary : w.Primary,
+              balance_usd: w.balance_usd !== undefined ? w.balance_usd : w.BalanceUSD,
+              pnl_usd: w.pnl_usd !== undefined ? w.pnl_usd : w.PnLUSD,
+              open_orders: w.open_orders !== undefined ? w.open_orders : w.OpenOrders,
+              total_trades: w.total_trades !== undefined ? w.total_trades : w.TotalTrades,
+            }
+          })
           walletsMap.value = m
         }
+
+        orders.value = event.data.orders || []
+        positions.value = event.data.positions || []
+        // Map strategies for consistency
+        strategies.value = (event.data.strategies || []).map(s => ({
+          name: s.name || s.Name,
+          status: s.status || s.Status,
+          wallet_id: s.wallet_id || s.WalletID,
+          wallet_label: s.wallet_label || s.WalletLabel,
+          details: s.details || s.Details,
+        }))
+
+        {
+          const all = Object.values(walletsMap.value)
+          const primary = all.find(w => w.primary) || all[0]
+          overview.value = {
+            ...overview.value,
+            balance: event.data.balance,
+            pnl: event.data.pnl,
+            wallet: primary ? primary.id : (event.data.wallet || ''),
+            wallet_address: primary ? primary.address : '',
+            subsystems: event.data.subsystems || [],
+            orders: orders.value,
+            positions: positions.value,
+            strategies: strategies.value
+          }
+        }
+        logs.value = (event.data.logs || []).reverse()
         break
       case 'overview':
         overview.value = event.data;
         if (event.data.orders) orders.value = event.data.orders;
         if (event.data.positions) positions.value = event.data.positions;
-        if (event.data.strategies) strategies.value = event.data.strategies;
+        if (event.data.strategies) {
+          strategies.value = (event.data.strategies || []).map(s => ({
+            name: s.name || s.Name,
+            status: s.status || s.Status,
+            wallet_id: s.wallet_id || s.WalletID,
+            wallet_label: s.wallet_label || s.WalletLabel,
+            details: s.details || s.Details,
+          }))
+        }
         break
       case 'balance':
         overview.value = { ...overview.value, balance: event.data.usdc }
@@ -67,57 +107,98 @@ export const useAppStore = defineStore('app', () => {
       }
       case 'orders':      orders.value = event.data; break
       case 'positions':   positions.value = event.data; break
-      case 'strategies':  strategies.value = event.data; break
+      case 'strategies':
+        strategies.value = (event.data || []).map(s => ({
+          name: s.name || s.Name,
+          status: s.status || s.Status,
+          wallet_id: s.wallet_id || s.WalletID,
+          wallet_label: s.wallet_label || s.WalletLabel,
+          details: s.details || s.Details,
+        }))
+        break
       case 'log':         logs.value = [event.data, ...logs.value].slice(0, 200); break
       case 'copytrading': copytrading.value = event.data; break
       case 'settings':    settings.value = event.data; break
-      case 'wallet_added':
-        walletsMap.value = { ...walletsMap.value, [event.data.id]: event.data }
-        if (event.data.primary) {
-          overview.value = { ...overview.value, wallet: event.data.id }
+      case 'wallet_added': {
+        const w = event.data
+        const id = w.id || w.ID
+        const mapped = {
+          id: id,
+          address: w.address || w.Address || '',
+          label: w.label || w.Label || '',
+          enabled: w.enabled !== undefined ? w.enabled : w.Enabled,
+          primary: w.primary !== undefined ? w.primary : w.Primary,
+          balance_usd: 0,
+          pnl_usd: 0,
+          open_orders: 0,
+          total_trades: 0,
+        }
+        walletsMap.value = { ...walletsMap.value, [id]: mapped }
+        if (mapped.primary) {
+          overview.value = { ...overview.value, wallet: id, wallet_address: mapped.address }
         }
         break
+      }
       case 'wallet_removed': {
+        const id = event.data.id || event.data.ID
         const m = { ...walletsMap.value }
-        delete m[event.data.id]
+        delete m[id]
         walletsMap.value = m
         break
       }
       case 'wallet_changed': {
-        const existing = walletsMap.value[event.data.id]
+        const id = event.data.id || event.data.ID
+        const existing = walletsMap.value[id]
         if (existing) {
-          const updated = { ...existing, enabled: event.data.enabled }
-          if ('primary' in event.data) updated.primary = event.data.primary
+          const enabled = event.data.enabled !== undefined ? event.data.enabled : event.data.Enabled
+          const primary = event.data.primary !== undefined ? event.data.primary : event.data.Primary
+          const updated = { ...existing, enabled: enabled }
+          if (primary !== undefined) updated.primary = primary
           // If this wallet became primary, clear primary from all others
-          if (event.data.primary) {
+          if (primary) {
             const next = {}
-            for (const [id, w] of Object.entries(walletsMap.value)) {
-              next[id] = id === event.data.id ? updated : { ...w, primary: false }
+            for (const [wid, w] of Object.entries(walletsMap.value)) {
+              next[wid] = wid === id ? updated : { ...w, primary: false }
             }
             walletsMap.value = next
-            overview.value = { ...overview.value, wallet: event.data.id }
+            overview.value = { ...overview.value, wallet: id, wallet_address: updated.address }
           } else {
-            walletsMap.value = { ...walletsMap.value, [event.data.id]: updated }
+            walletsMap.value = { ...walletsMap.value, [id]: updated }
           }
         }
         break
       }
-      case 'wallet_stats':
-        walletsMap.value = { ...walletsMap.value, [event.data.id]: event.data }
+      case 'wallet_stats': {
+        const w = event.data
+        const id = w.id || w.ID
+        const mapped = {
+          id: id,
+          address: w.address || w.Address || '',
+          label: w.label || w.Label || '',
+          enabled: w.enabled !== undefined ? w.enabled : w.Enabled,
+          primary: w.primary !== undefined ? w.primary : w.Primary,
+          balance_usd: w.balance_usd !== undefined ? w.balance_usd : w.BalanceUSD,
+          pnl_usd: w.pnl_usd !== undefined ? w.pnl_usd : w.PnLUSD,
+          open_orders: w.open_orders !== undefined ? w.open_orders : w.OpenOrders,
+          total_trades: w.total_trades !== undefined ? w.total_trades : w.TotalTrades,
+        }
+        walletsMap.value = { ...walletsMap.value, [id]: mapped }
         // Update aggregate balance/pnl in overview too
         {
           const all = Object.values(walletsMap.value)
-          const totalBal = all.reduce((s, w) => s + (w.balance_usd || 0), 0)
-          const totalPnL = all.reduce((s, w) => s + (w.pnl_usd || 0), 0)
-          const primary = all.find(w => w.primary)
+          const totalBal = all.reduce((s, wl) => s + (wl.balance_usd || 0), 0)
+          const totalPnL = all.reduce((s, wl) => s + (wl.pnl_usd || 0), 0)
+          const primary = all.find(wl => wl.primary) || all[0]
           overview.value = {
             ...overview.value,
             balance: totalBal,
             pnl: totalPnL,
-            wallet: primary ? primary.id : overview.value.wallet
+            wallet: primary ? primary.id : overview.value.wallet,
+            wallet_address: primary ? primary.address : (overview.value.wallet_address || '')
           }
         }
         break
+      }
       case 'market_alert':
         toast(
           `🔔 ${event.data.question || event.data.conditionId}: price went ${event.data.direction} ${Number(event.data.threshold).toFixed(3)} (now ${Number(event.data.currentPrice).toFixed(3)})`,

@@ -20,6 +20,7 @@ type LogEntry struct {
 // WalletEntry holds the latest stats snapshot for one wallet.
 type WalletEntry struct {
 	ID          string  `json:"id"`
+	Address     string  `json:"address"`
 	Label       string  `json:"label"`
 	Enabled     bool    `json:"enabled"`
 	Primary     bool    `json:"primary"`

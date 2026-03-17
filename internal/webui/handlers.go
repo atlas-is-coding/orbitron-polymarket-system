@@ -124,41 +124,33 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
-        type subsystemEntry struct {
-                Name   string `json:"name"`
-                Active bool   `json:"active"`
-        }
-        subs := s.state.Subsystems()
-        subsArr := make([]subsystemEntry, 0, len(subs))
-        for name, active := range subs {
-                subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
-        }
-        sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
+	snap := s.nx.Snapshot()
 
-        wallets := s.state.Wallets()
-        var totalBal, totalPnL float64
-        var primaryAddr string
-        for _, wl := range wallets {
-                totalBal += wl.BalanceUSD
-                totalPnL += wl.PnLUSD
-                if wl.Primary {
-                        primaryAddr = wl.ID // fallback to ID if we don't have addr here
-                }
-        }
+	subsMap := snap["subsystems"].(map[string]bool)
+	type subsystemEntry struct {
+		Name   string `json:"name"`
+		Active bool   `json:"active"`
+	}
+	subsArr := make([]subsystemEntry, 0, len(subsMap))
+	for name, active := range subsMap {
+		subsArr = append(subsArr, subsystemEntry{Name: name, Active: active})
+	}
+	sort.Slice(subsArr, func(i, j int) bool { return subsArr[i].Name < subsArr[j].Name })
 
-        writeJSON(w, http.StatusOK, map[string]any{
-                "balance":    totalBal,
-                "pnl":        totalPnL,
-                "wallet":     primaryAddr,
-                "subsystems": subsArr,
-                "orders":     s.state.Orders(),
-                "positions":  s.state.Positions(),
-                "strategies": s.state.Strategies(),
-        })
+	writeJSON(w, http.StatusOK, map[string]any{
+		"balance":    snap["balance"],
+		"pnl":        snap["pnl"],
+		"subsystems": subsArr,
+		"orders":     snap["orders"],
+		"positions":  snap["positions"],
+		"strategies": snap["strategies"],
+		"wallets":    snap["wallets"],
+	})
 }
 
 func (s *Server) handleStrategies(w http.ResponseWriter, _ *http.Request) {
-        writeJSON(w, http.StatusOK, s.state.Strategies())
+	snap := s.nx.Snapshot()
+	writeJSON(w, http.StatusOK, snap["strategies"])
 }
 
 func (s *Server) handleStartStrategy(w http.ResponseWriter, r *http.Request) {
@@ -200,11 +192,14 @@ func (s *Server) handleStopStrategy(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 
-func (s *Server) handleOrders(w http.ResponseWriter, _ *http.Request) {	writeJSON(w, http.StatusOK, s.state.Orders())
+func (s *Server) handleOrders(w http.ResponseWriter, _ *http.Request) {
+	snap := s.nx.Snapshot()
+	writeJSON(w, http.StatusOK, snap["orders"])
 }
 
 func (s *Server) handlePositions(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.state.Positions())
+	snap := s.nx.Snapshot()
+	writeJSON(w, http.StatusOK, snap["positions"])
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, _ *http.Request) {
@@ -521,9 +516,10 @@ func (s *Server) handleEditTrader(w http.ResponseWriter, r *http.Request) {
 
 // ── Wallet handlers ───────────────────────────────────────────────────────────
 
-// handleGetWallets returns the cached wallet list from WebState.
+// handleGetWallets returns the cached wallet list from Nexus.
 func (s *Server) handleGetWallets(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.state.Wallets())
+	snap := s.nx.Snapshot()
+	writeJSON(w, http.StatusOK, snap["wallets"])
 }
 
 // handleAddWallet handles POST /api/v1/wallets
@@ -582,7 +578,7 @@ func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
 		s.adder.AddInactive(wCfg)
 	}
 	if s.bus != nil {
-		s.bus.Send(tui.WalletAddedMsg{ID: id, Label: wCfg.Label, Enabled: true})
+		s.bus.Send(tui.WalletAddedMsg{ID: id, Address: addr, Label: wCfg.Label, Enabled: true})
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":          id,

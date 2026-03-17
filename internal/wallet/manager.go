@@ -61,6 +61,15 @@ func (m *Manager) AddInactive(cfg config.WalletConfig) {
 		Cfg:   cfg,
 		Stats: &WalletStats{},
 	})
+	if m.bus != nil {
+		m.bus.Send(tui.WalletAddedMsg{
+			ID:      cfg.ID,
+			Address: "", // Watch-only or disabled
+			Label:   cfg.Label,
+			Enabled: cfg.Enabled,
+			Primary: cfg.Primary,
+		})
+	}
 }
 
 // AddActive adds a fully initialised wallet instance and broadcasts WalletAddedMsg.
@@ -69,7 +78,13 @@ func (m *Manager) AddActive(inst *WalletInstance) {
 	defer m.mu.Unlock()
 	m.instances = append(m.instances, inst)
 	if m.bus != nil {
-		m.bus.Send(tui.WalletAddedMsg{ID: inst.Cfg.ID, Label: inst.Cfg.Label, Enabled: inst.Cfg.Enabled, Primary: inst.Cfg.Primary})
+		m.bus.Send(tui.WalletAddedMsg{
+			ID:      inst.Cfg.ID,
+			Address: inst.Address,
+			Label:   inst.Cfg.Label,
+			Enabled: inst.Cfg.Enabled,
+			Primary: inst.Cfg.Primary,
+		})
 	}
 }
 

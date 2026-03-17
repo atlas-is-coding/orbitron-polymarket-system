@@ -87,6 +87,7 @@ func (m *Manager) pollWalletStats(inst *WalletInstance, dc dataClient) {
 	if m.bus != nil {
 		m.bus.Send(tui.WalletStatsMsg{
 			ID:          inst.Cfg.ID,
+			Address:     inst.Address,
 			Label:       inst.Cfg.Label,
 			Enabled:     inst.Cfg.Enabled,
 			Primary:     inst.Cfg.Primary,

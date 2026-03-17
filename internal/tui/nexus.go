@@ -36,7 +36,19 @@ func (n *Nexus) Handle(msg tea.Msg) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	// fmt.Printf("[NEXUS] Handling %T\n", msg) // Manual debug if needed
+
 	switch m := msg.(type) {
+	case WalletAddedMsg:
+		if _, ok := n.wallets[m.ID]; !ok {
+			n.wallets[m.ID] = WalletStatsMsg{
+				ID:      m.ID,
+				Address: m.Address,
+				Label:   m.Label,
+				Enabled: m.Enabled,
+				Primary: m.Primary,
+			}
+		}
 	case WalletStatsMsg:
 		n.wallets[m.ID] = m
 	case StrategiesUpdateMsg:
@@ -51,6 +63,20 @@ func (n *Nexus) Handle(msg tea.Msg) {
 		n.health = m.Snapshot
 	case WalletRemovedMsg:
 		delete(n.wallets, m.ID)
+	case WalletChangedMsg:
+		if w, ok := n.wallets[m.ID]; ok {
+			w.Enabled = m.Enabled
+			w.Primary = m.Primary
+			n.wallets[m.ID] = w
+		}
+		if m.Primary {
+			for id, w := range n.wallets {
+				if id != m.ID && w.Primary {
+					w.Primary = false
+					n.wallets[id] = w
+				}
+			}
+		}
 	}
 }
 

@@ -70,9 +70,10 @@ const pnlClass = computed(() => pnl.value >= 0 ? 'pnl-pos' : 'pnl-neg')
 const pnlSign = computed(() => pnl.value >= 0 ? '+' : '-')
 
 const shortAddr = computed(() => {
-  const w = overview.value.wallet
-  if (!w) return '—'
-  return w.slice(0, 6) + '…' + w.slice(-4)
+  const addr = overview.value.wallet_address || overview.value.wallet
+  if (!addr) return '—'
+  if (addr.length < 10) return addr
+  return addr.slice(0, 6) + '…' + addr.slice(-4)
 })
 
 function fmt2(n) {

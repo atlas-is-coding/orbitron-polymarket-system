@@ -4,7 +4,7 @@
     <div v-if="showWelcome" class="boot-terminal anim-in">
       <div class="boot-line bl-1">◈ POLYTRADE NEXUS TERMINAL — SYSTEM READY</div>
       <div class="boot-line bl-2">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
-      <div class="boot-line bl-3">Wallet    <span class="bval">{{ overview.wallet || 'loading...' }}</span></div>
+      <div class="boot-line bl-3">Wallet    <span class="bval">{{ overview.wallet_address || overview.wallet || 'loading...' }}</span></div>
       <div class="boot-line bl-4">Balance   <span class="bval num-glow">${{ fmt2(overview.balance) }}</span></div>
       <div class="boot-line bl-5">Subsystems  <span class="bval">{{ activeCount }}/{{ overview.subsystems?.length ?? 0 }} online</span></div>
     </div>
@@ -103,12 +103,13 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>LABEL</th><th>BALANCE</th><th>P&amp;L</th><th>STATUS</th>
+                <th>LABEL</th><th>ADDRESS</th><th>BALANCE</th><th>P&amp;L</th><th>STATUS</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="w in wallets" :key="w.id">
                 <td>{{ w.label || w.id }}</td>
+                <td class="mono addr-cell">{{ w.address ? w.address.slice(0, 8) + '…' + w.address.slice(-4) : '—' }}</td>
                 <td class="mono">${{ fmt2(w.balance_usd) }}</td>
                 <td class="mono" :class="w.pnl_usd >= 0 ? 'num-success' : 'num-danger'">
                   {{ w.pnl_usd >= 0 ? '+' : '' }}{{ fmt2(w.pnl_usd) }}
@@ -159,7 +160,7 @@ function fmt2(n) {
 }
 
 const kpis = computed(() => [
-  { label: overview.value.wallet ? 'WALLET' : 'WALLET', value: overview.value.wallet ? overview.value.wallet.slice(0,10)+'…' : '—', cls: 'mono-sm', sub: null },
+  { label: 'WALLET', value: (overview.value.wallet_address || overview.value.wallet || '—').slice(0,10)+'…', cls: 'mono-sm', sub: null },
   { label: 'BALANCE',   value: '$' + fmt2(overview.value.balance), cls: 'num-glow' },
   { label: 'OPEN ORDERS',  value: overview.value.orders?.length ?? 0, cls: 'val-neutral' },
   { label: 'POSITIONS', value: overview.value.positions?.length ?? 0, cls: 'val-neutral' },

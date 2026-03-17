@@ -106,7 +106,7 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 		h.broadcast(WsEvent{Type: "config_reloaded", Data: nil})
 
 	case tui.WalletAddedMsg:
-		e := WalletEntry{ID: m.ID, Label: m.Label, Enabled: m.Enabled, Primary: m.Primary}
+		e := WalletEntry{ID: m.ID, Address: m.Address, Label: m.Label, Enabled: m.Enabled, Primary: m.Primary}
 		state.UpsertWallet(e)
 		h.broadcast(WsEvent{Type: "wallet_added", Data: e})
 
@@ -140,6 +140,7 @@ func (h *hub) handleMsg(msg tea.Msg, state *WebState) {
 	case tui.WalletStatsMsg:
 		e := WalletEntry{
 			ID:          m.ID,
+			Address:     m.Address,
 			Label:       m.Label,
 			Enabled:     m.Enabled,
 			Primary:     m.Primary,
@@ -215,6 +216,7 @@ func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, nx *tui.Nexus, sta
 			},
 		}
 		raw, _ := json.Marshal(initEv)
+		// fmt.Printf("[WS] Sending initial_state to %s (wallets: %d, strategies: %d)\n", clientID, len(snap["wallets"].([]tui.WalletStatsMsg)), len(snap["strategies"].([]tui.StrategyRow)))
 		_ = conn.WriteMessage(websocket.TextMessage, raw)
 	}
 	ctx, cancel := context.WithCancel(r.Context())

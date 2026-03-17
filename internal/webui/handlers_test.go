@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/tui"
 )
 
 func makeTestServer(t *testing.T) *Server {
@@ -20,6 +21,7 @@ func makeTestServer(t *testing.T) *Server {
 		cfg:      cfg,
 		cfgPath:  "",
 		password: "correct",
+		nx:       tui.NewNexus(),
 		state:    newWebState(),
 		hub:      newHub(),
 	}

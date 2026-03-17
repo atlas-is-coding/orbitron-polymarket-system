@@ -238,23 +238,24 @@ const activeUIStrategy = computed(() => uiMetadata.find(s => s.key === activeKey
 
 const displayStrategies = computed(() => {
   return (storeStrategies.value || []).map(s => {
-    const meta = uiMetadata.find(u => u.key === s.Name)
+    const meta = uiMetadata.find(u => u.key === s.name)
     return {
-      name: s.Name,
-      status: s.Status,
-      label: meta ? app.$t(meta.nameKey) : s.Name,
+      ...s,
+      name: s.name,
+      status: s.status,
+      label: meta ? app.$t(meta.nameKey) : s.name,
       icon: meta ? meta.icon : '◈',
-      details: s.Details,
-      walletLabel: s.WalletLabel
+      details: s.details,
+      walletLabel: s.wallet_label
     }
   })
 })
 
 function openDrawer(key) {
   activeKey.value = key
-  const storeVer = (storeStrategies.value || []).find(s => s.Name === key)
-  if (storeVer && storeVer.WalletID) {
-    selectedWalletIds.value = [storeVer.WalletID]
+  const storeVer = (storeStrategies.value || []).find(s => s.name === key)
+  if (storeVer && storeVer.wallet_id) {
+    selectedWalletIds.value = [storeVer.wallet_id]
   } else {
     selectedWalletIds.value = []
   }

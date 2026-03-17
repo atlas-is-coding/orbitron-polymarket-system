@@ -568,6 +568,11 @@ func run() error {
 
 	adapter := &engineAdapter{engine: engine, wm: wm, bus: bus, ctx: ctx, cfgPath: *cfgPath}
 
+	// --- Emit initial state to Nexus/WebUI ---
+	if bus != nil {
+		bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
+	}
+
 	// --- Telegram Bot (interactive) ---
 	// Initialised before subsystems so it can be started alongside them.
 	// tgBot may be nil if bot_token is empty or init fails.
@@ -618,9 +623,6 @@ func run() error {
 			bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
 		})
 		go watcher.Run(ctx)
-
-		// Emit initial strategies
-		bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
 
 		// Start TUI
 		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, nx, 0, 0, nil, adapter)
