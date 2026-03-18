@@ -15,6 +15,10 @@ export const useMarketsStore = defineStore('markets', {
     totalCount: 0,
     syncing: false,
     loadProgress: { loaded: 0, total: 500 },
+    // pagination
+    page: 1,
+    pageSize: 24,
+    totalFiltered: 0,
     // multi-select batch buy
     selectedMarkets: {},
     batchSide: 'YES',
@@ -34,20 +38,29 @@ export const useMarketsStore = defineStore('markets', {
     selectedCount(state) {
       return Object.keys(state.selectedMarkets).length
     },
+    totalPages(state) {
+      return Math.ceil(state.totalFiltered / state.pageSize)
+    }
   },
   actions: {
-    async fetchMarkets() {
-      this.loading = true
+    async fetchMarkets(options = { background: false }) {
+      if (!options.background) this.loading = true
       this.error = null
       try {
         const params = new URLSearchParams()
         if (this.activeTag) params.set('tag', this.activeTag)
+        
+        const offset = (this.page - 1) * this.pageSize
+        params.set('limit', this.pageSize)
+        params.set('offset', offset)
+
         const { data } = await axios.get(`/api/v1/markets?${params}`)
-        this.markets = data
+        this.markets = data.markets
+        this.totalFiltered = data.total
       } catch (e) {
         this.error = e.message
       } finally {
-        this.loading = false
+        if (!options.background) this.loading = false
       }
     },
     async fetchTrending(limit = 50) {
@@ -76,6 +89,7 @@ export const useMarketsStore = defineStore('markets', {
     },
     setViewMode(mode) {
       this.viewMode = mode
+      this.page = 1
       if (mode === 'categories') this.fetchMarkets()
       else this.fetchTrending()
     },
@@ -87,6 +101,11 @@ export const useMarketsStore = defineStore('markets', {
     },
     setTag(slug) {
       this.activeTag = slug
+      this.page = 1
+      this.fetchMarkets()
+    },
+    setPage(p) {
+      this.page = p
       this.fetchMarkets()
     },
     async createAlert(conditionId, tokenId, direction, threshold) {

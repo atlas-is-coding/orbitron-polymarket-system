@@ -243,7 +243,7 @@ export const useAppStore = defineStore('app', () => {
         break
 
       case 'markets_updated':
-        useMarketsStore().fetchMarkets()
+        useMarketsStore().fetchMarkets({ background: true })
         break
 
       case 'markets_loading':

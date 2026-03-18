@@ -16,6 +16,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/markets"
 	"github.com/atlasdev/orbitron/internal/tui"
+	"github.com/atlasdev/orbitron/internal/wallet"
 )
 
 // OrderCanceler wraps TradesMonitor cancel operations.
@@ -590,11 +591,28 @@ func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
 
+	// Check token allowances (non-blocking for UI, but we return results)
+	allowances, _ := wallet.CheckAllowances(r.Context(), s.cfg.API.PolygonRPC, addr)
+
+	// Automatically grant missing allowances
+	if err := wallet.GrantMissingAllowances(r.Context(), s.cfg.API.PolygonRPC, req.PrivateKey, allowances); err == nil {
+		// Re-check after granting to update the status in response
+		if updated, err2 := wallet.CheckAllowances(r.Context(), s.cfg.API.PolygonRPC, addr); err2 == nil {
+			allowances = updated
+		}
+	}
+
 	if s.adder != nil {
 		s.adder.AddInactive(wCfg)
 	}
 	if s.bus != nil {
-		s.bus.Send(tui.WalletAddedMsg{ID: id, Address: addr, Label: wCfg.Label, Enabled: true})
+		s.bus.Send(tui.WalletAddedMsg{
+			ID:         id,
+			Address:    addr,
+			Label:      wCfg.Label,
+			Enabled:    true,
+			Allowances: allowances,
+		})
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":          id,
@@ -604,6 +622,7 @@ func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
 		"balance_usd": 0,
 		"pnl_usd":     0,
 		"open_orders": 0,
+		"allowances":  allowances,
 	})
 }
 
@@ -751,7 +770,7 @@ func (s *Server) handleGetHealth(w http.ResponseWriter, _ *http.Request) {
 // handleMarketsList handles GET /api/v1/markets?tag=crypto&limit=50&offset=0
 func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
 	tag := r.URL.Query().Get("tag")
-	limit := 0
+	limit := 20
 	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
@@ -764,15 +783,18 @@ func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var result []gamma.Market
+	var all []gamma.Market
 	if s.mkts != nil {
-		result = s.mkts.GetByTag(tag)
+		all = s.mkts.GetByTag(tag)
 	}
-	if result == nil {
-		result = []gamma.Market{}
+	if all == nil {
+		all = []gamma.Market{}
 	}
 
+	total := len(all)
+
 	// Apply offset/limit in-handler
+	result := all
 	if offset > len(result) {
 		offset = len(result)
 	}
@@ -781,7 +803,10 @@ func (s *Server) handleMarketsList(w http.ResponseWriter, r *http.Request) {
 		result = result[:limit]
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"markets": result,
+		"total":   total,
+	})
 }
 
 // handleMarketsTags handles GET /api/v1/markets/tags

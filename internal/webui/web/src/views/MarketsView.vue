@@ -5,7 +5,10 @@
     <div class="page-header anim-in">
       <div class="header-top">
         <h2 class="view-title">{{ $t('markets.title') }}</h2>
-        <span v-if="store.totalCount > 0" class="market-count">
+        <span v-if="store.viewMode === 'categories' && store.totalFiltered > 0" class="market-count">
+          {{ store.totalFiltered }} markets found
+        </span>
+        <span v-else-if="store.totalCount > 0" class="market-count">
           {{ store.totalCount }} markets total
         </span>
         <span v-else-if="!store.loading && sortedMarkets.length" class="market-count">
@@ -102,6 +105,14 @@
       />
     </div>
 
+    <!-- Pagination -->
+    <Pagination
+      v-if="store.viewMode === 'categories'"
+      :page="store.page"
+      :total-pages="store.totalPages"
+      @change="store.setPage($event)"
+    />
+
     <!-- Detail panel -->
     <MarketDetailPanel
       v-if="store.selectedMarket"
@@ -140,6 +151,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useMarketsStore } from '@/stores/markets'
 import TagFilter from '@/components/markets/TagFilter.vue'
 import MarketCard from '@/components/markets/MarketCard.vue'
+import Pagination from '@/components/markets/Pagination.vue'
 import MarketDetailPanel from '@/components/markets/MarketDetailPanel.vue'
 import PriceAlertDialog from '@/components/markets/PriceAlertDialog.vue'
 import QuickBuyDialog from '@/components/markets/QuickBuyDialog.vue'
