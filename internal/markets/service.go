@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 type GammaClient interface {
 	GetMarkets(params gamma.MarketsParams) ([]gamma.Market, error)
 	GetMarket(id string) (*gamma.Market, error)
+	GetEvents(params gamma.EventsParams) ([]gamma.Event, error)
 }
 
 // Service polls Gamma API for markets and manages price alerts.
@@ -64,11 +66,11 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}
 
-	// 2. Initial load: top-500 markets (5 pages x 100)
+	// 2. Initial load: top-1000 events (50 pages x 20)
 	s.initialLoad(ctx)
 
-	// 3. Background full sync (pages 500+)
-	go s.runFullSync(ctx, 500, false)
+	// 3. Background full sync (offset 1000+)
+	go s.runFullSync(ctx, 1000, false)
 
 	// 4. Main polling loop
 	trendTicker := time.NewTicker(30 * time.Second)
@@ -121,15 +123,15 @@ func (s *Service) loadFromCache(ctx context.Context) error {
 	return nil
 }
 
-// initialLoad fetches the top-500 markets (5 pages x 100) and emits progress.
-// Emits MarketsReadyMsg when done or on any unrecoverable error.
+// initialLoad fetches top events (20/page, up to 50 pages) and emits progress.
+// Emits MarketsReadyMsg when done.
 func (s *Service) initialLoad(ctx context.Context) {
 	if s.gamma == nil {
 		s.emitReady()
 		return
 	}
-	const pages = 5
-	const pageSize = 100
+	const pages = 50
+	const pageSize = 20
 	t := true
 	f := false
 
@@ -140,69 +142,70 @@ func (s *Service) initialLoad(ctx context.Context) {
 			return
 		default:
 		}
-		params := gamma.MarketsParams{
+		params := gamma.EventsParams{
 			Active:    &t,
 			Closed:    &f,
-			Order:     "volume_24hr",
+			Order:     "volume",
 			Ascending: false,
 			Limit:     pageSize,
 			Offset:    page * pageSize,
 		}
-		mks, err := s.gamma.GetMarkets(params)
+		evs, err := s.gamma.GetEvents(params)
 		if err != nil {
 			if s.log != nil {
 				s.log.Warn().Err(err).Int("page", page).Msg("markets: initial load page failed")
 			}
+			s.notifyBusErr(err)
 			s.emitReady()
 			return
 		}
-		s.mergePage(ctx, mks)
-		loaded := (page + 1) * pageSize
-		if loaded > pages*pageSize {
-			loaded = pages * pageSize
+		if len(evs) == 0 {
+			break
 		}
+		s.mergeEvents(ctx, evs)
+
+		loaded := (page + 1) * pageSize
 		if s.bus != nil {
 			s.bus.Send(tui.MarketsLoadingMsg{Loaded: loaded, Total: pages * pageSize})
 		}
-		if len(mks) < pageSize {
-			break // reached end of results
+		if len(evs) < pageSize {
+			break
 		}
 	}
 	s.emitReady()
 }
 
-// pollTrending refreshes the trending top-100 in memory and cache.
+// pollTrending refreshes the trending top-100 (using events) in memory and cache.
 func (s *Service) pollTrending(ctx context.Context) error {
 	if s.gamma == nil {
 		return nil
 	}
 	t := true
 	f := false
-	mks, err := s.gamma.GetMarkets(gamma.MarketsParams{
+	evs, err := s.gamma.GetEvents(gamma.EventsParams{
 		Active: &t, Closed: &f,
-		Order: "volume_24hr", Ascending: false,
-		Limit: 100,
+		Order: "volume", Ascending: false,
+		Limit: 10, // 10 events should cover ~100 markets
 	})
 	if err != nil {
 		return fmt.Errorf("pollTrending: %w", err)
 	}
-	s.mergePage(ctx, mks)
+	s.mergeEvents(ctx, evs)
 	return nil
 }
 
-// runFullSync paginates all markets from startOffset, updating cache.
-// When detectNew=true, records markets whose first_seen is after syncStart.
+// runFullSync paginates all events from startOffset, updating cache.
 func (s *Service) runFullSync(ctx context.Context, startOffset int, detectNew bool) {
 	if s.gamma == nil {
 		return
 	}
 	if !s.syncMu.TryLock() {
-		return // another sync is already running
+		return
 	}
 	defer s.syncMu.Unlock()
 
 	syncStart := time.Now()
-	const pageSize = 100
+	const pageSize = 20
 	t := true
 	f := false
 	offset := startOffset
@@ -213,9 +216,9 @@ func (s *Service) runFullSync(ctx context.Context, startOffset int, detectNew bo
 			return
 		default:
 		}
-		mks, err := s.gamma.GetMarkets(gamma.MarketsParams{
+		evs, err := s.gamma.GetEvents(gamma.EventsParams{
 			Active: &t, Closed: &f,
-			Order: "volume_24hr", Ascending: false,
+			Order: "volume", Ascending: false,
 			Limit: pageSize, Offset: offset,
 		})
 		if err != nil {
@@ -224,12 +227,12 @@ func (s *Service) runFullSync(ctx context.Context, startOffset int, detectNew bo
 			}
 			return
 		}
-		if len(mks) == 0 {
+		if len(evs) == 0 {
 			break
 		}
-		s.mergePage(ctx, mks)
-		offset += len(mks)
-		if len(mks) < pageSize {
+		s.mergeEvents(ctx, evs)
+		offset += len(evs)
+		if len(evs) < pageSize {
 			break
 		}
 	}
@@ -240,6 +243,24 @@ func (s *Service) runFullSync(ctx context.Context, startOffset int, detectNew bo
 			s.log.Info().Int("count", len(newMkts)).Msg("markets: new markets detected")
 		}
 	}
+}
+
+// mergeEvents flattens events into markets and calls mergePage.
+func (s *Service) mergeEvents(ctx context.Context, evs []gamma.Event) {
+	var mks []gamma.Market
+	for _, ev := range evs {
+		// Tag derivation as per GEMINI.md
+		tags := ev.Tags
+		if len(tags) == 0 && ev.Category != "" {
+			slug := strings.ToLower(strings.ReplaceAll(ev.Category, " ", "-"))
+			tags = []gamma.Tag{{Slug: slug, Label: ev.Category}}
+		}
+		for _, m := range ev.Markets {
+			m.Tags = tags // Backfill tags from event
+			mks = append(mks, m)
+		}
+	}
+	s.mergePage(ctx, mks)
 }
 
 // mergePage adds/updates markets in memory and cache.
@@ -309,6 +330,14 @@ func (s *Service) notifyBus() {
 	copy(tags, s.tags)
 	s.mu.RUnlock()
 	s.bus.Send(tui.MarketsUpdatedMsg{Markets: markets, Tags: tags})
+}
+
+// notifyBusErr sends a MarketsUpdatedMsg with an error.
+func (s *Service) notifyBusErr(err error) {
+	if s.bus == nil {
+		return
+	}
+	s.bus.Send(tui.MarketsUpdatedMsg{Err: err})
 }
 
 // emitReady sends MarketsReadyMsg to the event bus.
@@ -403,9 +432,8 @@ func (s *Service) Tags() []gamma.Tag {
 	return out
 }
 
-// GetTrending returns markets sorted by volume descending, capped at limit.
-// limit <= 0 means return all.
-func (s *Service) GetTrending(limit int) []gamma.Market {
+// GetTrending returns markets sorted by volume descending.
+func (s *Service) GetTrending() []gamma.Market {
 	s.mu.RLock()
 	cp := make([]gamma.Market, len(s.markets))
 	copy(cp, s.markets)
@@ -414,9 +442,6 @@ func (s *Service) GetTrending(limit int) []gamma.Market {
 	sort.Slice(cp, func(i, j int) bool {
 		return cp[i].Volume > cp[j].Volume
 	})
-	if limit > 0 && len(cp) > limit {
-		return cp[:limit]
-	}
 	return cp
 }
 

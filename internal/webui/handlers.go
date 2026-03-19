@@ -821,23 +821,41 @@ func (s *Server) handleMarketsTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tags)
 }
 
-// handleMarketsTrending handles GET /api/v1/markets/trending?limit=N
+// handleMarketsTrending handles GET /api/v1/markets/trending?limit=N&offset=M
 func (s *Server) handleMarketsTrending(w http.ResponseWriter, r *http.Request) {
 	if s.mkts == nil {
-		writeJSON(w, http.StatusOK, []gamma.Market{})
+		writeJSON(w, http.StatusOK, map[string]any{"markets": []gamma.Market{}, "total": 0})
 		return
 	}
-	limit := 50
+	limit := 24
+	offset := 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n
 		}
 	}
-	result := s.mkts.GetTrending(limit)
-	if result == nil {
-		result = []gamma.Market{}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if n, err := strconv.Atoi(o); err == nil && n >= 0 {
+			offset = n
+		}
 	}
-	writeJSON(w, http.StatusOK, result)
+
+	all := s.mkts.GetTrending()
+	total := len(all)
+
+	result := all
+	if offset > len(result) {
+		offset = len(result)
+	}
+	result = result[offset:]
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"markets": result,
+		"total":   total,
+	})
 }
 
 // handleMarketsStats handles GET /api/v1/markets/stats
