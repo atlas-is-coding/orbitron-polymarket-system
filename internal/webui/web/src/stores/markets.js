@@ -63,16 +63,18 @@ export const useMarketsStore = defineStore('markets', {
         if (!options.background) this.loading = false
       }
     },
-    async fetchTrending(limit = 50) {
-      this.loading = true
+    async fetchTrending(options = { background: false }) {
+      if (!options.background) this.loading = true
       this.error = null
       try {
-        const { data } = await axios.get(`/api/v1/markets/trending?limit=${limit}`)
-        this.trending = data
+        const offset = (this.page - 1) * this.pageSize
+        const { data } = await axios.get(`/api/v1/markets/trending?limit=${this.pageSize}&offset=${offset}`)
+        this.trending = data.markets
+        this.totalFiltered = data.total
       } catch (e) {
         this.error = e.message
       } finally {
-        this.loading = false
+        if (!options.background) this.loading = false
       }
     },
     async fetchStats() {
@@ -106,7 +108,8 @@ export const useMarketsStore = defineStore('markets', {
     },
     setPage(p) {
       this.page = p
-      this.fetchMarkets()
+      if (this.viewMode === 'categories') this.fetchMarkets()
+      else this.fetchTrending()
     },
     async createAlert(conditionId, tokenId, direction, threshold) {
       await axios.post('/api/v1/alerts', { conditionId, tokenId, direction, threshold })

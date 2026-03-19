@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,6 +37,7 @@ type WalletMutator interface {
 // WalletAdder allows the Web UI to register a new wallet in the manager.
 type WalletAdder interface {
 	AddInactive(cfg config.WalletConfig)
+	Activate(ctx context.Context, cfg config.WalletConfig) (*wallet.WalletInstance, error)
 }
 
 // MarketsProvider exposes markets data to the Web UI.
@@ -44,7 +46,7 @@ type MarketsProvider interface {
 	GetMarket(conditionID string) (gamma.Market, bool)
 	Tags() []gamma.Tag
 	AddAlert(rule markets.AlertRule) string
-	GetTrending(limit int) []gamma.Market
+	GetTrending() []gamma.Market
 	TotalCount() int
 }
 
@@ -603,7 +605,7 @@ func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.adder != nil {
-		s.adder.AddInactive(wCfg)
+		s.adder.Activate(r.Context(), wCfg)
 	}
 	if s.bus != nil {
 		s.bus.Send(tui.WalletAddedMsg{

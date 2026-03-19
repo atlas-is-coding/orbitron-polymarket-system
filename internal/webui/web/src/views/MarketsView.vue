@@ -107,7 +107,6 @@
 
     <!-- Pagination -->
     <Pagination
-      v-if="store.viewMode === 'categories'"
       :page="store.page"
       :total-pages="store.totalPages"
       @change="store.setPage($event)"

@@ -19,15 +19,15 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/api/gamma"
 	"github.com/atlasdev/orbitron/internal/api/ws"
-	"github.com/atlasdev/orbitron/internal/auth"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/copytrading"
+	"github.com/atlasdev/orbitron/internal/diag"
 	"github.com/atlasdev/orbitron/internal/health"
+
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/logger"
 	"github.com/atlasdev/orbitron/internal/markets"
 	"github.com/atlasdev/orbitron/internal/monitor"
-	"github.com/atlasdev/orbitron/internal/analytics"
 	"github.com/atlasdev/orbitron/internal/notify"
 	telegramNotify "github.com/atlasdev/orbitron/internal/notify/telegram"
 	"github.com/atlasdev/orbitron/internal/storage"
@@ -188,10 +188,11 @@ func run() error {
 	// --- Flags ---
 	cfgPath := flag.String("config", "config.toml", "path to config file")
 	noTUI := flag.Bool("no-tui", false, "disable TUI, use plain log output (headless/CI)")
+	runDiag := flag.Bool("diag", false, "run diagnostics and exit")
 	flag.Parse()
 
 	// --- Initial setup (wizard) if config.toml does not exist ---
-	if _, err := os.Stat(*cfgPath); os.IsNotExist(err) && !*noTUI {
+	if _, err := os.Stat(*cfgPath); os.IsNotExist(err) && !*noTUI && !*runDiag {
 		p := tea.NewProgram(tui.NewWizardModel(80, 24, *cfgPath), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("wizard: %w", err)
@@ -207,7 +208,16 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
+	// --- Diagnostics ---
+	if *runDiag {
+		// In diag mode, we use plain console logging
+		l := logger.New(cfg.Log.Level, cfg.Log.Format)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		return diag.Run(ctx, cfg, l)
+	}
 	// --- Proxy dialer (nil when proxy disabled) ---
+
 	proxyDial, err := api.BuildDialer(cfg.Proxy)
 	if err != nil {
 		return fmt.Errorf("proxy: %w", err)
@@ -291,11 +301,6 @@ func run() error {
 
 	log.Info().Str("config", *cfgPath).Msg(i18n.T().LogBotStarting)
 
-	// --- Wallet Manager ---
-	wm := wallet.NewManager(bus)
-	wm.SetDialer(proxyDial)
-	wm.SetLogger(log)
-
 	// --- HTTP clients ---
 	clobHTTP := api.NewClientWithDialer(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
 	gammaHTTP := api.NewClientWithDialer(cfg.API.GammaURL, cfg.API.TimeoutSec, cfg.API.MaxRetries, proxyDial)
@@ -304,6 +309,7 @@ func run() error {
 	// --- API clients (shared/public) ---
 	gammaClient := gamma.NewClient(gammaHTTP)
 	dataClient := data.NewClient(dataHTTP)
+	pubClobClient := clob.NewClient(clobHTTP, nil)
 
 	// --- WebSocket ---
 	wsClient := ws.NewClient(cfg.API.WSURL, log)
@@ -322,131 +328,44 @@ func run() error {
 
 	// --- Storage (SQLite) ---
 	var db *sqlite.DB
+	var derr error
 	if cfg.Database.Enabled {
-		db, err = sqlite.Open(cfg.Database.Path)
-		if err != nil {
-			return fmt.Errorf("open database: %w", err)
+		db, derr = sqlite.Open(cfg.Database.Path)
+		if derr != nil {
+			return fmt.Errorf("open database: %w", derr)
 		}
 		defer db.Close()
 		log.Info().Str("path", cfg.Database.Path).Msg(i18n.T().LogDatabaseOpened)
 	}
 
+	// --- Wallet Manager ---
+	wm := wallet.NewManager(bus, cfg, wsClient)
+	wm.SetDialer(proxyDial)
+	wm.SetLogger(log)
+	wm.SetDataClient(dataClient)
+	wm.SetNotifier(notifier)
+	wm.SetDatabase(db)
+	wm.SetConfigPath(*cfgPath)
+	if builderCreds != nil {
+		wm.SetBuilderKey(builderCreds.APIKey)
+	}
+
 	// --- Build wallet instances ---
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pubClobClient := clob.NewClient(clobHTTP, nil)
+
 	for _, wCfg := range cfg.Wallets {
 		if !wCfg.Enabled {
 			wm.AddInactive(wCfg)
 			continue
 		}
-		var addr string
-		var l1 *auth.L1Signer
-		if wCfg.PrivateKey != "" {
-			l1, err = auth.NewL1Signer(wCfg.PrivateKey)
-			if err != nil {
-				log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("l1 signer failed, skipping wallet")
-				wm.AddInactive(wCfg)
-				continue
-			}
-			addr = l1.Address()
-		}
-		l2 := &auth.L2Credentials{
-			APIKey:     wCfg.APIKey,
-			APISecret:  wCfg.APISecret,
-			Passphrase: wCfg.Passphrase,
-		}
-		if l1 != nil {
-			l2.Address = l1.Address()
-		}
-		if l2.APIKey == "" && l1 != nil {
-			derived, deriveErr := pubClobClient.DeriveAPIKey(l1)
-			if deriveErr != nil {
-				log.Warn().Err(deriveErr).Str("wallet", wCfg.Label).Msg("auto-derive api_key failed")
-			} else {
-				l2.APIKey = derived.APIKey
-				l2.APISecret = derived.APISecret
-				l2.Passphrase = derived.Passphrase
-				log.Info().Str("wallet", wCfg.Label).Str("address", addr).Msg("api_key auto-derived from private_key")
-			}
-		}
-		if l2.APIKey == "" {
-			log.Warn().Str("wallet", wCfg.Label).Msg("wallet has no api_key, skipping")
+
+		_, err := wm.Activate(ctx, wCfg)
+		if err != nil {
+			log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("wallet activation failed, skipping")
 			wm.AddInactive(wCfg)
 			continue
 		}
-		if addr != "" {
-			log.Info().Str("wallet", wCfg.Label).Str("address", addr).Msg("wallet initialized")
-		}
-		wClobClient := clob.NewClient(clobHTTP, l2)
-
-		// Subscribe WebSocket user events for this wallet
-		wsClient.Subscribe(ws.UserSubscription(l2), func(msg *ws.Message) {
-			log.Debug().Str("event", msg.EventType).Msg(i18n.T().LogWSUserEvent)
-		})
-
-		inst := &wallet.WalletInstance{
-			Cfg:        wCfg,
-			Address:    addr,
-			L2:         l2,
-			ClobClient: wClobClient,
-			Stats:      &wallet.WalletStats{},
-		}
-		if l1 != nil {
-			orderSigner := auth.NewOrderSigner(l1, wCfg.ChainID, wCfg.NegRisk)
-			inst.Executor = copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, log)
-			if builderCreds != nil {
-				inst.Executor.WithBuilderKey(builderCreds.APIKey)
-			}
-		}
-		var analyticsHub *analytics.AnalyticsHub 
-		if cfg.Analytics.Enabled && l1 != nil { 
-			analyticsHub = analytics.NewAnalyticsHub(cfg.Analytics.BatchSize) 
-			analyticsClient := analytics.NewClient(l1, wCfg.Label, cfg.Analytics.Endpoint, log) 
-			go func(hub *analytics.AnalyticsHub, client *analytics.Client) { 
-				interval := time.Duration(cfg.Analytics.ReportInterval) * time.Second 
-				if interval == 0 { interval = 30 * time.Second } 
-				ticker := time.NewTicker(interval) 
-				defer ticker.Stop() 
-				for { 
-					select { 
-					case <-ctx.Done(): return 
-					case <-hub.Trigger():
-					case <-ticker.C: 
-						trades := hub.Flush() 
-						if len(trades) > 0 { 
-							if err := client.Report(ctx, trades); err != nil { 
-								log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("failed to report analytics") 
-							} 
-						} 
-					} 
-				} 
-			}(analyticsHub, analyticsClient) 
-		}
-		if cfg.Monitor.Trades.Enabled {
-			tm := monitor.NewTradesMonitor(analyticsHub, wClobClient, dataClient, notifier, &cfg.Monitor.Trades, log, addr, db)
-			if bus != nil {
-				tm.SetBus(bus)
-			}
-			inst.TradesMon = tm
-		}
-		if cfg.Copytrading.Enabled && db != nil && l1 != nil {
-			ct := copytrading.NewCopyTrader(
-				*cfgPath,
-				func() *config.CopytradingConfig { return &cfg.Copytrading },
-				dataClient,
-				inst.Executor,
-				db,
-				notifier,
-				wClobClient,
-				log,
-			)
-			if bus != nil {
-				ct.SetBus(bus)
-			}
-			inst.CopyTrader = ct
-		}
-		wm.AddActive(inst)
 	}
 
 	// --- Context with graceful shutdown ---
@@ -648,7 +567,6 @@ func run() error {
 
 		// Start TUI
 		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, nx, 0, 0, nil, adapter)
-
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {
