@@ -181,7 +181,7 @@ func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, nx *tui.Nexus, sta
 	}
 	defer conn.Close()
 
-	ch := make(chan []byte, 256)
+	ch := make(chan []byte, 1024) // was 256 — 4× larger to absorb bursts
 	h.register(clientID, ch)
 	defer h.unregister(clientID)
 
