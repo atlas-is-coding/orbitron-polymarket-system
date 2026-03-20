@@ -2,8 +2,10 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/atlasdev/orbitron/internal/api/gamma"
@@ -24,6 +26,7 @@ type Monitor struct {
 	store    storage.Store
 
 	// Предыдущие состояния рынков для сравнения
+	mu        sync.RWMutex
 	prevState map[string]*gamma.Market
 }
 
@@ -95,18 +98,27 @@ func (m *Monitor) poll(ctx context.Context) {
 				Str("message", alert.Message).
 				Msg("alert triggered")
 
-			if err := m.notifier.Send(ctx, alert.Message); err != nil {
-				m.logger.Warn().Err(err).Msg("failed to send alert")
-			}
+			go func(msg string) {
+				notifCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := m.notifier.Send(notifCtx, msg); err != nil {
+					m.logger.Warn().Err(err).Msg("failed to send alert")
+				}
+			}(alert.Message)
 		}
 
+		m.mu.Lock()
 		m.prevState[mkt.ConditionID] = mkt
+		m.mu.Unlock()
 	}
 }
 
 // evaluate проверяет правила для рынка и возвращает сработавшие алерты.
 func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
+	m.mu.RLock()
 	prev, hasPrev := m.prevState[mkt.ConditionID]
+	m.mu.RUnlock()
+
 	var alerts []Alert
 
 	for _, rule := range m.rules {
