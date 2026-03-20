@@ -269,14 +269,6 @@ func run() error {
 
 	// --- Nexus State Manager ---
 	nx := tui.NewNexus()
-	if bus != nil {
-		tap := bus.Tap()
-		go func() {
-			for msg := range tap {
-				nx.Handle(msg)
-			}
-		}()
-	}
 
 	// Load Builder Program credentials (non-fatal: bot runs without them).
 	builderCreds, licenseErr := license.Load()
@@ -354,6 +346,24 @@ func run() error {
 	// --- Build wallet instances ---
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if bus != nil {
+		tap := bus.Tap()
+		go func() {
+			defer bus.Untap(tap)
+			for {
+				select {
+				case msg, ok := <-tap:
+					if !ok {
+						return
+					}
+					nx.Handle(msg)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
 
 	for _, wCfg := range cfg.Wallets {
 		if !wCfg.Enabled {
@@ -596,6 +606,9 @@ func run() error {
 		// Goodbye message (printed after alt screen is restored)
 		fmt.Println("\n  ◈ orbitron — shutdown complete. Goodbye!")
 		cancel()
+		if bus != nil {
+			bus.Close()
+		}
 		return nil
 	}
 
@@ -612,6 +625,9 @@ func run() error {
 
 	wsClient.Close()
 	engine.Stop()
+	if bus != nil {
+		bus.Close()
+	}
 	log.Info().Msg(i18n.T().LogBye)
 	return nil
 }

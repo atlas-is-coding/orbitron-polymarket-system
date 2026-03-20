@@ -74,9 +74,10 @@ const (
 // Supports multiple subscribers via Tap(); the primary channel is
 // used by the TUI via WaitForEvent().
 type EventBus struct {
-	ch   chan tea.Msg
-	mu   sync.Mutex
-	taps []chan tea.Msg
+	ch     chan tea.Msg
+	mu     sync.Mutex
+	taps   []chan tea.Msg
+	closed bool
 }
 
 // NewEventBus creates an EventBus with a buffered channel.
@@ -93,6 +94,14 @@ func (b *EventBus) Send(msg tea.Msg) {
 // PriorityHigh messages block until they are enqueued to ensure delivery.
 // Other priorities are non-blocking and may be dropped if buffers are full.
 func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
+	// Guard against send on closed channel.
+	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+	b.mu.Unlock()
+
 	if p == PriorityHigh {
 		b.ch <- msg
 	} else {
@@ -104,6 +113,9 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
 	for _, tap := range b.taps {
 		if p == PriorityHigh {
 			tap <- msg
@@ -139,6 +151,23 @@ func (b *EventBus) Untap(ch <-chan tea.Msg) {
 			return
 		}
 	}
+}
+
+// Close shuts down the EventBus by closing all tap channels and the primary channel.
+// Idempotent — safe to call more than once.
+// Call once during application shutdown after all bus senders have stopped.
+func (b *EventBus) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
+	b.closed = true
+	for _, tap := range b.taps {
+		close(tap)
+	}
+	b.taps = nil
+	close(b.ch)
 }
 
 // WaitForEvent returns a tea.Cmd that blocks until the next EventBus message.
