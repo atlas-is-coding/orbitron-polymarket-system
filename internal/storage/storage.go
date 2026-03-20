@@ -110,6 +110,25 @@ type SentAlertStore interface {
 	MarkAlertSent(ctx context.Context, alertType, conditionID string) error
 }
 
+// MarketAlertRecord — запись о пользовательском алерте на цену.
+type MarketAlertRecord struct {
+	ID          string
+	ConditionID string
+	TokenID     string
+	Direction   string
+	Threshold   float64
+	CreatedAt   time.Time
+	Triggered   bool
+}
+
+// MarketAlertStore — хранилище пользовательских алертов.
+type MarketAlertStore interface {
+	SaveAlert(ctx context.Context, a *MarketAlertRecord) error
+	DeleteAlert(ctx context.Context, id string) error
+	GetAlerts(ctx context.Context) ([]*MarketAlertRecord, error)
+	MarkAlertTriggered(ctx context.Context, id string) error
+}
+
 // MarketCacheRecord — снимок рынка для локального кеша.
 type MarketCacheRecord struct {
 	ConditionID string
@@ -135,6 +154,108 @@ type Store interface {
 	CopyTradeStore
 	WalletStatsStore
 	SentAlertStore
+	MarketAlertStore
 	MarketCacheStore // NEW
+	OrderHistoryStore
+	NotificationQueueStore
+	WalletStatisticsStore
 	Close() error
+}
+
+// --- New structures for orders history ---
+
+// Order — расширенная запись об ордере с информацией о кошельке и GTD.
+type Order struct {
+	ID            string
+	WalletAddress string
+	ConditionID   string
+	AssetID       string
+	Side          string    // "BUY" or "SELL"
+	OrderType     string
+	Price         float64
+	Size          float64
+	Status        string    // "PENDING", "OPEN", "FILLED", "CANCELED", "EXPIRED"
+	ExpiresAt     *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	SyncedAt      *time.Time
+}
+
+// Trade — расширенная запись о сделке.
+type Trade struct {
+	ID            string
+	WalletAddress string
+	OrderID       string
+	TradeID       string
+	ConditionID   string
+	AssetID       string
+	Side          string
+	Price         float64
+	Size          float64
+	Fee           float64
+	Timestamp     time.Time
+}
+
+// WalletStats — статистика кошелька.
+type WalletStats struct {
+	WalletAddress string
+	FetchedAt     time.Time
+	BalanceUSD    float64
+	PnLUSD        float64
+	WinRate       float64   // percentage
+	TotalTrades   int
+	TotalVolume   float64
+}
+
+// Notification — уведомление в очереди.
+type Notification struct {
+	ID            string
+	WalletAddress string
+	EventType     string // "ORDER_PLACED", "ORDER_FILLED", "ORDER_CANCELED", etc.
+	Payload       string // JSON
+	Status        string // "PENDING", "SENT", "FAILED", "DELIVERED"
+	RetryCount    int
+	MaxRetries    int
+	NextRetryAt   *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// OrderFilters — фильтры для поиска ордеров.
+type OrderFilters struct {
+	WalletAddress string
+	ConditionID   string
+	Status        string
+	Side          string
+	From          time.Time
+	To            time.Time
+	Limit         int
+}
+
+// --- Interfaces for orders history ---
+
+// OrderHistoryStore — интерфейс для хранения истории ордеров.
+type OrderHistoryStore interface {
+	InsertOrder(ctx context.Context, order *Order) error
+	UpdateOrder(ctx context.Context, order *Order) error
+	GetOrder(ctx context.Context, id string) (*Order, error)
+	GetOrders(ctx context.Context, filters OrderFilters) ([]*Order, error)
+	GetExpiredOrders(ctx context.Context, before time.Time) ([]*Order, error)
+
+	InsertTrade(ctx context.Context, trade *Trade) error
+	GetTrades(ctx context.Context, walletAddress string, from, to time.Time) ([]*Trade, error)
+}
+
+// NotificationQueueStore — интерфейс для очереди уведомлений.
+type NotificationQueueStore interface {
+	EnqueueNotification(ctx context.Context, notif *Notification) error
+	GetPendingNotifications(ctx context.Context, walletAddress string) ([]*Notification, error)
+	UpdateNotificationStatus(ctx context.Context, id, status string, retryCount int, nextRetryAt *time.Time) error
+	DeleteNotification(ctx context.Context, id string) error
+}
+
+// WalletStatisticsStore — интерфейс для статистики кошельков.
+type WalletStatisticsStore interface {
+	SaveWalletStats(ctx context.Context, stats *WalletStats) error
+	GetWalletStats(ctx context.Context, walletAddress string, limit int) ([]*WalletStats, error)
 }
