@@ -324,8 +324,9 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-// --- TradeStore ---
+// --- Old TradeStore and OrderStore methods (deprecated, for backward compatibility) ---
 
+// SaveTrade saves a trade to the old 'trades' table (deprecated, use InsertTrade instead).
 func (d *DB) SaveTrade(ctx context.Context, t *storage.TradeRecord) error {
 	_, err := d.db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO trades (id, trade_id, order_id, asset_id, condition_id, side, price, size, fee, timestamp)
@@ -336,50 +337,7 @@ func (d *DB) SaveTrade(ctx context.Context, t *storage.TradeRecord) error {
 	return err
 }
 
-func (d *DB) GetTrades(ctx context.Context, f storage.TradeFilter) ([]*storage.TradeRecord, error) {
-	q := `SELECT id, trade_id, order_id, asset_id, condition_id, side, price, size, fee, timestamp
-	      FROM trades WHERE 1=1`
-	args := []any{}
-	if f.AssetID != "" {
-		q += " AND asset_id = ?"
-		args = append(args, f.AssetID)
-	}
-	if f.ConditionID != "" {
-		q += " AND condition_id = ?"
-		args = append(args, f.ConditionID)
-	}
-	if !f.From.IsZero() {
-		q += " AND timestamp >= ?"
-		args = append(args, f.From.UTC().Format(time.RFC3339))
-	}
-	if !f.To.IsZero() {
-		q += " AND timestamp <= ?"
-		args = append(args, f.To.UTC().Format(time.RFC3339))
-	}
-	if f.Limit > 0 {
-		q += fmt.Sprintf(" LIMIT %d", f.Limit)
-	}
-	rows, err := d.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.TradeRecord
-	for rows.Next() {
-		var t storage.TradeRecord
-		var ts string
-		if err := rows.Scan(&t.ID, &t.TradeID, &t.OrderID, &t.AssetID, &t.ConditionID,
-			&t.Side, &t.Price, &t.Size, &t.Fee, &ts); err != nil {
-			return nil, err
-		}
-		t.Timestamp, _ = time.Parse(time.RFC3339, ts)
-		result = append(result, &t)
-	}
-	return result, rows.Err()
-}
-
-// --- OrderStore ---
-
+// SaveOrder saves an order to the old 'orders' table (deprecated).
 func (d *DB) SaveOrder(ctx context.Context, o *storage.OrderRecord) error {
 	_, err := d.db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO orders (id, asset_id, condition_id, side, order_type, price, size, status, created_at, updated_at)
@@ -390,40 +348,13 @@ func (d *DB) SaveOrder(ctx context.Context, o *storage.OrderRecord) error {
 	return err
 }
 
+// UpdateOrderStatus updates an order status in the old 'orders' table (deprecated).
 func (d *DB) UpdateOrderStatus(ctx context.Context, id, status string) error {
 	_, err := d.db.ExecContext(ctx,
 		`UPDATE orders SET status = ?, updated_at = ? WHERE id = ?`,
 		status, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
-}
-
-func (d *DB) GetOrders(ctx context.Context, status string) ([]*storage.OrderRecord, error) {
-	q := `SELECT id, asset_id, condition_id, side, order_type, price, size, status, created_at, updated_at
-	      FROM orders`
-	args := []any{}
-	if status != "" {
-		q += " WHERE status = ?"
-		args = append(args, status)
-	}
-	rows, err := d.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.OrderRecord
-	for rows.Next() {
-		var o storage.OrderRecord
-		var ca, ua string
-		if err := rows.Scan(&o.ID, &o.AssetID, &o.ConditionID, &o.Side, &o.OrderType,
-			&o.Price, &o.Size, &o.Status, &ca, &ua); err != nil {
-			return nil, err
-		}
-		o.CreatedAt, _ = time.Parse(time.RFC3339, ca)
-		o.UpdatedAt, _ = time.Parse(time.RFC3339, ua)
-		result = append(result, &o)
-	}
-	return result, rows.Err()
 }
 
 // --- CopyTradeStore ---
@@ -502,42 +433,6 @@ func scanCopyTrades(rows *sql.Rows) ([]*storage.CopyTradeRecord, error) {
 
 // --- WalletStatsStore ---
 
-// SaveWalletStats сохраняет снимок статистики кошелька.
-func (d *DB) SaveWalletStats(ctx context.Context, walletID string, balanceUSD, pnlUSD float64) error {
-	_, err := d.db.ExecContext(ctx,
-		`INSERT OR REPLACE INTO wallet_stats (wallet_id, fetched_at, balance_usd, pnl_usd)
-		 VALUES (?, ?, ?, ?)`,
-		walletID, time.Now().Unix(), balanceUSD, pnlUSD,
-	)
-	return err
-}
-
-// GetWalletStats возвращает последние limit снимков статистики для кошелька walletID.
-func (d *DB) GetWalletStats(ctx context.Context, walletID string, limit int) ([]*storage.WalletStatsRecord, error) {
-	rows, err := d.db.QueryContext(ctx,
-		`SELECT wallet_id, fetched_at, balance_usd, pnl_usd
-		 FROM wallet_stats
-		 WHERE wallet_id = ?
-		 ORDER BY fetched_at DESC
-		 LIMIT ?`,
-		walletID, limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.WalletStatsRecord
-	for rows.Next() {
-		var r storage.WalletStatsRecord
-		var ts int64
-		if err := rows.Scan(&r.WalletID, &ts, &r.BalanceUSD, &r.PnLUSD); err != nil {
-			return nil, err
-		}
-		r.FetchedAt = time.Unix(ts, 0)
-		result = append(result, &r)
-	}
-	return result, rows.Err()
-}
 
 // --- MarketCacheStore ---
 
@@ -611,217 +506,6 @@ func scanMarketCacheRows(rows *sql.Rows) ([]storage.MarketCacheRecord, error) {
 	return result, rows.Err()
 }
 
-// --- OrderHistoryStore ---
-
-// InsertOrder вставляет новый ордер в базу.
-func (d *DB) InsertOrder(ctx context.Context, order *storage.Order) error {
-	expiresAtStr := ""
-	if order.ExpiresAt != nil {
-		expiresAtStr = order.ExpiresAt.UTC().Format(time.RFC3339)
-	}
-	_, err := d.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO orders_history
-		 (id, wallet_address, condition_id, asset_id, side, order_type, price, size, status, expires_at, created_at, updated_at, synced_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		order.ID, order.WalletAddress, order.ConditionID, order.AssetID, order.Side, order.OrderType,
-		order.Price, order.Size, order.Status, expiresAtStr,
-		order.CreatedAt.UTC().Format(time.RFC3339),
-		order.UpdatedAt.UTC().Format(time.RFC3339),
-		nil,
-	)
-	return err
-}
-
-// UpdateOrder обновляет существующий ордер.
-func (d *DB) UpdateOrder(ctx context.Context, order *storage.Order) error {
-	expiresAtStr := ""
-	if order.ExpiresAt != nil {
-		expiresAtStr = order.ExpiresAt.UTC().Format(time.RFC3339)
-	}
-	var syncedAtStr *string
-	if order.SyncedAt != nil {
-		s := order.SyncedAt.UTC().Format(time.RFC3339)
-		syncedAtStr = &s
-	}
-	_, err := d.db.ExecContext(ctx,
-		`UPDATE orders_history SET status = ?, expires_at = ?, updated_at = ?, synced_at = ? WHERE id = ?`,
-		order.Status, expiresAtStr,
-		order.UpdatedAt.UTC().Format(time.RFC3339), syncedAtStr, order.ID,
-	)
-	return err
-}
-
-// GetOrder получает ордер по ID.
-func (d *DB) GetOrder(ctx context.Context, id string) (*storage.Order, error) {
-	var order storage.Order
-	var expiresAtStr *string
-	var syncedAtStr *string
-	var createdAtStr, updatedAtStr string
-	err := d.db.QueryRowContext(ctx,
-		`SELECT id, wallet_address, condition_id, asset_id, side, order_type, price, size, status, expires_at, created_at, updated_at, synced_at
-		 FROM orders_history WHERE id = ?`,
-		id,
-	).Scan(&order.ID, &order.WalletAddress, &order.ConditionID, &order.AssetID, &order.Side, &order.OrderType,
-		&order.Price, &order.Size, &order.Status, &expiresAtStr, &createdAtStr, &updatedAtStr, &syncedAtStr)
-	if err != nil {
-		return nil, err
-	}
-	order.CreatedAt, _ = time.Parse(time.RFC3339, createdAtStr)
-	order.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAtStr)
-	if expiresAtStr != nil {
-		t, _ := time.Parse(time.RFC3339, *expiresAtStr)
-		order.ExpiresAt = &t
-	}
-	if syncedAtStr != nil {
-		t, _ := time.Parse(time.RFC3339, *syncedAtStr)
-		order.SyncedAt = &t
-	}
-	return &order, nil
-}
-
-// GetOrders получает ордеры по фильтрам.
-func (d *DB) GetOrders(ctx context.Context, filters storage.OrderFilters) ([]*storage.Order, error) {
-	q := `SELECT id, wallet_address, condition_id, asset_id, side, order_type, price, size, status, expires_at, created_at, updated_at, synced_at
-	      FROM orders_history WHERE 1=1`
-	args := []any{}
-	if filters.WalletAddress != "" {
-		q += " AND wallet_address = ?"
-		args = append(args, filters.WalletAddress)
-	}
-	if filters.ConditionID != "" {
-		q += " AND condition_id = ?"
-		args = append(args, filters.ConditionID)
-	}
-	if filters.Status != "" {
-		q += " AND status = ?"
-		args = append(args, filters.Status)
-	}
-	if filters.Side != "" {
-		q += " AND side = ?"
-		args = append(args, filters.Side)
-	}
-	if !filters.From.IsZero() {
-		q += " AND created_at >= ?"
-		args = append(args, filters.From.UTC().Format(time.RFC3339))
-	}
-	if !filters.To.IsZero() {
-		q += " AND created_at <= ?"
-		args = append(args, filters.To.UTC().Format(time.RFC3339))
-	}
-	q += " ORDER BY created_at DESC"
-	if filters.Limit > 0 {
-		q += fmt.Sprintf(" LIMIT %d", filters.Limit)
-	}
-	rows, err := d.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.Order
-	for rows.Next() {
-		var order storage.Order
-		var expiresAtStr *string
-		var syncedAtStr *string
-		var createdAtStr, updatedAtStr string
-		if err := rows.Scan(&order.ID, &order.WalletAddress, &order.ConditionID, &order.AssetID, &order.Side, &order.OrderType,
-			&order.Price, &order.Size, &order.Status, &expiresAtStr, &createdAtStr, &updatedAtStr, &syncedAtStr); err != nil {
-			return nil, err
-		}
-		order.CreatedAt, _ = time.Parse(time.RFC3339, createdAtStr)
-		order.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAtStr)
-		if expiresAtStr != nil {
-			t, _ := time.Parse(time.RFC3339, *expiresAtStr)
-			order.ExpiresAt = &t
-		}
-		if syncedAtStr != nil {
-			t, _ := time.Parse(time.RFC3339, *syncedAtStr)
-			order.SyncedAt = &t
-		}
-		result = append(result, &order)
-	}
-	return result, rows.Err()
-}
-
-// GetExpiredOrders получает истекшие GTD ордеры.
-func (d *DB) GetExpiredOrders(ctx context.Context, before time.Time) ([]*storage.Order, error) {
-	rows, err := d.db.QueryContext(ctx,
-		`SELECT id, wallet_address, condition_id, asset_id, side, order_type, price, size, status, expires_at, created_at, updated_at, synced_at
-		 FROM orders_history WHERE expires_at IS NOT NULL AND expires_at < ? AND status IN ('PENDING', 'OPEN')`,
-		before.UTC().Format(time.RFC3339),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.Order
-	for rows.Next() {
-		var order storage.Order
-		var expiresAtStr *string
-		var syncedAtStr *string
-		var createdAtStr, updatedAtStr string
-		if err := rows.Scan(&order.ID, &order.WalletAddress, &order.ConditionID, &order.AssetID, &order.Side, &order.OrderType,
-			&order.Price, &order.Size, &order.Status, &expiresAtStr, &createdAtStr, &updatedAtStr, &syncedAtStr); err != nil {
-			return nil, err
-		}
-		order.CreatedAt, _ = time.Parse(time.RFC3339, createdAtStr)
-		order.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAtStr)
-		if expiresAtStr != nil {
-			t, _ := time.Parse(time.RFC3339, *expiresAtStr)
-			order.ExpiresAt = &t
-		}
-		if syncedAtStr != nil {
-			t, _ := time.Parse(time.RFC3339, *syncedAtStr)
-			order.SyncedAt = &t
-		}
-		result = append(result, &order)
-	}
-	return result, rows.Err()
-}
-
-// InsertTrade вставляет новую сделку.
-func (d *DB) InsertTrade(ctx context.Context, trade *storage.Trade) error {
-	_, err := d.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO trades_history
-		 (id, wallet_address, order_id, trade_id, condition_id, asset_id, side, price, size, fee, timestamp)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		trade.ID, trade.WalletAddress, trade.OrderID, trade.TradeID, trade.ConditionID, trade.AssetID,
-		trade.Side, trade.Price, trade.Size, trade.Fee, trade.Timestamp.UTC().Format(time.RFC3339),
-	)
-	return err
-}
-
-// GetTrades получает сделки по кошельку и дате.
-func (d *DB) GetTrades(ctx context.Context, walletAddress string, from, to time.Time) ([]*storage.Trade, error) {
-	q := `SELECT id, wallet_address, order_id, trade_id, condition_id, asset_id, side, price, size, fee, timestamp
-	      FROM trades_history WHERE wallet_address = ?`
-	args := []any{walletAddress}
-	if !from.IsZero() {
-		q += " AND timestamp >= ?"
-		args = append(args, from.UTC().Format(time.RFC3339))
-	}
-	if !to.IsZero() {
-		q += " AND timestamp <= ?"
-		args = append(args, to.UTC().Format(time.RFC3339))
-	}
-	q += " ORDER BY timestamp DESC"
-	rows, err := d.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var result []*storage.Trade
-	for rows.Next() {
-		var trade storage.Trade
-		var timestampStr string
-		if err := rows.Scan(&trade.ID, &trade.WalletAddress, &trade.OrderID, &trade.TradeID, &trade.ConditionID, &trade.AssetID,
-			&trade.Side, &trade.Price, &trade.Size, &trade.Fee, &timestampStr); err != nil {
-			return nil, err
-		}
-		trade.Timestamp, _ = time.Parse(time.RFC3339, timestampStr)
-		result = append(result, &trade)
-	}
-	return result, rows.Err()
-}
 
 // --- NotificationQueueStore ---
 

@@ -149,16 +149,24 @@ type MarketCacheStore interface {
 
 // Store — объединённый интерфейс хранилища.
 type Store interface {
-	TradeStore
-	OrderStore
-	CopyTradeStore
-	WalletStatsStore
-	SentAlertStore
-	MarketAlertStore
-	MarketCacheStore // NEW
+	// Order and trade history (new interfaces with better signatures)
 	OrderHistoryStore
 	NotificationQueueStore
 	WalletStatisticsStore
+
+	// Market and alert stores
+	CopyTradeStore
+	SentAlertStore
+	MarketAlertStore
+	MarketCacheStore
+
+	// Old-style stores (for backwards compatibility where still used)
+	// Note: TradeStore, OrderStore, and WalletStatsStore methods are now
+	// better represented in OrderHistoryStore and WalletStatisticsStore
+	SaveTrade(ctx context.Context, t *TradeRecord) error
+	SaveOrder(ctx context.Context, o *OrderRecord) error
+	UpdateOrderStatus(ctx context.Context, id, status string) error
+
 	Close() error
 }
 
