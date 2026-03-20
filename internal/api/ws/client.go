@@ -155,17 +155,23 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	// Heartbeat: server expects text "PING" every 10 seconds, replies "PONG".
+	pingCtx, pingCancel := context.WithCancel(ctx)
+	defer pingCancel()
+
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-pingCtx.Done():
 				return
 			case <-ticker.C:
 				c.mu.RLock()
-				_ = conn.WriteMessage(websocket.TextMessage, []byte("PING"))
+				conn := c.conn
 				c.mu.RUnlock()
+				if conn != nil {
+					_ = conn.WriteMessage(websocket.TextMessage, []byte("PING"))
+				}
 			}
 		}
 	}()
