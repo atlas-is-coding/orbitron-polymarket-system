@@ -224,7 +224,9 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 			tm.SetBus(m.bus)
 		}
 		inst.TradesMon = tm
+		inst.wg.Add(1)
 		go func(t *monitor.TradesMonitor, label string) {
+			defer inst.wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
 					m.log.Error().Str("wallet", label).Interface("panic", r).Bytes("stack", debug.Stack()).Msg("trades monitor panicked")
@@ -249,7 +251,9 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 			m.log,
 		)
 		inst.CopyTrader = ct
+		inst.wg.Add(1)
 		go func(c *copytrading.CopyTrader, label string) {
+			defer inst.wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
 					m.log.Error().Str("wallet", label).Interface("panic", r).Bytes("stack", debug.Stack()).Msg("copy trader panicked")

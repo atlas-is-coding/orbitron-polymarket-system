@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"sync"
 
 	"github.com/atlasdev/orbitron/internal/api/clob"
 	"github.com/atlasdev/orbitron/internal/auth"
@@ -23,11 +24,13 @@ type WalletInstance struct {
 	CopyTrader *copytrading.CopyTrader      // nil if copytrading disabled
 	Stats      *WalletStats
 	cancel     context.CancelFunc
+	wg         sync.WaitGroup // tracks TradesMonitor and CopyTrader goroutines
 }
 
-// Stop cancels the wallet's context, triggering graceful shutdown of its subsystems.
+// Stop cancels the wallet's context and waits for all tracked goroutines to exit.
 func (w *WalletInstance) Stop() {
 	if w.cancel != nil {
 		w.cancel()
 	}
+	w.wg.Wait()
 }
