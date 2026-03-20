@@ -65,8 +65,9 @@ type Client struct {
 
 	mu       sync.RWMutex
 	conn     *websocket.Conn
-	subs     []SubscribeRequest
-	handlers []Handler
+	nextID   int
+	subs     map[int]SubscribeRequest
+	handlers map[int]Handler
 
 	reconnectDelay time.Duration
 	netDial        func(network, addr string) (net.Conn, error)
@@ -78,6 +79,8 @@ func NewClient(wsURL string, log zerolog.Logger) *Client {
 		url:            wsURL,
 		logger:         log.With().Str("component", "ws").Logger(),
 		reconnectDelay: 3 * time.Second,
+		subs:           make(map[int]SubscribeRequest),
+		handlers:       make(map[int]Handler),
 	}
 }
 
@@ -88,11 +91,24 @@ func (c *Client) WithDialer(dial func(network, addr string) (net.Conn, error)) {
 
 // Subscribe добавляет подписку и регистрирует обработчик сообщений.
 // Все зарегистрированные обработчики вызываются для каждого входящего сообщения.
-func (c *Client) Subscribe(req SubscribeRequest, handler Handler) {
+// Returns a subscription ID that can be passed to Unsubscribe().
+func (c *Client) Subscribe(req SubscribeRequest, handler Handler) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.subs = append(c.subs, req)
-	c.handlers = append(c.handlers, handler)
+	id := c.nextID
+	c.nextID++
+	c.subs[id] = req
+	c.handlers[id] = handler
+	return id
+}
+
+// Unsubscribe removes a subscription and its handler by ID.
+// Safe to call with an ID that was already removed (no-op).
+func (c *Client) Unsubscribe(id int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.subs, id)
+	delete(c.handlers, id)
 }
 
 // Run запускает WebSocket клиент с авто-переподключением.
@@ -115,7 +131,10 @@ func (c *Client) Run(ctx context.Context) error {
 
 func (c *Client) connect(ctx context.Context) error {
 	c.mu.RLock()
-	subs := c.subs
+	subs := make([]SubscribeRequest, 0, len(c.subs))
+	for _, sub := range c.subs {
+		subs = append(subs, sub)
+	}
 	c.mu.RUnlock()
 
 	// Each Polymarket WS channel has its own URL path (/ws/market, /ws/user).
@@ -201,7 +220,10 @@ func (c *Client) connect(ctx context.Context) error {
 		}
 
 		c.mu.RLock()
-		handlers := c.handlers
+		handlers := make([]Handler, 0, len(c.handlers))
+		for _, h := range c.handlers {
+			handlers = append(handlers, h)
+		}
 		c.mu.RUnlock()
 
 		for _, h := range handlers {

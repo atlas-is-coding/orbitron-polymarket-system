@@ -154,14 +154,7 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 
 	wClobClient := clob.NewClient(httpClient, l2)
 
-	// 5. Subscribe WebSocket user events
-	if m.wsClient != nil {
-		m.wsClient.Subscribe(ws.UserSubscription(l2), func(msg *ws.Message) {
-			m.log.Debug().Str("event", msg.EventType).Str("wallet", wCfg.Label).Msg("ws user event")
-		})
-	}
-
-	// 6. Create instance
+	// 5. Create instance
 	instCtx, instCancel := context.WithCancel(ctx)
 	inst := &WalletInstance{
 		Cfg:        wCfg,
@@ -170,6 +163,14 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 		ClobClient: wClobClient,
 		Stats:      &WalletStats{},
 		cancel:     instCancel,
+		wsSubID:    -1,
+	}
+
+	// 6. Subscribe WebSocket user events
+	if m.wsClient != nil {
+		inst.wsSubID = m.wsClient.Subscribe(ws.UserSubscription(l2), func(msg *ws.Message) {
+			m.log.Debug().Str("event", msg.EventType).Str("wallet", wCfg.Label).Msg("ws user event")
+		})
 	}
 
 	// 7. Setup order executor
@@ -323,6 +324,7 @@ func (m *Manager) AddInactive(cfg config.WalletConfig) {
 		Cfg:     cfg,
 		Address: addr,
 		Stats:   &WalletStats{},
+		wsSubID: -1,
 	})
 	if m.bus != nil {
 		m.bus.Send(tui.WalletAddedMsg{
@@ -405,6 +407,9 @@ func (m *Manager) Remove(id string) error {
 	defer m.mu.Unlock()
 	for i, w := range m.instances {
 		if w.Cfg.ID == id {
+			if m.wsClient != nil && w.wsSubID >= 0 {
+				m.wsClient.Unsubscribe(w.wsSubID)
+			}
 			w.Stop()
 			m.instances = append(m.instances[:i], m.instances[i+1:]...)
 			if m.bus != nil {
@@ -571,6 +576,10 @@ func (m *Manager) Toggle(id string, enabled bool) error {
 		if w.Cfg.ID == id {
 			w.Cfg.Enabled = enabled
 			if !enabled {
+				if m.wsClient != nil && w.wsSubID >= 0 {
+					m.wsClient.Unsubscribe(w.wsSubID)
+					w.wsSubID = -1
+				}
 				w.Stop()
 			}
 			if m.bus != nil {

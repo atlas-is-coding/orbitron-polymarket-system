@@ -25,6 +25,7 @@ type WalletInstance struct {
 	Stats      *WalletStats
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup // tracks TradesMonitor and CopyTrader goroutines
+	wsSubID    int            // subscription ID from wsClient.Subscribe(); -1 if not subscribed
 }
 
 // Stop cancels the wallet's context and waits for all tracked goroutines to exit.
