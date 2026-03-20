@@ -249,12 +249,13 @@ func (t *TraderTracker) closePosition(ctx context.Context, trade *storage.CopyTr
 
 	if err != nil {
 		t.logger.Error().Err(err).Str("trade_id", trade.ID).Msg("failed to close copy position")
-		status = "failed"
+		status = "open" // Keep as open so we retry in next poll/reconcile
 		t.sendAlert(ctx, fmt.Sprintf(
 			"❌ Failed to close copy: [%s] asset=%s\nError: %v",
 			t.trader.Label, trade.AssetID, err,
 		))
 	} else {
+		status = "closed"
 		pnl = &result.PnL
 	}
 
