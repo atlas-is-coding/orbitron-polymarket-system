@@ -114,7 +114,10 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 	b.mu.Unlock()
 
 	if p == PriorityHigh {
-		b.ch <- msg
+		func() {
+			defer func() { recover() }() //nolint:errcheck // guard: Close() may race with blocking send
+			b.ch <- msg
+		}()
 	} else {
 		select {
 		case b.ch <- msg:
@@ -134,7 +137,10 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 	}
 	for _, tap := range b.taps {
 		if p == PriorityHigh {
-			tap <- msg
+			func(t chan tea.Msg) {
+				defer func() { recover() }() //nolint:errcheck // guard: Close() may race with blocking send
+				t <- msg
+			}(tap)
 		} else {
 			select {
 			case tap <- msg:
