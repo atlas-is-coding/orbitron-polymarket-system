@@ -170,7 +170,9 @@ func (c *Client) connect(ctx context.Context) error {
 				conn := c.conn
 				c.mu.RUnlock()
 				if conn != nil {
-					_ = conn.WriteMessage(websocket.TextMessage, []byte("PING"))
+					if err := conn.WriteMessage(websocket.TextMessage, []byte("PING")); err != nil {
+						c.logger.Debug().Err(err).Msg("ws: ping failed")
+					}
 				}
 			}
 		}
@@ -215,7 +217,9 @@ func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn != nil {
-		_ = c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			c.logger.Debug().Err(err).Msg("ws: close error")
+		}
 		c.conn = nil
 	}
 }
