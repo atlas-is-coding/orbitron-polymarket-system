@@ -143,6 +143,7 @@ func (b *Bot) Run(ctx context.Context) error {
 
 	// Subscribe to EventBus — tap channel receives copies of all messages
 	tap := b.bus.Tap()
+	defer b.bus.Untap(tap) // deregister on exit so dead channel stops receiving sends
 
 	// EventBus consumer goroutine
 	go b.consumeEvents(ctx, tap)
