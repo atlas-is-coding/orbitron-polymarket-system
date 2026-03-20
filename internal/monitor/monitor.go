@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -99,11 +98,18 @@ func (m *Monitor) poll(ctx context.Context) {
 				Msg("alert triggered")
 
 			go func(msg string) {
-				notifCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := m.notifier.Send(notifCtx, msg); err != nil {
-					m.logger.Warn().Err(err).Msg("failed to send alert")
+				maxRetries := 3
+				for i := 0; i < maxRetries; i++ {
+					notifCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					err := m.notifier.Send(notifCtx, msg)
+					cancel()
+					if err == nil {
+						return
+					}
+					m.logger.Warn().Err(err).Int("attempt", i+1).Msg("failed to send alert, retrying")
+					time.Sleep(time.Duration(i+1) * 2 * time.Second)
 				}
+				m.logger.Error().Msg("failed to send alert after max retries")
 			}(alert.Message)
 		}
 
@@ -125,9 +131,16 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 		switch rule.AlertType {
 		case AlertPriceChange:
 			if hasPrev && len(mkt.OutcomePrices) > 0 && len(prev.OutcomePrices) > 0 {
-				// Сравниваем первый исход (YES)
-				// Цены хранятся как строки, упрощаем для примера
-				_ = math.Abs // используется ниже
+				currPrice, _ := strconv.ParseFloat(mkt.OutcomePrices[0], 64)
+				prevPrice, _ := strconv.ParseFloat(prev.OutcomePrices[0], 64)
+				diff := math.Abs(currPrice - prevPrice)
+				if diff >= rule.Threshold {
+					alerts = append(alerts, Alert{
+						Type:    AlertPriceChange,
+						Market:  mkt,
+						Message: formatAlert(AlertPriceChange, mkt, rule),
+					})
+				}
 			}
 
 		case AlertLowLiquidity:
@@ -166,6 +179,12 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 
 func formatAlert(t AlertType, mkt *gamma.Market, rule Rule) string {
 	switch t {
+	case AlertPriceChange:
+		price := "0.00"
+		if len(mkt.OutcomePrices) > 0 {
+			price = mkt.OutcomePrices[0]
+		}
+		return "⚠️ Изменение цены: " + mkt.Question + " (текущая: " + price + ")"
 	case AlertLowLiquidity:
 		return "⚠️ Низкая ликвидность: " + mkt.Question + " ($" + fmtFloat(float64(mkt.Liquidity)) + ")"
 	case AlertMarketClosed:
