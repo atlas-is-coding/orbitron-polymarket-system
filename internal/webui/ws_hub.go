@@ -182,7 +182,7 @@ func (h *hub) serveWS(w http.ResponseWriter, r *http.Request, nx *tui.Nexus, sta
 	}
 	defer conn.Close()
 
-	ch := make(chan []byte, 64)
+	ch := make(chan []byte, 256)
 	h.register(clientID, ch)
 	defer h.unregister(clientID)
 

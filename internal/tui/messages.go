@@ -81,7 +81,7 @@ type EventBus struct {
 
 // NewEventBus creates an EventBus with a buffered channel.
 func NewEventBus() *EventBus {
-	return &EventBus{ch: make(chan tea.Msg, 512)}
+	return &EventBus{ch: make(chan tea.Msg, 4096)}
 }
 
 // Send enqueues a message to the TUI channel and all tap subscribers (non-blocking; drops if full).
@@ -121,7 +121,7 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 // The caller is responsible for draining the channel to prevent blocking.
 // Call Untap() when the subscriber shuts down.
 func (b *EventBus) Tap() <-chan tea.Msg {
-	ch := make(chan tea.Msg, 512)
+	ch := make(chan tea.Msg, 4096)
 	b.mu.Lock()
 	b.taps = append(b.taps, ch)
 	b.mu.Unlock()
@@ -150,11 +150,12 @@ func (b *EventBus) WaitForEvent() tea.Cmd {
 
 // WalletAddedMsg is sent when a new active wallet is added.
 type WalletAddedMsg struct {
-	ID      string `json:"id"`
-	Address string `json:"address"`
-	Label   string `json:"label"`
-	Enabled bool   `json:"enabled"`
-	Primary bool   `json:"primary"`
+	ID         string                   `json:"id"`
+	Address    string                   `json:"address"`
+	Label      string                   `json:"label"`
+	Enabled    bool                     `json:"enabled"`
+	Primary    bool                     `json:"primary"`
+	Allowances []config.AllowanceStatus `json:"allowances,omitempty"`
 }
 // WalletRemovedMsg is sent when a wallet is removed.
 type WalletRemovedMsg struct {
