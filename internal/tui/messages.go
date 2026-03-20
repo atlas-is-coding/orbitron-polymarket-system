@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"fmt"
 	"sync"
+	"sync/atomic"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rs/zerolog"
 
 	"github.com/atlasdev/orbitron/internal/api/gamma"
 	"github.com/atlasdev/orbitron/internal/config"
@@ -74,16 +77,24 @@ const (
 // Supports multiple subscribers via Tap(); the primary channel is
 // used by the TUI via WaitForEvent().
 type EventBus struct {
-	ch     chan tea.Msg
-	mu     sync.Mutex
-	taps   []chan tea.Msg
-	closed bool
+	ch           chan tea.Msg
+	mu           sync.Mutex
+	taps         []chan tea.Msg
+	closed       bool
+	droppedCount atomic.Uint64 // counts silently dropped messages
+	log          zerolog.Logger
 }
 
 // NewEventBus creates an EventBus with a buffered channel.
 func NewEventBus() *EventBus {
-	return &EventBus{ch: make(chan tea.Msg, 4096)}
+	return &EventBus{ch: make(chan tea.Msg, 16384)}
 }
+
+// SetLogger attaches a logger for drop warnings. Call before the first Send().
+func (b *EventBus) SetLogger(log zerolog.Logger) { b.log = log }
+
+// DroppedCount returns the total number of silently dropped messages.
+func (b *EventBus) DroppedCount() uint64 { return b.droppedCount.Load() }
 
 // Send enqueues a message to the TUI channel and all tap subscribers (non-blocking; drops if full).
 func (b *EventBus) Send(msg tea.Msg) {
@@ -108,6 +119,11 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 		select {
 		case b.ch <- msg:
 		default:
+			n := b.droppedCount.Add(1)
+			b.log.Warn().
+				Str("msg_type", fmt.Sprintf("%T", msg)).
+				Uint64("total_dropped", n).
+				Msg("EventBus: main channel full, message dropped")
 		}
 	}
 
@@ -123,6 +139,11 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 			select {
 			case tap <- msg:
 			default:
+				n := b.droppedCount.Add(1)
+				b.log.Warn().
+					Str("msg_type", fmt.Sprintf("%T", msg)).
+					Uint64("total_dropped", n).
+					Msg("EventBus: tap channel full, message dropped")
 			}
 		}
 	}
@@ -133,7 +154,7 @@ func (b *EventBus) SendPriority(msg tea.Msg, p Priority) {
 // The caller is responsible for draining the channel to prevent blocking.
 // Call Untap() when the subscriber shuts down.
 func (b *EventBus) Tap() <-chan tea.Msg {
-	ch := make(chan tea.Msg, 4096)
+	ch := make(chan tea.Msg, 16384)
 	b.mu.Lock()
 	b.taps = append(b.taps, ch)
 	b.mu.Unlock()

@@ -256,6 +256,7 @@ func run() error {
 			w = io.MultiWriter(lw, fileWriter)
 		}
 		log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, w)
+		bus.SetLogger(log.With().Str("component", "eventbus").Logger())
 	} else {
 		if fileWriter != nil {
 			log = logger.NewWithWriter(cfg.Log.Level, cfg.Log.Format, io.MultiWriter(os.Stdout, fileWriter))
