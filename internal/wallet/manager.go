@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -184,6 +185,15 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 		analyticsHub = analytics.NewAnalyticsHub(m.cfg.Analytics.BatchSize)
 		analyticsClient := analytics.NewClient(l1, wCfg.Label, m.cfg.Analytics.Endpoint, m.log)
 		go func(hub *analytics.AnalyticsHub, client *analytics.Client) {
+			defer func() {
+				if r := recover(); r != nil {
+					m.log.Error().
+						Str("wallet", wCfg.Label).
+						Interface("panic", r).
+						Bytes("stack", debug.Stack()).
+						Msg("analytics goroutine panicked")
+				}
+			}()
 			interval := time.Duration(m.cfg.Analytics.ReportInterval) * time.Second
 			if interval == 0 {
 				interval = 30 * time.Second
@@ -214,7 +224,16 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 			tm.SetBus(m.bus)
 		}
 		inst.TradesMon = tm
-		go tm.Run(instCtx)
+		go func(t *monitor.TradesMonitor, label string) {
+			defer func() {
+				if r := recover(); r != nil {
+					m.log.Error().Str("wallet", label).Interface("panic", r).Bytes("stack", debug.Stack()).Msg("trades monitor panicked")
+				}
+			}()
+			if err := t.Run(instCtx); err != nil && instCtx.Err() == nil {
+				m.log.Error().Err(err).Str("wallet", label).Msg("trades monitor stopped with error")
+			}
+		}(tm, wCfg.Label)
 	}
 
 	// 10. Setup Copy Trader
@@ -230,7 +249,16 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 			m.log,
 		)
 		inst.CopyTrader = ct
-		go ct.Run(instCtx)
+		go func(c *copytrading.CopyTrader, label string) {
+			defer func() {
+				if r := recover(); r != nil {
+					m.log.Error().Str("wallet", label).Interface("panic", r).Bytes("stack", debug.Stack()).Msg("copy trader panicked")
+				}
+			}()
+			if err := c.Run(instCtx); err != nil && instCtx.Err() == nil {
+				m.log.Error().Err(err).Str("wallet", label).Msg("copy trader stopped with error")
+			}
+		}(ct, wCfg.Label)
 	}
 
 	// 11. Register or update in manager

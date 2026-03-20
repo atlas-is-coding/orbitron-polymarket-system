@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -426,18 +427,18 @@ func run() error {
 		mon.WithStore(db)
 	}
 
-	// --- Markets Cache ---
-	var mktCache storage.MarketCacheStore
+	// --- Storage for Markets ---
+	var store storage.Store
 	if db != nil {
-		mktCache = db
+		store = db
 	}
 
 	// --- Markets Service ---
 	var marketsService *markets.Service
 	if bus != nil || cfg.WebUI.Enabled {
-		marketsService = markets.NewService(gammaClient, bus, mktCache).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, bus, store).WithLogger(&log)
 	} else {
-		marketsService = markets.NewService(gammaClient, nil, mktCache).WithLogger(&log)
+		marketsService = markets.NewService(gammaClient, nil, store).WithLogger(&log)
 	}
 
 	// --- Health Service ---
@@ -466,6 +467,18 @@ func run() error {
 
 	startSubsystem := func(name string, fn func() error) {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error().
+						Str("subsystem", name).
+						Interface("panic", r).
+						Bytes("stack", debug.Stack()).
+						Msg("subsystem panicked — recovered, subsystem halted")
+					if bus != nil {
+						bus.Send(tui.SubsystemStatusMsg{Name: name, Active: false})
+					}
+				}
+			}()
 			if err := fn(); err != nil && ctx.Err() == nil {
 				errCh <- fmt.Errorf("%s: %w", name, err)
 			}
