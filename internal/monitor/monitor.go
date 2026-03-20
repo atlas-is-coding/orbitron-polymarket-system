@@ -15,9 +15,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// GammaClient определяет методы Gamma API, необходимые монитору.
+type GammaClient interface {
+	GetMarkets(params gamma.MarketsParams) ([]gamma.Market, error)
+}
+
 // Monitor периодически опрашивает рынки и генерирует алерты.
 type Monitor struct {
-	gamma    *gamma.Client
+	gamma    GammaClient
 	notifier notify.Notifier
 	cfg      *config.MonitorConfig
 	rules    []Rule
@@ -31,7 +36,7 @@ type Monitor struct {
 
 // New создаёт Monitor.
 func New(
-	gammaClient *gamma.Client,
+	gammaClient GammaClient,
 	notifier notify.Notifier,
 	cfg *config.MonitorConfig,
 	log zerolog.Logger,
@@ -91,26 +96,50 @@ func (m *Monitor) poll(ctx context.Context) {
 
 		alerts := m.evaluate(mkt)
 		for _, alert := range alerts {
+			// Проверка на дубликаты в БД
+			if m.store != nil {
+				// Cooldown 24h для рыночных алертов (low liquidity, high volume)
+				cooldown := 24 * time.Hour
+				sent, err := m.store.WasAlertSent(ctx, string(alert.Type), mkt.ConditionID, cooldown)
+				if err == nil && sent {
+					continue
+				}
+			}
+
 			m.logger.Info().
 				Str("type", string(alert.Type)).
 				Str("market", mkt.ConditionID).
 				Str("message", alert.Message).
 				Msg("alert triggered")
 
-			go func(msg string) {
+			go func(a Alert, parentCtx context.Context) {
 				maxRetries := 3
 				for i := 0; i < maxRetries; i++ {
-					notifCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					err := m.notifier.Send(notifCtx, msg)
+					if parentCtx.Err() != nil {
+						return
+					}
+					notifCtx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+					err := m.notifier.Send(notifCtx, a.Message)
 					cancel()
 					if err == nil {
+						if m.store != nil {
+							storeCtx, storeCancel := context.WithTimeout(parentCtx, 5*time.Second)
+							if storeErr := m.store.MarkAlertSent(storeCtx, string(a.Type), a.Market.ConditionID); storeErr != nil {
+								m.logger.Warn().Err(storeErr).Msg("failed to mark alert as sent")
+							}
+							storeCancel()
+						}
 						return
 					}
 					m.logger.Warn().Err(err).Int("attempt", i+1).Msg("failed to send alert, retrying")
-					time.Sleep(time.Duration(i+1) * 2 * time.Second)
+					select {
+					case <-parentCtx.Done():
+						return
+					case <-time.After(time.Duration(i+1) * 2 * time.Second):
+					}
 				}
 				m.logger.Error().Msg("failed to send alert after max retries")
-			}(alert.Message)
+			}(alert, ctx)
 		}
 
 		m.mu.Lock()
@@ -135,9 +164,10 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 				prevPrice, _ := strconv.ParseFloat(prev.OutcomePrices[0], 64)
 				diff := math.Abs(currPrice - prevPrice)
 				if diff >= rule.Threshold {
+					mktCopy := *mkt
 					alerts = append(alerts, Alert{
 						Type:    AlertPriceChange,
-						Market:  mkt,
+						Market:  &mktCopy,
 						Message: formatAlert(AlertPriceChange, mkt, rule),
 					})
 				}
@@ -145,18 +175,20 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 
 		case AlertLowLiquidity:
 			if float64(mkt.Liquidity) < rule.Threshold {
+				mktCopy := *mkt
 				alerts = append(alerts, Alert{
 					Type:    AlertLowLiquidity,
-					Market:  mkt,
+					Market:  &mktCopy,
 					Message: formatAlert(AlertLowLiquidity, mkt, rule),
 				})
 			}
 
 		case AlertMarketClosed:
 			if !hasPrev && mkt.Closed {
+				mktCopy := *mkt
 				alerts = append(alerts, Alert{
 					Type:    AlertMarketClosed,
-					Market:  mkt,
+					Market:  &mktCopy,
 					Message: formatAlert(AlertMarketClosed, mkt, rule),
 				})
 			}
@@ -164,9 +196,10 @@ func (m *Monitor) evaluate(mkt *gamma.Market) []Alert {
 		case AlertHighVolume:
 			if float64(mkt.Volume) > rule.Threshold {
 				if !hasPrev || float64(prev.Volume) <= rule.Threshold {
+					mktCopy := *mkt
 					alerts = append(alerts, Alert{
 						Type:    AlertHighVolume,
-						Market:  mkt,
+						Market:  &mktCopy,
 						Message: formatAlert(AlertHighVolume, mkt, rule),
 					})
 				}

@@ -110,14 +110,14 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 	for id := range tm.prevOrderIDs {
 		if _, ok := newOrderIDs[id]; !ok {
 			tm.logger.Info().Str("order_id", id).Msg(i18n.T().LogOrderClosed)
-			go func(orderID string) {
-				notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			go func(orderID string, parentCtx context.Context) {
+				notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 				defer cancel()
 				msg := fmt.Sprintf(i18n.T().TgOrderClosed, orderID)
-				if err := tm.notifier.Send(notifCtx, msg); err != nil {
+				if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
 					tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 				}
-			}(id)
+			}(id, ctx)
 		}
 	}
 
@@ -125,14 +125,14 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 		for _, o := range resp.Data {
 			if _, ok := tm.prevOrderIDs[o.ID]; !ok {
 				tm.logger.Info().Str("order_id", o.ID).Str("side", string(o.Side)).Str("price", o.Price).Msg(i18n.T().LogNewOrderDetected)
-				go func(order clob.Order) {
-					notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				go func(order clob.Order, parentCtx context.Context) {
+					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 					defer cancel()
 					msg := fmt.Sprintf(i18n.T().TgNewOrder, order.Side, order.AssetID[:8]+"...", order.Price, order.OriginalSize)
-					if err := tm.notifier.Send(notifCtx, msg); err != nil {
+					if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
-				}(o)
+				}(o, ctx)
 			}
 		}
 	}
@@ -200,15 +200,15 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 					})
 				}
 
-				go func(trade clob.Trade) {
-					notifCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				go func(trade clob.Trade, parentCtx context.Context) {
+					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 					defer cancel()
 					msg := fmt.Sprintf(i18n.T().TgTradeExecuted,
 						trade.Side, trade.AssetID[:8]+"...", trade.Price, trade.Size)
-					if err := tm.notifier.Send(notifCtx, msg); err != nil {
+					if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
-				}(t)
+				}(t, ctx)
 			}
 		}
 	}
