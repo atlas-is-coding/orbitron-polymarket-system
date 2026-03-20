@@ -66,7 +66,8 @@ func (s *Server) recoverMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) Run(ctx context.Context) error {
 	// Subscribe to EventBus
 	tap := s.bus.Tap()
-	go s.hub.consume(ctx, tap, s.nx, s.state)
+	defer s.bus.Untap(tap) // deregister tap channel when server exits
+	go s.hub.consume(ctx, tap, s.state)
 
 	mux := http.NewServeMux()
 

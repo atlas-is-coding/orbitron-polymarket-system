@@ -59,9 +59,9 @@ func (h *hub) broadcast(ev WsEvent) {
 	h.mu.Unlock()
 }
 
-// consume reads from EventBus tap channel and broadcasts to WS clients,
-// also updating state snapshot.
-func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, nx *tui.Nexus, state *WebState) {
+// consume reads from EventBus tap channel, updates WebState, and broadcasts to WS clients.
+// Nexus is updated separately by the dedicated goroutine in cmd/bot/main.go.
+func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, state *WebState) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -70,7 +70,6 @@ func (h *hub) consume(ctx context.Context, tap <-chan tea.Msg, nx *tui.Nexus, st
 			if !ok {
 				return
 			}
-			nx.Handle(msg)
 			h.handleMsg(msg, state)
 		}
 	}
