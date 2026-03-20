@@ -60,38 +60,37 @@ func (e *Engine) Strategies() []Strategy {
 	return out
 }
 
-// Start запускает все зарегистрированные стратегии.
+// Start запускает все зарегистрированные стратегии в фоновых горутинах.
+// Возвращает управление сразу после запуска.
 func (e *Engine) Start(ctx context.Context) error {
-	e.mu.RLock()
-	entries := make([]strategyEntry, len(e.entries))
-	copy(entries, e.entries)
-	e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
-	if len(entries) == 0 {
+	if len(e.entries) == 0 {
 		e.logger.Warn().Msg("no strategies registered")
 		return nil
 	}
 
-	errCh := make(chan error, len(entries))
-	var wg sync.WaitGroup
-
-	for _, en := range entries {
-		wg.Add(1)
-		go func(s Strategy) {
-			defer wg.Done()
+	for i := range e.entries {
+		if e.entries[i].cancel != nil {
+			continue // Already running
+		}
+		sCtx, cancel := context.WithCancel(ctx)
+		e.entries[i].cancel = cancel
+		go func(idx int, s Strategy, c context.CancelFunc) {
+			defer c()
 			e.logger.Info().Str("strategy", s.Name()).Msg("starting strategy")
-			if err := s.Start(ctx); err != nil && ctx.Err() == nil {
+			if err := s.Start(sCtx); err != nil && sCtx.Err() == nil {
 				e.logger.Error().Err(err).Str("strategy", s.Name()).Msg("strategy error")
-				errCh <- fmt.Errorf("strategy %q: %w", s.Name(), err)
+				e.mu.Lock()
+				if e.entries[idx].cancel != nil {
+					e.entries[idx].cancel = nil
+				}
+				e.mu.Unlock()
 			}
-		}(en.strategy)
+		}(i, e.entries[i].strategy, cancel)
 	}
 
-	wg.Wait()
-	close(errCh)
-	for err := range errCh {
-		return err
-	}
 	return nil
 }
 
