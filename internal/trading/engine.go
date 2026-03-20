@@ -12,6 +12,7 @@ import (
 type strategyEntry struct {
 	strategy Strategy
 	cancel   context.CancelFunc // nil if not running
+	gen      uint64             // incremented on each start; goroutine only clears cancel when gen matches
 }
 
 // Engine управляет жизненным циклом торговых стратегий.
@@ -77,18 +78,19 @@ func (e *Engine) Start(ctx context.Context) error {
 		}
 		sCtx, cancel := context.WithCancel(ctx)
 		e.entries[i].cancel = cancel
-		go func(idx int, s Strategy, c context.CancelFunc) {
+		e.entries[i].gen++
+		go func(idx int, s Strategy, c context.CancelFunc, gen uint64) {
 			defer c()
 			e.logger.Info().Str("strategy", s.Name()).Msg("starting strategy")
 			if err := s.Start(sCtx); err != nil && sCtx.Err() == nil {
 				e.logger.Error().Err(err).Str("strategy", s.Name()).Msg("strategy error")
-				e.mu.Lock()
-				if e.entries[idx].cancel != nil {
-					e.entries[idx].cancel = nil
-				}
-				e.mu.Unlock()
 			}
-		}(i, e.entries[i].strategy, cancel)
+			e.mu.Lock()
+			if e.entries[idx].gen == gen {
+				e.entries[idx].cancel = nil
+			}
+			e.mu.Unlock()
+		}(i, e.entries[i].strategy, cancel, e.entries[i].gen)
 	}
 
 	return nil
@@ -105,12 +107,19 @@ func (e *Engine) StartStrategy(ctx context.Context, name string) error {
 			}
 			sCtx, cancel := context.WithCancel(ctx)
 			e.entries[i].cancel = cancel
-			go func(s Strategy, c context.CancelFunc) {
+			e.entries[i].gen++
+			go func(idx int, s Strategy, c context.CancelFunc, gen uint64) {
 				defer c()
 				if err := s.Start(sCtx); err != nil && sCtx.Err() == nil {
 					e.logger.Error().Err(err).Str("strategy", s.Name()).Msg("strategy error")
 				}
-			}(en.strategy, cancel)
+				// Clear cancel so the strategy can be restarted.
+				e.mu.Lock()
+				if e.entries[idx].gen == gen {
+					e.entries[idx].cancel = nil
+				}
+				e.mu.Unlock()
+			}(i, en.strategy, cancel, e.entries[i].gen)
 			e.logger.Info().Str("strategy", name).Msg("strategy started")
 			return nil
 		}
