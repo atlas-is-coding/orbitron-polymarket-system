@@ -14,6 +14,8 @@ GEMINI.md
 **/mock_test.go
 # Exception for order expiration tests
 !internal/order/expiration_test.go
+# Exception for integration tests
+!internal/monitor/integration_test.go
 
 # AI / Workflow artifacts
 .superpowers/
