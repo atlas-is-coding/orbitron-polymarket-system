@@ -363,7 +363,7 @@ func (m OverviewModel) View() string {
 			if colW < 12 {
 				colW = 12
 			}
-			hdr := StyleFgDim.Bold(true).Render(fmt.Sprintf(" %-*s  %-14s  %-14s  %s", colW, "LABEL", "BALANCE", "P&L", "STATUS"))
+			hdr := StyleFgDimBold.Render(fmt.Sprintf(" %-*s  %-14s  %-14s  %s", colW, "LABEL", "BALANCE", "P&L", "STATUS"))
 			walletsContent.WriteString(hdr + "\n")
 			walletsContent.WriteString(StyleMuted.Render(" "+strings.Repeat("─", m.width-6)) + "\n")
 

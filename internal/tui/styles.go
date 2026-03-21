@@ -78,7 +78,8 @@ var (
 	StylePrimary = lipgloss.NewStyle().Foreground(ColorPrimary)
 	StyleAccent  = lipgloss.NewStyle().Foreground(ColorAccent)
 	StyleGlow    = lipgloss.NewStyle().Foreground(ColorGlow).Bold(true)
-	StyleFgDim   = lipgloss.NewStyle().Foreground(ColorFgDim)
+	StyleFgDim      = lipgloss.NewStyle().Foreground(ColorFgDim)
+	StyleFgDimBold  = lipgloss.NewStyle().Foreground(ColorFgDim).Bold(true)
 
 	// ── Typography (spec §3) ─────────────────────────────────────────────────
 	StylePageTitle   = lipgloss.NewStyle().Bold(true).Foreground(ColorBright)
