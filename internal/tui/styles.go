@@ -16,9 +16,9 @@ var (
 	ColorPrimary2   = lipgloss.Color("#4A1580") // unchanged
 	ColorPrimaryDim = lipgloss.Color("#555555") // new
 
-	ColorBright = lipgloss.Color("#a78bfa") // new
-	ColorAccent = lipgloss.Color("#a78bfa") // compat alias → same as ColorBright
-	ColorGlow   = lipgloss.Color("#a78bfa") // compat alias → same as ColorBright
+	ColorBright = lipgloss.Color("#a78bfa") // new — prefer this in new code
+	ColorAccent = lipgloss.Color("#a78bfa") // compat alias → prefer ColorBright in new code
+	ColorGlow   = lipgloss.Color("#a78bfa") // compat alias → prefer ColorBright in new code
 
 	ColorSuccess = lipgloss.Color("#34d399") // was #00FF9D
 	ColorWarning = lipgloss.Color("#fbbf24") // was #FFD700
@@ -28,8 +28,8 @@ var (
 	ColorText   = lipgloss.Color("#e0e0e0") // new
 	ColorFg     = lipgloss.Color("#e0e0e0") // compat alias → same as ColorText
 	ColorFgDim  = lipgloss.Color("#888888") // was #9595A8
-	ColorMuted  = lipgloss.Color("#888888") // was #4A4A60
-	ColorBorder = lipgloss.Color("#555555") // was #2A2A37 → matches ColorPrimaryDim
+	ColorMuted  = lipgloss.Color("#888888") // was #4A4A60 — now visibly readable (used in help bars, empty states, metadata)
+	ColorBorder = lipgloss.Color("#555555") // intentionally same as ColorPrimaryDim for this palette; separate if palette diverges
 
 	// ── Borders ─────────────────────────────────────────────────────────────
 	BorderNormal = lipgloss.Border{
@@ -56,6 +56,7 @@ var (
 
 	BorderRounded = lipgloss.RoundedBorder()
 
+	// BorderSpec uses double vertical bars (║) with thin horizontal (─) per spec §6.
 	BorderSpec = lipgloss.Border{
 		Top:         "─",
 		Bottom:      "─",
