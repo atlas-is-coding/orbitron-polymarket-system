@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
@@ -18,7 +19,7 @@ import (
 //go:embed web/dist
 var staticFiles embed.FS
 
-// New creates a Server. canceler, wallets, and mkts may be nil.
+// New creates a Server. canceler, wallets, mkts, trading, and store may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
@@ -29,6 +30,7 @@ func New(
 	mkts MarketsProvider,
 	placer OrderPlacer,
 	trading TradingProvider,
+	store storage.Store, // may be nil
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -42,6 +44,7 @@ func New(
 		mkts:     mkts,
 		placer:   placer,
 		trading:  trading,
+		store:    store,
 		state:    newWebState(),
 		hub:      newHub(),
 	}
@@ -205,6 +208,11 @@ func (s *Server) Run(ctx context.Context) error {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	}))
+
+	// Wallet history endpoints
+	mux.HandleFunc("/api/v1/wallets/history/orders", s.jwtMiddleware(s.handleOrderHistory))
+	mux.HandleFunc("/api/v1/wallets/history/trades", s.jwtMiddleware(s.handleTradeHistory))
+	mux.HandleFunc("/api/v1/wallets/stats", s.jwtMiddleware(s.handleWalletStats))
 
 	// Markets — order matters: exact paths before the wildcard subtree
 	mux.HandleFunc("/api/v1/markets/tags", s.jwtMiddleware(s.handleMarketsTags))

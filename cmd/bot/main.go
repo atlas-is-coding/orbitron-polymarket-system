@@ -573,7 +573,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 
 		// Emit initial state to Nexus/WebUI after server is ready

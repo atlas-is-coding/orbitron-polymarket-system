@@ -16,6 +16,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/atlasdev/orbitron/internal/wallet"
 )
@@ -77,6 +78,7 @@ type Server struct {
 	mkts     MarketsProvider // may be nil
 	placer   OrderPlacer     // may be nil
 	trading  TradingProvider // may be nil
+	store    storage.Store   // may be nil
 	state    *WebState
 	hub      *hub
 }
@@ -348,7 +350,7 @@ func (s *Server) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
                 return
         }
         if req.Price <= 0 || req.Price >= 1 {
-                writeError(w, http.StatusBadRequest, "price must be between 0.01 and 0.99")
+                writeError(w, http.StatusBadRequest, "price must be between 0.001 and 0.999")
                 return
         }
         if req.SizeUSD <= 0 {
@@ -370,6 +372,133 @@ func (s *Server) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
         }
         writeJSON(w, http.StatusOK, map[string]string{"order_id": orderID})
 }
+
+// handleOrderHistory returns order history for a wallet.
+func (s *Server) handleOrderHistory(w http.ResponseWriter, r *http.Request) {
+	walletAddr := r.URL.Query().Get("wallet_address")
+	if walletAddr == "" {
+		writeError(w, http.StatusBadRequest, "missing wallet_address")
+		return
+	}
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	offset := 0
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	if s.store == nil {
+		writeError(w, http.StatusServiceUnavailable, "order store not available")
+		return
+	}
+
+	filters := storage.OrderFilters{
+		WalletAddress: walletAddr,
+		Limit:         limit,
+	}
+	orders, err := s.store.GetOrders(r.Context(), filters)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch order history")
+		return
+	}
+
+	// Apply offset and limit
+	if offset > len(orders) {
+		offset = len(orders)
+	}
+	orders = orders[offset:]
+	if limit > 0 && len(orders) > limit {
+		orders = orders[:limit]
+	}
+
+	if orders == nil {
+		orders = []*storage.Order{}
+	}
+
+	writeJSON(w, http.StatusOK, orders)
+}
+
+// handleTradeHistory returns trade history for a wallet.
+func (s *Server) handleTradeHistory(w http.ResponseWriter, r *http.Request) {
+	walletAddr := r.URL.Query().Get("wallet_address")
+	if walletAddr == "" {
+		writeError(w, http.StatusBadRequest, "missing wallet_address")
+		return
+	}
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	if s.store == nil {
+		writeError(w, http.StatusServiceUnavailable, "trade store not available")
+		return
+	}
+
+	// Get trades for the wallet within a time range (e.g., last 90 days)
+	now := time.Now()
+	ninetyDaysAgo := now.AddDate(0, 0, -90)
+
+	trades, err := s.store.GetTrades(r.Context(), walletAddr, ninetyDaysAgo, now)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch trade history")
+		return
+	}
+
+	// Apply limit
+	if limit > 0 && len(trades) > limit {
+		trades = trades[:limit]
+	}
+
+	if trades == nil {
+		trades = []*storage.Trade{}
+	}
+
+	writeJSON(w, http.StatusOK, trades)
+}
+
+// handleWalletStats returns wallet statistics.
+func (s *Server) handleWalletStats(w http.ResponseWriter, r *http.Request) {
+	walletAddr := r.URL.Query().Get("wallet_address")
+	if walletAddr == "" {
+		writeError(w, http.StatusBadRequest, "missing wallet_address")
+		return
+	}
+
+	if s.store == nil {
+		writeError(w, http.StatusServiceUnavailable, "stats store not available")
+		return
+	}
+
+	stats, err := s.store.GetWalletStats(r.Context(), walletAddr, 1)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch wallet stats")
+		return
+	}
+
+	if stats == nil || len(stats) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"wallet_address": walletAddr,
+			"balance_usd":    0.0,
+			"pnl_usd":        0.0,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats[0])
+}
+
 func (s *Server) handleAddTrader(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Address  string  `json:"address"`
