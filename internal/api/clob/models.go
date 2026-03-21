@@ -105,6 +105,7 @@ const (
 	StatusCanceled  OrderStatus = "CANCELED"
 	StatusRetrying  OrderStatus = "RETRYING"
 	StatusUnmatched OrderStatus = "UNMATCHED"
+	StatusExpired   OrderStatus = "EXPIRED"
 )
 
 // Order — ордер в книге ордеров.

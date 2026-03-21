@@ -13,6 +13,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/notify"
+	"github.com/atlasdev/orbitron/internal/order"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
@@ -31,8 +32,9 @@ type TradesMonitor struct {
 	trades    []clob.Trade
 	positions []clob.Position
 
-	prevOrderIDs map[string]struct{}
-	prevTradeIDs map[string]struct{}
+	prevOrderIDs    map[string]struct{}
+	prevTradeIDs    map[string]struct{}
+	expiredOrderIDs map[string]struct{}
 
 	bus *tui.EventBus
 }
@@ -53,10 +55,11 @@ func NewTradesMonitor(
 		dataClient:   dataClient,
 		notifier:     notifier,
 		cfg:          cfg,
-		logger:       log.With().Str("component", "trades-monitor").Logger(),
-		address:      address,
-		prevOrderIDs: make(map[string]struct{}),
-		prevTradeIDs: make(map[string]struct{}),
+		logger:          log.With().Str("component", "trades-monitor").Logger(),
+		address:         address,
+		prevOrderIDs:    make(map[string]struct{}),
+		prevTradeIDs:    make(map[string]struct{}),
+		expiredOrderIDs: make(map[string]struct{}),
 	}
 }
 
@@ -133,6 +136,26 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(o, ctx)
+			}
+		}
+	}
+
+	// Mark expired GTD orders
+	for idx := range resp.Data {
+		if order.IsOrderExpired(&resp.Data[idx]) {
+			resp.Data[idx].Status = clob.StatusExpired
+			orderID := resp.Data[idx].ID
+			if _, alreadyNotified := tm.expiredOrderIDs[orderID]; !alreadyNotified {
+				tm.expiredOrderIDs[orderID] = struct{}{}
+				tm.logger.Info().Str("order_id", orderID).Msg("GTD order expired")
+				go func(expiredOrder clob.Order, parentCtx context.Context) {
+					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
+					defer cancel()
+					msg := fmt.Sprintf("Order %s expired (GTD expiration reached)", expiredOrder.ID[:8]+"...")
+					if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
+						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
+					}
+				}(resp.Data[idx], ctx)
 			}
 		}
 	}

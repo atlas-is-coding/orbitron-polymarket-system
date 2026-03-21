@@ -12,6 +12,8 @@ GEMINI.md
 # Tests (requested for removal)
 **/*_test.go
 **/mock_test.go
+# Exception for order expiration tests
+!internal/order/expiration_test.go
 
 # AI / Workflow artifacts
 .superpowers/
@@ -36,6 +38,7 @@ config.toml
 
 # Docs
 docs/
+docs/*
 
 # Frontend
 internal/webui/web/node_modules/
@@ -46,3 +49,9 @@ internal/webui/web/node_modules/
 .DS_Store
 .worktrees/
 CHANGELOG.md
+TESTING.md
+DATA_SYNC_ANALYSIS.md
+DATA_SYNC_EXAMPLES.md
+DATA_SYNC_FIXES_PHASE1.md
+DATA_SYNC_QUICK_REF.md
+DATA_SYNC_SUMMARY.md
