@@ -2,12 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/ui"
 )
 
 // TradingSubTab identifies which sub-tab is active inside Trading.
@@ -49,12 +51,13 @@ type CancelAllOrdersMsg struct{}
 
 // TradingModel is the Trading tab sub-model (Orders + Positions with sub-tabs).
 type TradingModel struct {
-	subTab    TradingSubTab
-	orders    table.Model
-	orderRows []OrderRow
-	positions table.Model
-	width     int
-	height    int
+	subTab         TradingSubTab
+	orders         table.Model
+	orderRows      []OrderRow
+	positions      table.Model
+	width          int
+	height         int
+	cancelDebounce *ui.Debouncer
 }
 
 // NewTradingModel creates a new TradingModel.
@@ -114,11 +117,12 @@ func NewTradingModel(width, height int) TradingModel {
 	pt.SetStyles(ps)
 
 	return TradingModel{
-		subTab:    SubTabOrders,
-		orders:    ot,
-		positions: pt,
-		width:     width,
-		height:    height,
+		subTab:         SubTabOrders,
+		orders:         ot,
+		positions:      pt,
+		width:          width,
+		height:         height,
+		cancelDebounce: ui.NewDebouncer(200 * time.Millisecond),
 	}
 }
 
@@ -161,6 +165,9 @@ func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 			m.orders.Blur()
 			return m, nil
 		case "x", "X":
+			if !m.cancelDebounce.Allow() {
+				return m, nil // ignore rapid presses
+			}
 			if m.subTab == SubTabOrders {
 				if idx := m.orders.Cursor(); idx >= 0 && idx < len(m.orderRows) {
 					id := m.orderRows[idx].ID
@@ -169,6 +176,9 @@ func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 			}
 			return m, nil
 		case "ctrl+x":
+			if !m.cancelDebounce.Allow() {
+				return m, nil // ignore rapid presses
+			}
 			if m.subTab == SubTabOrders {
 				return m, func() tea.Msg { return CancelAllOrdersMsg{} }
 			}
