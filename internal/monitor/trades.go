@@ -353,6 +353,13 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 	tm.prevTradeIDs = newTradeIDs
 	tm.mu.Unlock()
 
+	// Update wallet stats after new trades
+	if len(resp.Data) > 0 && tm.db != nil {
+		if err := tm.db.UpdateWalletStats(ctx, tm.address); err != nil {
+			tm.logger.Warn().Err(err).Msg("failed to update wallet stats")
+		}
+	}
+
 	tm.logger.Debug().Int("count", len(resp.Data)).Msg("trades updated")
 }
 

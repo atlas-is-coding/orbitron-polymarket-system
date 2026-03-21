@@ -252,6 +252,12 @@ type OrderHistoryStore interface {
 
 	InsertTrade(ctx context.Context, trade *Trade) error
 	GetTrades(ctx context.Context, walletAddress string, from, to time.Time) ([]*Trade, error)
+	GetWalletTradesByCondition(ctx context.Context, walletAddress, conditionID string) ([]*Trade, error)
+	GetWalletOrdersByCondition(ctx context.Context, walletAddress, conditionID string) ([]*Order, error)
+
+	// Statistics computation
+	UpdateWalletStats(ctx context.Context, walletAddress string) error
+	GetWalletStatsComputed(ctx context.Context, walletAddress string) (*WalletStats, error)
 }
 
 // NotificationQueueStore — интерфейс для очереди уведомлений.

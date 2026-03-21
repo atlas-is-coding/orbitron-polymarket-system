@@ -257,3 +257,75 @@ func (d *DB) GetWalletTradesByCondition(ctx context.Context, walletAddress, cond
 	}
 	return result, rows.Err()
 }
+
+// UpdateWalletStats перевычисляет статистику кошелька на основе всех его сделок
+func (d *DB) UpdateWalletStats(ctx context.Context, walletAddress string) error {
+	// SQL запрос для подсчета статистики:
+	// - COUNT(*) всех сделок
+	// - SUM(volume) - общий объем
+	// - Количество побед (продажи выше средней цены покупок)
+	// - Количество проигрышей (ниже средней цены покупок)
+
+	query := `
+		SELECT
+			COUNT(*) as total_trades,
+			COALESCE(SUM(price * size), 0) as total_volume,
+			COALESCE(SUM(CASE WHEN side = 'SELL' AND price > (
+				SELECT COALESCE(AVG(price), 0) FROM trades_history
+				WHERE wallet_address = ? AND side = 'BUY'
+			) THEN 1 ELSE 0 END), 0) as win_count,
+			COALESCE(SUM(CASE WHEN side = 'SELL' AND price <= (
+				SELECT COALESCE(AVG(price), 0) FROM trades_history
+				WHERE wallet_address = ? AND side = 'BUY'
+			) THEN 1 ELSE 0 END), 0) as loss_count
+		FROM trades_history WHERE wallet_address = ?
+	`
+
+	var totalTrades int
+	var totalVolume float64
+	var winCount int
+	var lossCount int
+
+	row := d.db.QueryRowContext(ctx, query, walletAddress, walletAddress, walletAddress)
+	if err := row.Scan(&totalTrades, &totalVolume, &winCount, &lossCount); err != nil {
+		return fmt.Errorf("compute stats: %w", err)
+	}
+
+	now := time.Now().Unix()
+	_, err := d.db.ExecContext(ctx, `
+		INSERT INTO wallet_statistics (wallet_address, fetched_at, balance_usd, pnl_usd, win_rate, total_trades, total_volume)
+		VALUES (?, ?, 0, 0, ?, ?, ?)
+		ON CONFLICT(wallet_address, fetched_at) DO UPDATE SET
+			total_trades = excluded.total_trades,
+			total_volume = excluded.total_volume,
+			win_rate = excluded.win_rate
+	`, walletAddress, now, float64(winCount), totalTrades, totalVolume)
+
+	return err
+}
+
+// GetWalletStatsComputed получает вычисленную статистику кошелька
+func (d *DB) GetWalletStatsComputed(ctx context.Context, walletAddress string) (*storage.WalletStats, error) {
+	var stats storage.WalletStats
+	var fetchedAtVal int64
+	result := d.db.QueryRowContext(ctx, `
+		SELECT wallet_address, fetched_at, balance_usd, pnl_usd,
+		       win_rate, total_trades, total_volume
+		FROM wallet_statistics WHERE wallet_address = ?
+		ORDER BY fetched_at DESC LIMIT 1
+	`, walletAddress)
+
+	err := result.Scan(&stats.WalletAddress, &fetchedAtVal, &stats.BalanceUSD, &stats.PnLUSD,
+		&stats.WinRate, &stats.TotalTrades, &stats.TotalVolume)
+
+	if err != nil && err.Error() == "sql: no rows in result set" {
+		// Если не найдено, вернуть пустую статистику
+		return &storage.WalletStats{WalletAddress: walletAddress}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get wallet stats: %w", err)
+	}
+
+	stats.FetchedAt = time.Unix(fetchedAtVal, 0)
+	return &stats, nil
+}
