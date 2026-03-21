@@ -1,10 +1,12 @@
   [monitor.trades]
     enabled = true
-    poll_interval_ms = 5000
+    poll_interval_ms = 2000       # интервал опроса ордеров (миллисекунды)
+    positions_poll_ms = 5000      # интервал опроса позиций (раздельно)
+    max_backoff_ms = 30000        # макс exponential backoff на ошибках
+    trades_limit = 100            # макс сделок за один poll
     track_positions = true
     alert_on_fill = true
     alert_on_cancel = true
-    trades_limit = 50
 
 [analytics]
   # Enable analytics reporting to a central server (Next.js website).
@@ -16,6 +18,15 @@
   report_interval = 30
   # Batch size to trigger immediate report (default 10)
   batch_size = 10
+
+
+[api]
+  clob_url = "https://clob.polymarket.com"
+  gamma_url = "https://gamma-api.polymarket.com"
+  data_url = "https://data-api.polymarket.com"
+  ws_url = "wss://ws-subscriptions-clob.polymarket.com/ws/"
+  timeout_sec = 10
+  max_retries = 3
 
 [telegram]
   enabled = false

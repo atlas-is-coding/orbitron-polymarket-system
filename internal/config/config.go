@@ -23,7 +23,7 @@ type WalletConfig struct {
 
 // Config — root configuration structure.
 type Config struct {
-        Analytics   AnalyticsConfig   `toml:"analytics"   json:"analytics"`
+	Analytics   AnalyticsConfig   `toml:"analytics"   json:"analytics"`
 	Wallets     []WalletConfig    `toml:"wallets"     json:"wallets"`
 	Auth        AuthConfig        `toml:"auth"        json:"auth"` // Deprecated: use [[wallets]]; kept for migration
 	API         APIConfig         `toml:"api"         json:"api"`
@@ -43,6 +43,7 @@ type APIConfig struct {
 	GammaURL   string `toml:"gamma_url"   json:"gamma_url"`
 	DataURL    string `toml:"data_url"    json:"data_url"`
 	WSURL      string `toml:"ws_url"      json:"ws_url"`
+	PolygonRPC string `toml:"polygon_rpc" json:"polygon_rpc"`
 	TimeoutSec int    `toml:"timeout_sec" json:"timeout_sec"`
 	MaxRetries int    `toml:"max_retries" json:"max_retries"`
 }
@@ -86,6 +87,10 @@ type TradesMonitorConfig struct {
 	AlertOnCancel bool `toml:"alert_on_cancel" json:"alert_on_cancel"`
 	// TradesLimit — maximum number of trades in one request
 	TradesLimit int `toml:"trades_limit" json:"trades_limit"`
+	// PositionsPollMs — polling interval for positions separately
+	PositionsPollMs int `toml:"positions_poll_ms" json:"positions_poll_ms"`
+	// MaxBackoffMs — maximum exponential backoff on errors
+	MaxBackoffMs int `toml:"max_backoff_ms" json:"max_backoff_ms"`
 }
 
 type TelegramConfig struct {
@@ -106,10 +111,10 @@ type LogConfig struct {
 }
 
 type AnalyticsConfig struct {
-        Enabled        bool   `toml:"enabled"         json:"enabled"` 
-        Endpoint       string `toml:"endpoint"        json:"endpoint"` 
-        ReportInterval int    `toml:"report_interval" json:"report_interval"` 
-        BatchSize      int    `toml:"batch_size"      json:"batch_size"` 
+	Enabled        bool   `toml:"enabled"         json:"enabled"`
+	Endpoint       string `toml:"endpoint"        json:"endpoint"`
+	ReportInterval int    `toml:"report_interval" json:"report_interval"`
+	BatchSize      int    `toml:"batch_size"      json:"batch_size"`
 }
 
 type UIConfig struct {
@@ -129,6 +134,15 @@ type ProxyConfig struct {
 	Addr     string `toml:"addr"     json:"addr"` // "host:port"
 	Username string `toml:"username" json:"username"`
 	Password string `toml:"password" json:"password"`
+}
+
+// AllowanceStatus represents the approval state for a token/spender pair.
+type AllowanceStatus struct {
+	TokenSymbol string `json:"token_symbol"`
+	Token       string `json:"token"`
+	SpenderName string `json:"spender_name"`
+	Spender     string `json:"spender"`
+	Approved    bool   `json:"approved"`
 }
 
 // CopytradingConfig — copytrading subsystem configuration.
@@ -177,22 +191,22 @@ type RiskConfig struct {
 }
 
 type ArbitrageConfig struct {
-	Enabled        bool    `toml:"enabled"          json:"enabled"`
+	Enabled        bool     `toml:"enabled"          json:"enabled"`
 	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
-	MinProfitUSD   float64 `toml:"min_profit_usd"   json:"min_profit_usd"`
-	MaxPositionUSD float64 `toml:"max_position_usd" json:"max_position_usd"`
-	PollIntervalMs int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
-	ExecuteOrders  bool    `toml:"execute_orders"   json:"execute_orders"`
+	MinProfitUSD   float64  `toml:"min_profit_usd"   json:"min_profit_usd"`
+	MaxPositionUSD float64  `toml:"max_position_usd" json:"max_position_usd"`
+	PollIntervalMs int      `toml:"poll_interval_ms" json:"poll_interval_ms"`
+	ExecuteOrders  bool     `toml:"execute_orders"   json:"execute_orders"`
 }
 
 type MarketMakingConfig struct {
-	Enabled              bool    `toml:"enabled"                json:"enabled"`
-	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
-	SpreadPct            float64 `toml:"spread_pct"             json:"spread_pct"`
-	MaxPositionUSD       float64 `toml:"max_position_usd"       json:"max_position_usd"`
-	RebalanceIntervalSec int     `toml:"rebalance_interval_sec" json:"rebalance_interval_sec"`
-	MinLiquidityUSD      float64 `toml:"min_liquidity_usd"      json:"min_liquidity_usd"`
-	ExecuteOrders        bool    `toml:"execute_orders"         json:"execute_orders"`
+	Enabled              bool     `toml:"enabled"                json:"enabled"`
+	WalletIDs            []string `toml:"wallet_ids"       json:"wallet_ids"`
+	SpreadPct            float64  `toml:"spread_pct"             json:"spread_pct"`
+	MaxPositionUSD       float64  `toml:"max_position_usd"       json:"max_position_usd"`
+	RebalanceIntervalSec int      `toml:"rebalance_interval_sec" json:"rebalance_interval_sec"`
+	MinLiquidityUSD      float64  `toml:"min_liquidity_usd"      json:"min_liquidity_usd"`
+	ExecuteOrders        bool     `toml:"execute_orders"         json:"execute_orders"`
 }
 
 type PositiveEVConfig struct {
@@ -207,23 +221,23 @@ type PositiveEVConfig struct {
 }
 
 type RisklessRateConfig struct {
-	Enabled         bool    `toml:"enabled"          json:"enabled"`
-	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
-	MinDurationDays int     `toml:"min_duration_days" json:"min_duration_days"`
-	MaxNOPrice      float64 `toml:"max_no_price"     json:"max_no_price"`
-	MaxPositionUSD  float64 `toml:"max_position_usd" json:"max_position_usd"`
-	PollIntervalMs  int     `toml:"poll_interval_ms" json:"poll_interval_ms"`
-	ExecuteOrders   bool    `toml:"execute_orders"   json:"execute_orders"`
+	Enabled         bool     `toml:"enabled"          json:"enabled"`
+	WalletIDs       []string `toml:"wallet_ids"       json:"wallet_ids"`
+	MinDurationDays int      `toml:"min_duration_days" json:"min_duration_days"`
+	MaxNOPrice      float64  `toml:"max_no_price"     json:"max_no_price"`
+	MaxPositionUSD  float64  `toml:"max_position_usd" json:"max_position_usd"`
+	PollIntervalMs  int      `toml:"poll_interval_ms" json:"poll_interval_ms"`
+	ExecuteOrders   bool     `toml:"execute_orders"   json:"execute_orders"`
 }
 
 type FadeChaosConfig struct {
-	Enabled           bool    `toml:"enabled"              json:"enabled"`
-	WalletIDs      []string `toml:"wallet_ids"       json:"wallet_ids"`
-	SpikeThresholdPct float64 `toml:"spike_threshold_pct"  json:"spike_threshold_pct"`
-	CooldownSec       int     `toml:"cooldown_sec"         json:"cooldown_sec"`
-	MaxPositionUSD    float64 `toml:"max_position_usd"     json:"max_position_usd"`
-	PollIntervalMs    int     `toml:"poll_interval_ms"     json:"poll_interval_ms"`
-	ExecuteOrders     bool    `toml:"execute_orders"       json:"execute_orders"`
+	Enabled           bool     `toml:"enabled"              json:"enabled"`
+	WalletIDs         []string `toml:"wallet_ids"       json:"wallet_ids"`
+	SpikeThresholdPct float64  `toml:"spike_threshold_pct"  json:"spike_threshold_pct"`
+	CooldownSec       int      `toml:"cooldown_sec"         json:"cooldown_sec"`
+	MaxPositionUSD    float64  `toml:"max_position_usd"     json:"max_position_usd"`
+	PollIntervalMs    int      `toml:"poll_interval_ms"     json:"poll_interval_ms"`
+	ExecuteOrders     bool     `toml:"execute_orders"       json:"execute_orders"`
 }
 
 type CrossMarketConfig struct {
@@ -305,6 +319,21 @@ func (c *Config) validate() error {
 	if c.API.ClobURL == "" {
 		return fmt.Errorf("api.clob_url is required")
 	}
+	if c.API.PolygonRPC == "" {
+		// Use Amoy RPC for testnet, else mainnet
+		isTestnet := false
+		for _, w := range c.Wallets {
+			if w.ChainID == 80002 {
+				isTestnet = true
+				break
+			}
+		}
+		if isTestnet {
+			c.API.PolygonRPC = "https://polygon-amoy.drpc.org/"
+		} else {
+			c.API.PolygonRPC = "https://polygon.drpc.org"
+		}
+	}
 	if c.API.TimeoutSec <= 0 {
 		c.API.TimeoutSec = 10
 	}
@@ -315,10 +344,16 @@ func (c *Config) validate() error {
 		c.Monitor.PollIntervalMs = 1000
 	}
 	if c.Monitor.Trades.PollIntervalMs <= 0 {
-		c.Monitor.Trades.PollIntervalMs = 5000
+		c.Monitor.Trades.PollIntervalMs = 2000
+	}
+	if c.Monitor.Trades.PositionsPollMs <= 0 {
+		c.Monitor.Trades.PositionsPollMs = 5000
+	}
+	if c.Monitor.Trades.MaxBackoffMs <= 0 {
+		c.Monitor.Trades.MaxBackoffMs = 30000
 	}
 	if c.Monitor.Trades.TradesLimit <= 0 {
-		c.Monitor.Trades.TradesLimit = 50
+		c.Monitor.Trades.TradesLimit = 100
 	}
 	if c.Trading.DefaultOrderType == "" {
 		c.Trading.DefaultOrderType = "GTC"

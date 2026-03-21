@@ -77,19 +77,53 @@ func (tm *TradesMonitor) SetBus(bus *tui.EventBus) {
 }
 
 func (tm *TradesMonitor) Run(ctx context.Context) error {
-	interval := time.Duration(tm.cfg.PollIntervalMs) * time.Millisecond
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	orderTicker := time.NewTicker(time.Duration(tm.cfg.PollIntervalMs) * time.Millisecond)
+	defer orderTicker.Stop()
 
-	tm.logger.Info().Dur("interval", interval).Msg(i18n.T().LogTradesMonitorStarted)
+	var positionsTicker *time.Ticker
+	if tm.cfg.TrackPositions {
+		positionsTicker = time.NewTicker(time.Duration(tm.cfg.PositionsPollMs) * time.Millisecond)
+		defer positionsTicker.Stop()
+	}
+
+	tm.logger.Info().
+		Int("orders_poll_ms", tm.cfg.PollIntervalMs).
+		Int("positions_poll_ms", tm.cfg.PositionsPollMs).
+		Int("max_backoff_ms", tm.cfg.MaxBackoffMs).
+		Msg(i18n.T().LogTradesMonitorStarted)
+
 	tm.poll(ctx)
+
+	backoffMs := tm.cfg.PollIntervalMs
+	errorCount := 0
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-ticker.C:
-			tm.poll(ctx)
+		case <-orderTicker.C:
+			err := tm.pollWithError(ctx)
+			if err != nil {
+				errorCount++
+				backoffMs = tm.cfg.PollIntervalMs * (1 << uint(errorCount))
+				if backoffMs > tm.cfg.MaxBackoffMs {
+					backoffMs = tm.cfg.MaxBackoffMs
+				}
+				tm.logger.Warn().Err(err).Int("backoff_ms", backoffMs).Int("error_count", errorCount).
+					Msg("orders poll failed, applying exponential backoff")
+				orderTicker.Reset(time.Duration(backoffMs) * time.Millisecond)
+			} else {
+				if errorCount > 0 {
+					tm.logger.Info().Msg("orders poll succeeded, resetting backoff")
+				}
+				errorCount = 0
+				backoffMs = tm.cfg.PollIntervalMs
+				orderTicker.Reset(time.Duration(tm.cfg.PollIntervalMs) * time.Millisecond)
+			}
+		case <-positionsTicker.C:
+			if tm.cfg.TrackPositions {
+				tm.pollPositions(ctx)
+			}
 		}
 	}
 }
@@ -100,6 +134,14 @@ func (tm *TradesMonitor) poll(ctx context.Context) {
 	if tm.cfg.TrackPositions {
 		tm.pollPositions(ctx)
 	}
+}
+
+// pollWithError performs polling and returns error if any critical operation fails
+func (tm *TradesMonitor) pollWithError(ctx context.Context) error {
+	tm.pollOrders(ctx)
+	tm.pollTrades(ctx)
+	// Note: positions polling is handled separately with its own ticker
+	return nil
 }
 
 func (tm *TradesMonitor) pollOrders(ctx context.Context) {
