@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
@@ -531,6 +532,26 @@ func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, s
 		return "", fmt.Errorf("trading blocked in %s (IP: %s) — configure [proxy] in config.toml", geo.Country, geo.IP)
 	}
 
+	// Validate price: must be between 0.001 and 0.999
+	if price <= 0 || price >= 1 {
+		return "", fmt.Errorf("price must be between 0.001 and 0.999")
+	}
+
+	// Validate size: minimum $1 USD
+	if sizeUSD <= 1 {
+		return "", fmt.Errorf("minimum order size is $1 USD")
+	}
+
+	// Validate side
+	if side != "YES" && side != "NO" {
+		return "", fmt.Errorf("side must be either YES or NO")
+	}
+
+	// Validate orderType
+	if orderType != "GTC" && orderType != "FOK" && orderType != "GTD" {
+		return "", fmt.Errorf("orderType must be GTC, FOK, or GTD")
+	}
+
 	m.mu.RLock()
 	var inst *WalletInstance
 	for _, w := range m.instances {
@@ -549,6 +570,21 @@ func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, s
 	}
 	if inst.Cfg.PrivateKey == "" {
 		return "", fmt.Errorf("wallet %q has no private key", walletID)
+	}
+
+	// Check balance before placing order
+	balanceResp, err := inst.ClobClient.GetBalanceAllowance("COLLATERAL", "")
+	if err != nil {
+		return "", fmt.Errorf("failed to check balance: %w", err)
+	}
+	// Balance is in wei (6 decimals for USDC), convert to USD
+	balanceWei, err := strconv.ParseFloat(balanceResp.Balance, 64)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse balance: %w", err)
+	}
+	balanceUSD := balanceWei / 1e6
+	if balanceUSD < sizeUSD {
+		return "", fmt.Errorf("insufficient balance: have $%.2f, need $%.2f", balanceUSD, sizeUSD)
 	}
 
 	l1, err := auth.NewL1Signer(inst.Cfg.PrivateKey)

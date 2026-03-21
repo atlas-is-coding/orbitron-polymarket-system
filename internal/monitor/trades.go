@@ -12,8 +12,10 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/notification"
 	"github.com/atlasdev/orbitron/internal/notify"
 	"github.com/atlasdev/orbitron/internal/order"
+	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
 )
@@ -37,6 +39,10 @@ type TradesMonitor struct {
 	expiredOrderIDs map[string]struct{}
 
 	bus *tui.EventBus
+
+	db         storage.Store
+	optCache   *order.OptimisticCache
+	notifQueue *notification.Queue
 }
 
 func NewTradesMonitor(
@@ -47,7 +53,7 @@ func NewTradesMonitor(
 	cfg *config.TradesMonitorConfig,
 	log zerolog.Logger,
 	address string,
-	db ...interface{},
+	dbStore storage.Store,
 ) *TradesMonitor {
 	return &TradesMonitor{
 		analyticsHub: analyticsHub,
@@ -60,6 +66,9 @@ func NewTradesMonitor(
 		prevOrderIDs:    make(map[string]struct{}),
 		prevTradeIDs:    make(map[string]struct{}),
 		expiredOrderIDs: make(map[string]struct{}),
+		db:              dbStore,
+		optCache:        order.NewOptimisticCache(),
+		notifQueue:      notification.NewQueue(notifier, dbStore, log),
 	}
 }
 
@@ -117,7 +126,13 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 				notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 				defer cancel()
 				msg := fmt.Sprintf(i18n.T().TgOrderClosed, orderID)
-				if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
+				// Enqueue notification instead of sending directly
+				notif := &storage.Notification{
+					WalletAddress: tm.address,
+					EventType:     "ORDER_CLOSED",
+					Payload:       msg,
+				}
+				if err := tm.notifQueue.Enqueue(notifCtx, notif); err != nil && parentCtx.Err() == nil {
 					tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 				}
 			}(id, ctx)
@@ -132,7 +147,13 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 					defer cancel()
 					msg := fmt.Sprintf(i18n.T().TgNewOrder, order.Side, order.AssetID[:8]+"...", order.Price, order.OriginalSize)
-					if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
+					// Enqueue notification instead of sending directly
+					notif := &storage.Notification{
+						WalletAddress: tm.address,
+						EventType:     "ORDER_PLACED",
+						Payload:       msg,
+					}
+					if err := tm.notifQueue.Enqueue(notifCtx, notif); err != nil && parentCtx.Err() == nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(o, ctx)
@@ -152,11 +173,45 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 					defer cancel()
 					msg := fmt.Sprintf("Order %s expired (GTD expiration reached)", expiredOrder.ID[:8]+"...")
-					if err := tm.notifier.Send(notifCtx, msg); err != nil && parentCtx.Err() == nil {
+					// Enqueue notification instead of sending directly
+					notif := &storage.Notification{
+						WalletAddress: tm.address,
+						EventType:     "ORDER_EXPIRED",
+						Payload:       msg,
+					}
+					if err := tm.notifQueue.Enqueue(notifCtx, notif); err != nil && parentCtx.Err() == nil {
 						tm.logger.Warn().Err(err).Msg(i18n.T().LogFailedSendAlert)
 					}
 				}(resp.Data[idx], ctx)
 			}
+		}
+	}
+
+	// Save orders to database and reconcile cache
+	if tm.db != nil {
+		for idx := range resp.Data {
+			dbOrder := &storage.Order{
+				ID:            resp.Data[idx].ID,
+				WalletAddress: tm.address,
+				ConditionID:   "", // ConditionID is not provided by CLOB API, using AssetID (token_id) as primary identifier
+				AssetID:       resp.Data[idx].AssetID,
+				Side:          string(resp.Data[idx].Side),
+				OrderType:     string(resp.Data[idx].OrderType),
+				Price:         parseFloat(resp.Data[idx].Price),
+				Size:          parseFloat(resp.Data[idx].OriginalSize),
+				Status:        string(resp.Data[idx].Status),
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+			if resp.Data[idx].ExpiresAt > 0 {
+				expiresAt := time.UnixMilli(resp.Data[idx].ExpiresAt)
+				dbOrder.ExpiresAt = &expiresAt
+			}
+			if err := tm.db.InsertOrder(ctx, dbOrder); err != nil {
+				tm.logger.Warn().Err(err).Str("order_id", resp.Data[idx].ID).Msg("failed to save order to database")
+			}
+			// Reconcile optimistic cache with API data
+			tm.optCache.Reconcile(ctx, resp.Data[idx].ID, &resp.Data[idx])
 		}
 	}
 
@@ -166,21 +221,37 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 
 	tm.logger.Debug().Int("count", len(resp.Data)).Msg(i18n.T().LogOrdersUpdated)
 
+	// Process pending notifications
+	if err := tm.notifQueue.ProcessPending(ctx); err != nil {
+		tm.logger.Warn().Err(err).Msg("failed to process pending notifications")
+	}
+
 	if tm.bus != nil {
 		rows := make([]tui.OrderRow, 0, len(resp.Data))
 		for _, o := range resp.Data {
+			status := string(o.Status)
+			// Check if order is optimistically canceled and show "CANCELING..." instead of "LIVE"
+			if tm.optCache.IsOptimisticallyCanceled(ctx, o.ID) && status == string(clob.StatusLive) {
+				status = "CANCELING..."
+			}
 			rows = append(rows, tui.OrderRow{
 				Market: o.AssetID,
 				Side:   string(o.Side),
 				Price:  o.Price,
 				Size:   o.OriginalSize,
 				Filled: o.SizeFilled,
-				Status: string(o.Status),
+				Status: status,
 				ID:     o.ID,
 			})
 		}
 		tm.bus.Send(tui.OrdersUpdateMsg{Rows: rows})
 	}
+}
+
+// Helper function to parse float strings
+func parseFloat(s string) float64 {
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
 }
 
 func (tm *TradesMonitor) pollTrades(ctx context.Context) {
@@ -320,13 +391,37 @@ func (tm *TradesMonitor) GetPositions() []clob.Position {
 }
 
 func (tm *TradesMonitor) CancelOrder(orderID string) error {
-	resp, err := tm.clobClient.CancelOrder(orderID)
-	if err != nil {
-		return fmt.Errorf("trades-monitor: CancelOrder: %w", err)
-	}
-	if !resp.Canceled {
-		return fmt.Errorf("trades-monitor: CancelOrder: order %s not canceled", orderID)
-	}
+	// Apply optimistic update immediately for instant UI feedback
+	tm.optCache.MarkCanceled(context.Background(), orderID)
+
+	// Execute API call asynchronously (non-blocking)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		resp, err := tm.clobClient.CancelOrder(orderID)
+		if err != nil {
+			tm.logger.Warn().Err(err).Str("order_id", orderID).Msg("failed to cancel order via API")
+			// Rollback optimistic update on error
+			tm.optCache.Reconcile(ctx, orderID, nil)
+			return
+		}
+		if !resp.Canceled {
+			tm.logger.Warn().Str("order_id", orderID).Msg("order cancellation not confirmed by API")
+			// Rollback optimistic update on error
+			tm.optCache.Reconcile(ctx, orderID, nil)
+			return
+		}
+
+		tm.logger.Info().Str("order_id", orderID).Msg("order canceled successfully")
+		// Reconcile cache with API response (mark as Canceled)
+		canceledOrder := &clob.Order{
+			ID:     orderID,
+			Status: clob.StatusCanceled,
+		}
+		tm.optCache.Reconcile(ctx, orderID, canceledOrder)
+	}()
+
 	return nil
 }
 
