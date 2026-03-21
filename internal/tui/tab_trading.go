@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -55,15 +56,113 @@ type TradingModel struct {
 	orders         table.Model
 	orderRows      []OrderRow
 	positions      table.Model
+	positionRows   []PositionRow
 	width          int
 	height         int
+	tick           int
 	cancelDebounce *ui.Debouncer
 }
 
-// Resize updates the model dimensions without losing data.
+// Resize updates the model dimensions and rebuilds table columns/heights.
 func (m *TradingModel) Resize(w, h int) {
 	m.width = w
 	m.height = h
+	m.rebuildTables()
+}
+
+// rebuildTables resizes inner tables based on current width/height and breakpoint.
+func (m *TradingModel) rebuildTables() {
+	tableH := max(m.height-10, 1)
+	bp := breakpoint(m.width)
+
+	var orderCols []table.Column
+	var posCols []table.Column
+
+	switch bp {
+	case "tiny": // ≤80: show minimal columns
+		orderCols = []table.Column{
+			{Title: i18n.T().OrdersColPrice, Width: 10},
+			{Title: i18n.T().OrdersColSize, Width: 10},
+			{Title: i18n.T().OrdersColStatus, Width: 10},
+		}
+		posCols = []table.Column{
+			{Title: i18n.T().PosColSide, Width: 6},
+			{Title: i18n.T().PosColSize, Width: 10},
+			{Title: i18n.T().PosColPnL, Width: 12},
+		}
+	case "mobile": // ≤100: show 3-4 columns
+		orderCols = []table.Column{
+			{Title: i18n.T().OrdersColSide, Width: 6},
+			{Title: i18n.T().OrdersColPrice, Width: 10},
+			{Title: i18n.T().OrdersColSize, Width: 10},
+			{Title: i18n.T().OrdersColStatus, Width: 10},
+		}
+		posCols = []table.Column{
+			{Title: i18n.T().PosColSide, Width: 6},
+			{Title: i18n.T().PosColSize, Width: 10},
+			{Title: i18n.T().PosColEntry, Width: 10},
+			{Title: i18n.T().PosColPnL, Width: 12},
+		}
+	case "standard": // ≤140: all main columns
+		orderCols = []table.Column{
+			{Title: i18n.T().OrdersColMarket, Width: 20},
+			{Title: i18n.T().OrdersColSide, Width: 6},
+			{Title: i18n.T().OrdersColPrice, Width: 10},
+			{Title: i18n.T().OrdersColSize, Width: 10},
+			{Title: i18n.T().OrdersColFilled, Width: 10},
+			{Title: i18n.T().OrdersColStatus, Width: 10},
+		}
+		posCols = []table.Column{
+			{Title: i18n.T().PosColMarket, Width: 20},
+			{Title: i18n.T().PosColSide, Width: 6},
+			{Title: i18n.T().PosColSize, Width: 10},
+			{Title: i18n.T().PosColEntry, Width: 10},
+			{Title: i18n.T().PosColCurrent, Width: 10},
+			{Title: i18n.T().PosColPnL, Width: 12},
+		}
+	default: // large/xl: all columns including optional
+		orderCols = []table.Column{
+			{Title: i18n.T().OrdersColMarket, Width: 28},
+			{Title: i18n.T().OrdersColSide, Width: 6},
+			{Title: i18n.T().OrdersColPrice, Width: 10},
+			{Title: i18n.T().OrdersColSize, Width: 10},
+			{Title: i18n.T().OrdersColFilled, Width: 10},
+			{Title: i18n.T().OrdersColStatus, Width: 10},
+			{Title: i18n.T().OrdersColAge, Width: 10},
+		}
+		posCols = []table.Column{
+			{Title: i18n.T().PosColMarket, Width: 28},
+			{Title: i18n.T().PosColSide, Width: 6},
+			{Title: i18n.T().PosColSize, Width: 10},
+			{Title: i18n.T().PosColEntry, Width: 10},
+			{Title: i18n.T().PosColCurrent, Width: 10},
+			{Title: i18n.T().PosColPnL, Width: 12},
+			{Title: i18n.T().PosColPnLPct, Width: 8},
+		}
+	}
+
+	m.orders.SetColumns(orderCols)
+	m.orders.SetHeight(tableH)
+	m.positions.SetColumns(posCols)
+	m.positions.SetHeight(tableH)
+
+	// Re-apply rows with new column count
+	m.SetOrderRows(m.orderRows)
+	m.SetPositionRows(m.positionRows)
+}
+
+// colorStatus returns a status string rendered with the appropriate style.
+func colorStatus(status string) string {
+	switch strings.ToUpper(status) {
+	case "OPEN", "FILLED", "MATCHED":
+		return StylePositive.Render(status)
+	case "CANCELLED", "CANCELED", "FAILED":
+		return StyleNegative.Render(status)
+	case "PENDING":
+		return StyleWarning.Render(status)
+	default:
+		return StyleBody.Render(status)
+	}
 }
 
 // NewTradingModel creates a new TradingModel.
@@ -125,28 +224,51 @@ func NewTradingModel(width, height int) TradingModel {
 	return TradingModel{
 		subTab:         SubTabOrders,
 		orders:         ot,
+		orderRows:      nil,
 		positions:      pt,
+		positionRows:   nil,
 		width:          width,
 		height:         height,
 		cancelDebounce: ui.NewDebouncer(200 * time.Millisecond),
 	}
 }
 
-// SetOrderRows updates the orders table data.
+// SetOrderRows updates the orders table data, adapting to current breakpoint column count.
 func (m *TradingModel) SetOrderRows(rows []OrderRow) {
 	m.orderRows = rows
+	bp := breakpoint(m.width)
 	tableRows := make([]table.Row, len(rows))
 	for i, r := range rows {
-		tableRows[i] = table.Row{r.Market, r.Side, r.Price, r.Size, r.Filled, r.Status, r.Age}
+		switch bp {
+		case "tiny":
+			tableRows[i] = table.Row{r.Price, r.Size, r.Status}
+		case "mobile":
+			tableRows[i] = table.Row{r.Side, r.Price, r.Size, r.Status}
+		case "standard":
+			tableRows[i] = table.Row{r.Market, r.Side, r.Price, r.Size, r.Filled, r.Status}
+		default:
+			tableRows[i] = table.Row{r.Market, r.Side, r.Price, r.Size, r.Filled, r.Status, r.Age}
+		}
 	}
 	m.orders.SetRows(tableRows)
 }
 
-// SetPositionRows updates the positions table data.
+// SetPositionRows updates the positions table data, adapting to current breakpoint column count.
 func (m *TradingModel) SetPositionRows(rows []PositionRow) {
+	m.positionRows = rows
+	bp := breakpoint(m.width)
 	tableRows := make([]table.Row, len(rows))
 	for i, r := range rows {
-		tableRows[i] = table.Row{r.Market, r.Side, r.Size, r.Entry, r.Current, r.PnL, r.PnLPct}
+		switch bp {
+		case "tiny":
+			tableRows[i] = table.Row{r.Side, r.Size, r.PnL}
+		case "mobile":
+			tableRows[i] = table.Row{r.Side, r.Size, r.Entry, r.PnL}
+		case "standard":
+			tableRows[i] = table.Row{r.Market, r.Side, r.Size, r.Entry, r.Current, r.PnL}
+		default:
+			tableRows[i] = table.Row{r.Market, r.Side, r.Size, r.Entry, r.Current, r.PnL, r.PnLPct}
+		}
 	}
 	m.positions.SetRows(tableRows)
 }
@@ -158,6 +280,9 @@ func (m TradingModel) Init() tea.Cmd { return nil }
 
 func (m TradingModel) Update(msg tea.Msg) (TradingModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "o", "O":
@@ -214,26 +339,50 @@ func (m TradingModel) View() string {
 		subTabLine = StyleSubTabInactive.Render(ordersLabel) + " " + StyleSubTabActive.Render(posLabel)
 	}
 
-	// ── Content + help ──────────────────────────────────────────────────────
+	// ── Content + detail bar + help ─────────────────────────────────────────
 	var content string
-	var helpKeys string
+	var detailBar string
 	if m.subTab == SubTabOrders {
 		if len(m.orderRows) == 0 {
 			content = renderEmptyState("◈", t.OrdersEmpty, "", m.width)
 		} else {
 			content = m.orders.View()
+			// Selected-row detail bar
+			if idx := m.orders.Cursor(); idx >= 0 && idx < len(m.orderRows) {
+				r := m.orderRows[idx]
+				detailBar = StyleMuted.Render("Selected: ") +
+					StyleValue.Render(fmt.Sprintf("Order #%s", r.ID)) +
+					StyleMuted.Render(" | Side: ") + StyleValue.Render(r.Side) +
+					StyleMuted.Render(" | Price: ") + StyleValue.Render("$"+r.Price) +
+					StyleMuted.Render(" | Size: ") + StyleValue.Render(r.Size+" USDC") +
+					StyleMuted.Render(" | Status: ") + colorStatus(r.Status)
+			}
 		}
-		helpKeys = "[↑↓] navigate   [x] cancel order   [ctrl+x] cancel all   [o/p] switch"
 	} else {
 		if len(m.positions.Rows()) == 0 {
 			content = renderEmptyState("◈", t.PosEmpty, "", m.width)
 		} else {
 			content = m.positions.View()
+			// Selected-row detail bar
+			if idx := m.positions.Cursor(); idx >= 0 && idx < len(m.positionRows) {
+				r := m.positionRows[idx]
+				detailBar = StyleMuted.Render("Selected: ") +
+					StyleValue.Render(r.Market) +
+					StyleMuted.Render(" | Side: ") + StyleValue.Render(r.Side) +
+					StyleMuted.Render(" | Size: ") + StyleValue.Render(r.Size) +
+					StyleMuted.Render(" | Entry: ") + StyleValue.Render("$"+r.Entry) +
+					StyleMuted.Render(" | PnL: ") + StyleValue.Render(r.PnL)
+			}
 		}
-		helpKeys = "[↑↓] navigate   [o/p] switch"
 	}
 
 	tablePanel := renderPanel("", content, m.width, true)
-	helpPanel := renderHelpPanel(helpKeys, m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, " " + subTabLine, " ", tablePanel, " ", helpPanel)
+	helpPanel := renderHelpPanel("↑↓=navigate | Tab=switch-tab | x=cancel | q=quit", m.width)
+
+	parts := []string{" " + subTabLine, " ", tablePanel}
+	if detailBar != "" {
+		parts = append(parts, " "+detailBar)
+	}
+	parts = append(parts, " ", helpPanel)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
