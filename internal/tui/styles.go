@@ -145,8 +145,10 @@ var (
 
 	// ── UI Components ───────────────────────────────────────────────────────
 	StyleHelpBar = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Background(ColorSurface).
+			Background(ColorBgLight).
+			BorderTop(true).
+			BorderStyle(lipgloss.Border{Top: "─"}).
+			BorderForeground(ColorPrimary).
 			Padding(0, 1)
 
 	StyleHelpKey = lipgloss.NewStyle().

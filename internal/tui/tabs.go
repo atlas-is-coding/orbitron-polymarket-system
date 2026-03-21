@@ -112,6 +112,9 @@ func renderPanel(title, content string, width int, active bool) string {
 // keys format: "q=quit | Tab=switch | ?=help"
 // Keys (before =) are rendered in ColorBright; separators in ColorMuted.
 func renderHelpPanel(keys string, width int) string {
+	if width <= 0 {
+		return ""
+	}
 	innerW := width - 2
 	if innerW < 1 {
 		innerW = 1
@@ -131,14 +134,7 @@ func renderHelpPanel(keys string, width int) string {
 			sb.WriteString(StyleMuted.Render(" | "))
 		}
 	}
-	helpStyle := lipgloss.NewStyle().
-		Background(ColorBgLight).
-		BorderTop(true).
-		BorderStyle(lipgloss.Border{Top: "─"}).
-		BorderForeground(ColorPrimary).
-		Width(innerW).
-		Padding(0, 1)
-	return helpStyle.Render(sb.String())
+	return StyleHelpBar.Width(innerW).Render(sb.String())
 }
 
 // renderEmptyState renders a centered empty-state (spec §7.8).
