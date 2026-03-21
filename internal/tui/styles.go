@@ -3,23 +3,33 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// ── Modern Sleek Palette ────────────────────────────────────────────────
-	ColorBg        = lipgloss.Color("#0B0B0E") // Deep dark gray/black
-	ColorSurface   = lipgloss.Color("#13131A") // Slightly lighter for panels
-	ColorSurface2  = lipgloss.Color("#1E1E28") // Active rows
-	ColorPrimary   = lipgloss.Color("#8A2BE2") // Main purple accent
-	ColorPrimary2  = lipgloss.Color("#4A1580") // Darker purple
-	ColorAccent    = lipgloss.Color("#00E6F0") // Cyan glow
-	ColorGlow      = lipgloss.Color("#D480FF") // Soft purple glow
-	ColorSuccess   = lipgloss.Color("#00FF9D") // Bright neon green
-	ColorWarning   = lipgloss.Color("#FFD700") // Amber
-	ColorError     = lipgloss.Color("#FF3366") // Bright neon red
-	ColorMuted     = lipgloss.Color("#4A4A60") // Inactive gray
-	ColorBorder    = lipgloss.Color("#2A2A37") // Subtle border
-	ColorFg        = lipgloss.Color("#EBEBEB") // Off-white
-	ColorFgDim     = lipgloss.Color("#9595A8") // Dimmed text
-	ColorSelected  = lipgloss.Color("#2A2A40") // Tab active bg
-	ColorRowActive = lipgloss.Color("#252538") // Focused row
+	// ── Deep Violet Palette (spec §2) ───────────────────────────────────────
+	ColorBg        = lipgloss.Color("#0e0b1a") // was #0B0B0E
+	ColorBgMid     = lipgloss.Color("#13102a") // new
+	ColorBgLight   = lipgloss.Color("#1a1535") // new (replaces ColorSurface2/ColorRowActive)
+	ColorSurface   = lipgloss.Color("#13102a") // compat alias → same as ColorBgMid
+	ColorSurface2  = lipgloss.Color("#1a1535") // compat alias → same as ColorBgLight
+	ColorRowActive = lipgloss.Color("#1a1535") // compat alias → same as ColorBgLight
+	ColorSelected  = lipgloss.Color("#1a1535") // compat alias
+
+	ColorPrimary    = lipgloss.Color("#7c3aed") // was #8A2BE2
+	ColorPrimary2   = lipgloss.Color("#4A1580") // unchanged
+	ColorPrimaryDim = lipgloss.Color("#555555") // new
+
+	ColorBright = lipgloss.Color("#a78bfa") // new
+	ColorAccent = lipgloss.Color("#a78bfa") // compat alias → same as ColorBright
+	ColorGlow   = lipgloss.Color("#a78bfa") // compat alias → same as ColorBright
+
+	ColorSuccess = lipgloss.Color("#34d399") // was #00FF9D
+	ColorWarning = lipgloss.Color("#fbbf24") // was #FFD700
+	ColorDanger  = lipgloss.Color("#f87171") // new
+	ColorError   = lipgloss.Color("#f87171") // compat alias → same as ColorDanger
+
+	ColorText   = lipgloss.Color("#e0e0e0") // new
+	ColorFg     = lipgloss.Color("#e0e0e0") // compat alias → same as ColorText
+	ColorFgDim  = lipgloss.Color("#888888") // was #9595A8
+	ColorMuted  = lipgloss.Color("#888888") // was #4A4A60
+	ColorBorder = lipgloss.Color("#555555") // was #2A2A37 → matches ColorPrimaryDim
 
 	// ── Borders ─────────────────────────────────────────────────────────────
 	BorderNormal = lipgloss.Border{
@@ -46,6 +56,17 @@ var (
 
 	BorderRounded = lipgloss.RoundedBorder()
 
+	BorderSpec = lipgloss.Border{
+		Top:         "─",
+		Bottom:      "─",
+		Left:        "║",
+		Right:       "║",
+		TopLeft:     "╔",
+		TopRight:    "╗",
+		BottomLeft:  "╚",
+		BottomRight: "╝",
+	}
+
 	// ── Text Styles ─────────────────────────────────────────────────────────
 	StyleTooltip = lipgloss.NewStyle().Foreground(ColorFgDim)
 	StyleSuccess = lipgloss.NewStyle().Foreground(ColorSuccess)
@@ -57,6 +78,14 @@ var (
 	StyleAccent  = lipgloss.NewStyle().Foreground(ColorAccent)
 	StyleGlow    = lipgloss.NewStyle().Foreground(ColorGlow).Bold(true)
 	StyleFgDim   = lipgloss.NewStyle().Foreground(ColorFgDim)
+
+	// ── Typography (spec §3) ─────────────────────────────────────────────────
+	StylePageTitle   = lipgloss.NewStyle().Bold(true).Foreground(ColorBright)
+	StyleSectionHead = lipgloss.NewStyle().Bold(true).Foreground(ColorText)
+	StyleBody        = lipgloss.NewStyle().Foreground(ColorText)
+	StyleValue       = lipgloss.NewStyle().Foreground(ColorBright)
+	StylePositive    = lipgloss.NewStyle().Foreground(ColorSuccess)
+	StyleNegative    = lipgloss.NewStyle().Foreground(ColorDanger)
 
 	// ── Header & Tabs ───────────────────────────────────────────────────────
 	StyleHeader = lipgloss.NewStyle().
@@ -294,13 +323,13 @@ var (
 			Foreground(ColorBorder)
 
 	StylePanelActive = lipgloss.NewStyle().
-			Border(BorderRounded).
+			Border(BorderSpec).
 			BorderForeground(ColorPrimary).
 			Padding(0, 1)
 
 	StylePanelInactive = lipgloss.NewStyle().
-			Border(BorderRounded).
-			BorderForeground(ColorBorder).
+			Border(BorderSpec).
+			BorderForeground(ColorPrimaryDim).
 			Padding(0, 1)
 
 	StylePanelHelp = lipgloss.NewStyle().
@@ -308,6 +337,4 @@ var (
 			BorderForeground(ColorBorder).
 			Foreground(ColorMuted).
 			Padding(0, 1)
-
 )
-
