@@ -113,7 +113,6 @@ func NewAppModel(
 	}
 }
 
-
 // SetWallet is kept for API compatibility but no longer displays in the UI.
 func (m *AppModel) SetWallet(_ string) {}
 

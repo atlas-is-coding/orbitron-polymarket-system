@@ -152,9 +152,6 @@ func (m MarketsModel) Update(msg tea.Msg) (MarketsModel, tea.Cmd) {
 			return m.updateOrder(msg)
 		}
 
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
 	}
 	return m, nil
 }
