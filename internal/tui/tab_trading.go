@@ -60,6 +60,12 @@ type TradingModel struct {
 	cancelDebounce *ui.Debouncer
 }
 
+// Resize updates the model dimensions without losing data.
+func (m *TradingModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 // NewTradingModel creates a new TradingModel.
 func NewTradingModel(width, height int) TradingModel {
 	tableH := max(height-8, 1)

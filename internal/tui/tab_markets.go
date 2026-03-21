@@ -70,6 +70,12 @@ type MarketsModel struct {
 	height int
 }
 
+// Resize updates the model dimensions without losing data.
+func (m *MarketsModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 // NewMarketsModel creates the initial MarketsModel.
 func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 	pi := textinput.New()

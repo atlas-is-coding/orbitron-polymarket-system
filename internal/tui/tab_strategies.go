@@ -24,6 +24,12 @@ type StrategiesModel struct {
 	walletPicker bool
 }
 
+// Resize updates the model dimensions without losing data.
+func (m *StrategiesModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 func NewStrategiesModel(width, height int, provider StrategyProvider) StrategiesModel {
 	tableH := max(height-6, 1)
 

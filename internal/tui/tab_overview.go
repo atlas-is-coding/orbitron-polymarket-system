@@ -51,6 +51,12 @@ func NewOverviewModel(width, height int) OverviewModel {
 	}
 }
 
+// Resize updates the model dimensions without losing data.
+func (m *OverviewModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 func (m *OverviewModel) LoadSnapshot(snap map[string]any) {
 	if bal, ok := snap["balance"].(float64); ok {
 		m.balance = bal

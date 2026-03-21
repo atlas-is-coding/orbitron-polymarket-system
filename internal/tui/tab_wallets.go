@@ -64,6 +64,12 @@ type WalletsModel struct {
 	formErr      string
 }
 
+// Resize updates the model dimensions without losing data.
+func (m *WalletsModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 // NewWalletsModel creates a new WalletsModel.
 func NewWalletsModel(wm WalletProvider, cfgPath string, width, height int) WalletsModel {
 	cols := []table.Column{

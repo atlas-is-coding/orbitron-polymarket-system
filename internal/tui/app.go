@@ -28,6 +28,9 @@ type TradingProvider interface {
 	CancelAllOrders() error
 }
 
+// animTickMsg is fired every 100ms for animation updates.
+type animTickMsg struct{}
+
 // AppModel is the root Bubble Tea model for the TUI dashboard.
 type AppModel struct {
 	activeTab  TabID
@@ -50,6 +53,9 @@ type AppModel struct {
 
 	// Clock
 	now time.Time
+
+	// Animation tick counter (incremented every 100ms)
+	tickCount int
 
 	// Toast overlay
 	toast *toastEntry
@@ -115,6 +121,10 @@ func clockTick() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return clockTickMsg{} })
 }
 
+func animTick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return animTickMsg{} })
+}
+
 func (m AppModel) Init() tea.Cmd {
 	// Initialize models from Nexus snapshot
 	if m.nx != nil {
@@ -131,11 +141,23 @@ func (m AppModel) Init() tea.Cmd {
 			m.trading.SetPositionRows(positions)
 		}
 	}
-	return tea.Batch(m.bus.WaitForEvent(), clockTick())
+	return tea.Batch(m.bus.WaitForEvent(), clockTick(), animTick())
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case animTickMsg:
+		m.tickCount++
+		m.overview, _ = m.overview.Update(msg)
+		m.trading, _ = m.trading.Update(msg)
+		m.strategies, _ = m.strategies.Update(msg)
+		m.wallets, _ = m.wallets.Update(msg)
+		m.copytrader, _ = m.copytrader.Update(msg)
+		m.markets, _ = m.markets.Update(msg)
+		m.logs, _ = m.logs.Update(msg)
+		m.settings, _ = m.settings.Update(msg)
+		return m, animTick()
+
 	case clockTickMsg:
 		m.now = time.Now()
 		if m.toast != nil && time.Since(m.toast.created) >= toastDuration {
@@ -152,19 +174,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		cw := m.contentWidth()
 		ch := m.contentHeight()
-		// Update dimensions on all tab models (same package — unexported fields accessible)
-		m.overview.width = cw
-		m.overview.height = ch
-		m.trading.width = cw
-		m.trading.height = ch
-		m.strategies.width = cw
-		m.strategies.height = ch
-		m.wallets.width = cw
-		m.wallets.height = ch
-		m.copytrader.width = cw
-		m.copytrader.height = ch
-		m.logs = NewLogsModel(cw, ch)
-		m.markets, _ = m.markets.Update(msg)
+		m.overview.Resize(cw, ch)
+		m.trading.Resize(cw, ch)
+		m.strategies.Resize(cw, ch)
+		m.wallets.Resize(cw, ch)
+		m.copytrader.Resize(cw, ch)
+		m.markets.Resize(cw, ch)
+		m.logs.Resize(cw, ch)
+		m.settings.Resize(cw, ch)
 		return m, m.bus.WaitForEvent()
 
 	case MarketsUpdatedMsg:
@@ -327,7 +344,31 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs, _ = m.logs.Update(msg)
 		return m, m.bus.WaitForEvent()
 
-	case WalletAddedMsg, WalletRemovedMsg, WalletChangedMsg, WalletStatsMsg:
+	case WalletAddedMsg:
+		m.wallets, _ = m.wallets.Update(msg)
+		m.overview, _ = m.overview.Update(msg)
+		if len(msg.Allowances) > 0 {
+			missing := 0
+			for _, a := range msg.Allowances {
+				if !a.Approved {
+					missing++
+				}
+			}
+			if missing > 0 {
+				return m, tea.Batch(
+					func() tea.Msg {
+						return ToastMsg{
+							Text: fmt.Sprintf("Wallet added, but %d/6 allowances missing!", missing),
+							Kind: "warning",
+						}
+					},
+					m.bus.WaitForEvent(),
+				)
+			}
+		}
+		return m, m.bus.WaitForEvent()
+
+	case WalletRemovedMsg, WalletChangedMsg, WalletStatsMsg:
 		m.wallets, _ = m.wallets.Update(msg)
 		m.overview, _ = m.overview.Update(msg)
 		return m, m.bus.WaitForEvent()

@@ -32,6 +32,12 @@ const (
 	copyModeConfirmDelete
 )
 
+// Resize updates the model dimensions without losing data.
+func (m *CopytradingModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 // CopytradingModel is the Copytrading tab sub-model.
 type CopytradingModel struct {
 	tradersTable table.Model

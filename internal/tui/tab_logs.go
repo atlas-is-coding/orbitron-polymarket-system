@@ -65,6 +65,15 @@ func NewLogsModel(width, height int) LogsModel {
 	return LogsModel{viewport: vp, width: width, height: height}
 }
 
+// Resize updates the viewport size without destroying buffered log data.
+func (m *LogsModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+	m.viewport.Width = w - 4
+	m.viewport.Height = max(h-6, 1)
+	m.viewport.SetContent(m.renderLines())
+}
+
 func (m LogsModel) Init() tea.Cmd { return nil }
 
 func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {

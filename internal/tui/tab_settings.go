@@ -449,6 +449,12 @@ func sectionNames() []string {
 }
 
 // SettingsModel is the Settings tab sub-model.
+// Resize updates the model dimensions without losing data.
+func (m *SettingsModel) Resize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 type SettingsModel struct {
 	cfg      config.Config
 	original config.Config
