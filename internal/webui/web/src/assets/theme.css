@@ -85,6 +85,28 @@
   /* Scrollbar */
   --scrollbar-track: #07070f;
   --scrollbar-thumb: rgba(255, 255, 255, 0.10);
+
+  /* Layout — sidebar */
+  --sidebar-w: 220px;
+  --sidebar-w-collapsed: 56px;
+  --header-h-new: 54px;
+  --nav-icon-size: 32px;
+  --nav-icon-box: 32px;
+
+  /* Font sizes (px, for new components that don't use rem) */
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-kpi: 20px;
+  --font-size-nav: 13px;
+  --font-size-nav-icon: 16px;
+
+  /* Aliases for new components (map to existing variables) */
+  --bg-panel: var(--bg-card);
+  --fg: var(--text-primary);
+  --fg-muted: var(--text-secondary);
+  --fg-dim: var(--text-muted);
 }
 
 /* ── Base reset ─────────────────────────────────────────── */
