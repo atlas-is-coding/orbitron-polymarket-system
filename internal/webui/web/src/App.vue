@@ -1,28 +1,29 @@
 <template>
-  <div v-if="auth.isAuthenticated" class="app-layout">
-    <AppHeader />
-    <AppTabs />
-    <main class="app-content">
-      <RouterView />
-    </main>
-    <ToastContainer />
+  <div v-if="auth.isAuthenticated" class="app-shell">
+    <AppSidebar />
+    <div class="app-main">
+      <AppHeader />
+      <main class="app-content">
+        <RouterView />
+      </main>
+    </div>
   </div>
   <RouterView v-else />
+  <ToastContainer />
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocket } from '@/composables/useWebSocket'
+import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppHeader from '@/components/AppHeader.vue'
-import AppTabs from '@/components/AppTabs.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 
 const auth = useAuthStore()
 const { connect } = useWebSocket()
 
-// Restore token synchronously so child onMounted hooks (e.g. MarketsView.fetchMarkets)
-// already have the JWT header set before their first API call.
+// Restore token synchronously so child onMounted hooks already have JWT set.
 auth.restore()
 
 onMounted(() => {
@@ -36,17 +37,24 @@ onMounted(() => {
 html, body { height: 100%; }
 #app { height: 100%; }
 
-.app-layout {
+.app-shell {
   display: flex;
-  flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 20px 24px;
   background: var(--bg-primary);
   min-height: 0;
 }
