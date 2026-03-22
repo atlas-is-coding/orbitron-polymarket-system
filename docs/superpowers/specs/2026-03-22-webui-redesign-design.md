@@ -57,7 +57,7 @@ Full redesign of all Web UI pages from horizontal-tab layout to a collapsible si
 - API Health panel: 3-column grid, latency color-coded (ok/degraded/down), geoblock row
 - Wallets summary: aggregate bar (Total Balance, Total P&L, Active count) + `<table>` with per-wallet rows
 
-**New vs current**: Boot terminal animation retained on first load (2.2s then fades to dashboard).
+**New vs current**: Boot terminal animation retained on first load (2.2s then fades to dashboard). Animation lives inline in `OverviewView.vue` (existing `showWelcome` ref pattern). Sidebar renders normally during the 2.2s — animation is scoped to the content area only.
 
 ---
 
@@ -143,7 +143,7 @@ Full redesign of all Web UI pages from horizontal-tab layout to a collapsible si
 ### 6. Copytrading (`/copytrading`)
 **Data sources**: `GET /api/copytrading/traders`, `GET /api/copytrading/feed`
 
-**Layout**: 2-column — trader list (left, flex:1) + detail panel + live feed (right, 380px fixed)
+**Layout**: 2-column grid — left col (flex:1): trader cards list + add-trader placeholder. Right col (380px fixed): detail panel (top, updates on card click) + live feed (bottom, scrollable). On mobile (<768px) right col becomes a modal sheet.
 
 **Trader cards**:
 - Avatar, name/address, status pill (COPYING/PAUSED/STOPPED), copy wallet label
@@ -216,6 +216,8 @@ Full redesign of all Web UI pages from horizontal-tab layout to a collapsible si
 | `/api/copytrading/feed` | WS | Live copy events stream |
 | `/api/wallets/:id/approve` | POST | Trigger USDC approval tx |
 | `/api/orders/batch` | POST | Place batch orders |
+
+> **Note**: The table above lists only **new** endpoints required by the redesign. All other endpoints referenced in page sections (`/api/overview`, `/api/health`, `/api/markets`, `/api/orders`, `/api/positions`, `/api/trades`, `/api/wallets`, `/api/strategies`) are assumed to already exist in the Go backend.
 
 ---
 
