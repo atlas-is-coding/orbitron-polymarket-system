@@ -71,12 +71,62 @@ export function useApi() {
     return (await axios.post(`/api/v1/strategies/${key}/stop`)).data
   }
 
+  // Config — full object save
+  async function saveConfig(config) {
+    return (await axios.post('/api/v1/settings', config)).data
+  }
+
+  // Orderbook for markets detail panel
+  async function getOrderbook(conditionId) {
+    return (await axios.get(`/api/v1/orderbook/${conditionId}`)).data
+  }
+
+  // Wallets — USDC approval
+  async function approveAllowance(walletId, contract) {
+    return (await axios.post(`/api/v1/wallets/${walletId}/approve`, { contract })).data
+  }
+
+  // Batch orders
+  async function placeBatchOrder(tokenIds, side, sizeUsd) {
+    return (await axios.post('/api/v1/orders/batch', { token_ids: tokenIds, side, size_usd: sizeUsd })).data
+  }
+
+  // Close position
+  async function closePosition(positionId, quantity) {
+    return (await axios.post('/api/v1/positions/close', { position_id: positionId, quantity })).data
+  }
+
+  // Strategy config update
+  async function saveStrategyConfig(key, params) {
+    return (await axios.post(`/api/v1/strategies/${key}/config`, params)).data
+  }
+
+  // Copytrading traders
+  async function getTraders() {
+    return (await axios.get('/api/v1/copytrading/traders')).data
+  }
+  async function updateTrader(addr, data) {
+    return (await axios.patch(`/api/v1/copytrading/traders/${encodeURIComponent(addr)}`, data)).data
+  }
+
+  // Health test
+  async function testEndpoint(url) {
+    return (await axios.post('/api/v1/health/test', { url })).data
+  }
+
+  // Trades
+  async function getTrades() {
+    return (await axios.get('/api/v1/trades')).data
+  }
+
   return {
     getOverview, getOrders, getPositions, getLogs,
     getCopytrading, getSettings, cancelOrder, cancelAll,
-    postSettings, addTrader, removeTrader, toggleTrader,
+    postSettings, saveConfig, addTrader, removeTrader, toggleTrader,
     getWallets, toggleWallet, renameWallet, removeWallet, addWallet,
     editTrader, placeOrder, getMarkets, getMarketTags,
-    startStrategy, stopStrategy
+    startStrategy, stopStrategy, getOrderbook, approveAllowance,
+    placeBatchOrder, closePosition, saveStrategyConfig,
+    getTraders, updateTrader, testEndpoint, getTrades,
   }
 }

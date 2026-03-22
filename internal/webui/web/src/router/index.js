@@ -10,12 +10,12 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/overview'
+    name: 'overview',
+    component: () => import('@/views/OverviewView.vue'),
   },
   {
     path: '/overview',
-    name: 'overview',
-    component: () => import('@/views/OverviewView.vue')
+    redirect: '/'
   },
   {
     path: '/orders',
@@ -24,8 +24,7 @@ const routes = [
   },
   {
     path: '/positions',
-    name: 'positions',
-    component: () => import('@/views/PositionsView.vue')
+    redirect: '/orders?tab=positions'
   },
   {
     path: '/copytrading',
@@ -35,7 +34,6 @@ const routes = [
   {
     path: '/markets',
     name: 'markets',
-    meta: { requiresAuth: true },
     component: () => import('@/views/MarketsView.vue')
   },
   {
