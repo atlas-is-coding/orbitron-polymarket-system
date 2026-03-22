@@ -16,6 +16,10 @@ GEMINI.md
 !internal/order/expiration_test.go
 # Exception for integration tests
 !internal/monitor/integration_test.go
+# Exception for builder tests
+!internal/builder/validator_test.go
+!internal/builder/logger_test.go
+!internal/builder/integration_test.go
 
 # AI / Workflow artifacts
 .superpowers/
