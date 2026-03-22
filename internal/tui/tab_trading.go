@@ -185,14 +185,8 @@ func NewTradingModel(width, height int) TradingModel {
 		table.WithHeight(tableH),
 	)
 	os := table.DefaultStyles()
-	os.Header = os.Header.
-		Bold(true).
-		Foreground(ColorAccent).
-		Background(ColorSurface)
-	os.Selected = os.Selected.
-		Foreground(ColorBg).
-		Background(ColorAccent).
-		Bold(true)
+	os.Header = StyleTableHeader
+	os.Selected = StyleTableSelected
 	ot.SetStyles(os)
 
 	// Positions table
@@ -211,14 +205,8 @@ func NewTradingModel(width, height int) TradingModel {
 		table.WithHeight(tableH),
 	)
 	ps := table.DefaultStyles()
-	ps.Header = ps.Header.
-		Bold(true).
-		Foreground(ColorAccent).
-		Background(ColorSurface)
-	ps.Selected = ps.Selected.
-		Foreground(ColorBg).
-		Background(ColorAccent).
-		Bold(true)
+	ps.Header = StyleTableHeader
+	ps.Selected = StyleTableSelected
 	pt.SetStyles(ps)
 
 	return TradingModel{

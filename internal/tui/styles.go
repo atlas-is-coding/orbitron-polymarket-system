@@ -78,8 +78,22 @@ var (
 	StylePrimary = lipgloss.NewStyle().Foreground(ColorPrimary)
 	StyleAccent  = lipgloss.NewStyle().Foreground(ColorAccent)
 	StyleGlow    = lipgloss.NewStyle().Foreground(ColorGlow).Bold(true)
-	StyleFgDim      = lipgloss.NewStyle().Foreground(ColorFgDim)
-	StyleFgDimBold  = lipgloss.NewStyle().Foreground(ColorFgDim).Bold(true)
+	StyleFgDim     = lipgloss.NewStyle().Foreground(ColorFgDim)
+	StyleFgDimBold = lipgloss.NewStyle().Foreground(ColorFgDim).Bold(true)
+
+	// ── Table (bubbles/table) ────────────────────────────────────────────────
+	StyleTableHeader = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorAccent).
+				Background(ColorSurface).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(ColorBorder).
+				BorderBottom(true)
+
+	StyleTableSelected = lipgloss.NewStyle().
+				Foreground(ColorBg).
+				Background(ColorAccent).
+				Bold(true)
 
 	// ── Typography (spec §3) ─────────────────────────────────────────────────
 	StylePageTitle   = lipgloss.NewStyle().Bold(true).Foreground(ColorBright)
