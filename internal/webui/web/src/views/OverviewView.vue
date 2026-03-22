@@ -103,17 +103,17 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>LABEL</th><th>ADDRESS</th><th>BALANCE</th><th>P&amp;L</th><th>STATUS</th>
+                <th>ADDRESS</th><th>BALANCE</th><th>P&amp;L</th><th>ORDERS</th><th>STATUS</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="w in wallets" :key="w.id">
-                <td>{{ w.label || w.id }}</td>
                 <td class="mono addr-cell">{{ w.address ? w.address.slice(0, 8) + '…' + w.address.slice(-4) : '—' }}</td>
                 <td class="mono">${{ fmt2(w.balance_usd) }}</td>
-                <td class="mono" :class="w.pnl_usd >= 0 ? 'num-success' : 'num-danger'">
-                  {{ w.pnl_usd >= 0 ? '+' : '' }}{{ fmt2(w.pnl_usd) }}
+                <td class="mono" :class="(w.pnl_usd || 0) >= 0 ? 'num-success' : 'num-danger'">
+                  {{ (w.pnl_usd || 0) >= 0 ? '+' : '' }}{{ fmt2(w.pnl_usd) }}
                 </td>
+                <td class="mono">{{ w.orders_count ?? orders.filter(o => o.wallet_id === w.id && o.status === 'OPEN').length }}</td>
                 <td>
                   <span class="status-dot" :class="w.enabled ? 'status-dot--on' : 'status-dot--off'" />
                   <span class="status-text">{{ w.enabled ? 'ON' : 'OFF' }}</span>
@@ -138,7 +138,7 @@ import { createChart } from 'lightweight-charts'
 
 const { t } = useI18n()
 const app = useAppStore()
-const { overview, walletsMap } = storeToRefs(app)
+const { overview, walletsMap, orders, positions } = storeToRefs(app)
 const api = useApi()
 const healthStore = useHealthStore()
 
@@ -159,12 +159,15 @@ function fmt2(n) {
   return (+(n || 0)).toFixed(2)
 }
 
+const openOrdersCount = computed(() => orders.value.filter(o => o.status === 'OPEN').length)
+const pnl = computed(() => overview.value.pnl || 0)
+
 const kpis = computed(() => [
-  { label: 'WALLET', value: (overview.value.wallet_address || overview.value.wallet || '—').slice(0,10)+'…', cls: 'mono-sm', sub: null },
-  { label: 'BALANCE',   value: '$' + fmt2(overview.value.balance), cls: 'num-glow' },
-  { label: 'OPEN ORDERS',  value: overview.value.orders?.length ?? 0, cls: 'val-neutral' },
-  { label: 'POSITIONS', value: overview.value.positions?.length ?? 0, cls: 'val-neutral' },
-  { label: 'SUBSYSTEMS', value: activeCount.value + '/' + (overview.value.subsystems?.length ?? 0), cls: 'val-neutral', sub: 'online' },
+  { label: 'BALANCE',     value: '$' + fmt2(overview.value.balance), cls: 'num-glow' },
+  { label: 'SESSION P&L', value: (pnl.value >= 0 ? '+' : '') + fmt2(pnl.value), cls: pnl.value >= 0 ? 'num-success' : 'num-danger' },
+  { label: 'OPEN ORDERS', value: openOrdersCount.value, cls: 'val-neutral' },
+  { label: 'POSITIONS',   value: positions.value.length, cls: 'val-neutral' },
+  { label: 'SUBSYSTEMS',  value: activeCount.value + '/' + (overview.value.subsystems?.length ?? 0), cls: 'val-neutral', sub: 'online' },
 ])
 
 const updatedAgo = computed(() => {
@@ -287,14 +290,14 @@ onUnmounted(() => { if (chart) { chart.remove(); chart = null } })
 .kpi-card:hover { border-top-color: var(--accent); }
 
 .kpi-label {
-  font-size: 0.86rem;
+  font-size: var(--font-size-xs, 10px);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-secondary);
   margin-bottom: 0.3rem;
 }
 .kpi-value {
-  font-size: 1.25rem;
+  font-size: var(--font-size-kpi, 20px);
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text-primary);
