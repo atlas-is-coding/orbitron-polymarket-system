@@ -470,6 +470,8 @@ type SettingsModel struct {
 
 	activeSection int
 
+	tick int
+
 	width  int
 	height int
 
@@ -569,6 +571,9 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 		return m.updateEditing(msg)
 	}
 	switch msg := msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
 	case ConfigReloadedMsg:
 		m.cfg = *msg.Config
 		m.original = *msg.Config
@@ -735,29 +740,17 @@ func (m SettingsModel) renderWidget(i int) string {
 	switch f.Kind {
 	case KindBool:
 		if m.optionIdx[i] == 1 {
-			s := StyleToggleOn.Render("● ON ")
+			s := StyleToggleOn.Render("ON")
 			if focused {
-				return lipgloss.NewStyle().
-					Border(BorderRounded).
-					BorderForeground(ColorSuccess).
-					Render(s)
+				return StyleBorderActive.Render(s)
 			}
-			return lipgloss.NewStyle().
-				Border(BorderRounded).
-				BorderForeground(ColorBorder).
-				Render(s)
+			return StyleBorder.Render(s)
 		}
-		s := StyleToggleOff.Render("○ OFF")
+		s := StyleToggleOff.Render("OFF")
 		if focused {
-			return lipgloss.NewStyle().
-				Border(BorderRounded).
-				BorderForeground(ColorAccent).
-				Render(s)
+			return StyleBorderActive.Render(s)
 		}
-		return lipgloss.NewStyle().
-			Border(BorderRounded).
-			BorderForeground(ColorBorder).
-			Render(s)
+		return StyleBorder.Render(s)
 
 	case KindEnum:
 		cur := ""
@@ -768,15 +761,9 @@ func (m SettingsModel) renderWidget(i int) string {
 		right := StyleEnumArrow.Render("›")
 		val := StyleEnumValue.Render(fmt.Sprintf(" %-16s", cur))
 		if focused {
-			return lipgloss.NewStyle().
-				Border(BorderRounded).
-				BorderForeground(ColorAccent).
-				Render(left + val + right)
+			return StyleBorderActive.Render(left + val + right)
 		}
-		return lipgloss.NewStyle().
-			Border(BorderRounded).
-			BorderForeground(ColorBorder).
-			Render(StyleMuted.Render("‹") + StyleFgDim.Render(fmt.Sprintf(" %-16s", cur)) + StyleMuted.Render("›"))
+		return StyleBorder.Render(StyleMuted.Render("‹") + StyleFgDim.Render(fmt.Sprintf(" %-16s", cur)) + StyleMuted.Render("›"))
 
 	default:
 		return m.inputs[i].View()
