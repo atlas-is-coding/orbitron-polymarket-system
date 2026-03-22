@@ -57,6 +57,7 @@ type LogsModel struct {
 	freeze   bool
 	width    int
 	height   int
+	tick     int
 }
 
 // NewLogsModel creates a new LogsModel.
@@ -77,6 +78,11 @@ func (m *LogsModel) Resize(w, h int) {
 func (m LogsModel) Init() tea.Cmd { return nil }
 
 func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
+	switch msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
+	}
 	switch msg := msg.(type) {
 	case BotEventMsg:
 		m.lines = append(m.lines, msg)
@@ -114,6 +120,10 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			m.toggleFilter("error")
 			m.viewport.SetContent(m.renderLines())
 			return m, nil
+		case "c", "C":
+			m.lines = m.lines[:0]
+			m.viewport.SetContent("")
+			return m, nil
 		}
 	}
 	var cmd tea.Cmd
@@ -145,15 +155,30 @@ func (m LogsModel) renderLines() string {
 func colorLogLine(l BotEventMsg) string {
 	switch l.Level {
 	case "error":
-		return StyleError.Render(l.Message)
+		return StyleNegative.Render(l.Message)
 	case "warn":
 		return StyleWarning.Render(l.Message)
 	case "info":
-		return StyleAccent.Render(l.Message)
+		return StyleBody.Render(l.Message)
 	case "debug", "trace":
 		return StyleMuted.Render(l.Message)
 	default:
-		return l.Message
+		return StyleBody.Render(l.Message)
+	}
+}
+
+// colorLogLineStr colors a raw log line string by scanning for level keywords.
+func colorLogLineStr(line string) string {
+	upper := strings.ToUpper(line)
+	switch {
+	case strings.Contains(upper, "ERROR") || strings.Contains(upper, "FATAL"):
+		return StyleNegative.Render(line)
+	case strings.Contains(upper, "WARN"):
+		return StyleWarning.Render(line)
+	case strings.Contains(upper, "DEBUG"):
+		return StyleMuted.Render(line)
+	default:
+		return StyleBody.Render(line)
 	}
 }
 
@@ -169,6 +194,6 @@ func (m LogsModel) View() string {
 	}
 
 	logsPanel := renderPanel("Logs", m.viewport.View(), m.width, true)
-	helpPanel := renderHelpPanel("[ctrl+f] freeze   [t/d/i/w/e] filter   [↑↓] scroll"+freeze+filter, m.width)
+	helpPanel := renderHelpPanel("↑↓=scroll | /=filter | c=clear | Tab=next-tab | q=quit"+freeze+filter, m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, " ", logsPanel, " ", helpPanel)
 }

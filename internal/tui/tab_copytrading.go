@@ -36,6 +36,7 @@ const (
 func (m *CopytradingModel) Resize(w, h int) {
 	m.width = w
 	m.height = h
+	m.tradersTable.SetHeight(max(h-10, 3))
 }
 
 // CopytradingModel is the Copytrading tab sub-model.
@@ -44,6 +45,7 @@ type CopytradingModel struct {
 	recentTrades []string
 	width        int
 	height       int
+	tick         int
 
 	cfg     *config.Config
 	cfgPath string
@@ -69,14 +71,8 @@ func NewCopytradingModel(cfg *config.Config, cfgPath string, width, height int) 
 		table.WithHeight(max(height/2-3, 1)),
 	)
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		Bold(true).
-		Foreground(ColorAccent).
-		Background(ColorSurface)
-	s.Selected = s.Selected.
-		Foreground(ColorBg).
-		Background(ColorAccent).
-		Bold(true)
+	s.Header = StyleTableHeader
+	s.Selected = StyleTableSelected
 	t.SetStyles(s)
 
 	return CopytradingModel{
@@ -114,13 +110,29 @@ func (m CopytradingModel) IsEditing() bool {
 func (m *CopytradingModel) SetTraderRows(rows []TraderRow) {
 	tableRows := make([]table.Row, len(rows))
 	for i, r := range rows {
-		status := StyleMuted.Render("○ " + r.Status)
-		if r.Status == "active" {
-			status = StyleSuccess.Render("● " + r.Status)
-		}
-		tableRows[i] = table.Row{r.Address, r.Label, status, r.AllocPct}
+		icon := copytradingStatusIcon(r.Status, m.tick)
+		tableRows[i] = table.Row{r.Address, r.Label, icon + " " + r.Status, r.AllocPct}
 	}
 	m.tradersTable.SetRows(tableRows)
+}
+
+// copytradingStatusIcon returns the spec §7.3 status symbol for the given status string.
+func copytradingStatusIcon(status string, tick int) string {
+	switch strings.ToUpper(status) {
+	case "ACTIVE", "RUNNING":
+		return StylePositive.Render("●")
+	case "PENDING", "PAUSED":
+		return StyleWarning.Render("◆")
+	case "FAILED", "STOPPED", "ERROR":
+		return StyleNegative.Render("✕")
+	case "LOADING", "CONNECTING":
+		if tick%2 == 0 {
+			return StyleValue.Render("→")
+		}
+		return StyleMuted.Render("→")
+	default:
+		return StyleMuted.Render("○")
+	}
 }
 
 // AddTrade appends a line to the recent trades feed (keeps last 20).
@@ -134,6 +146,11 @@ func (m *CopytradingModel) AddTrade(line string) {
 func (m CopytradingModel) Init() tea.Cmd { return nil }
 
 func (m CopytradingModel) Update(msg tea.Msg) (CopytradingModel, tea.Cmd) {
+	switch msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
+	}
 	switch m.mode {
 	case copyModeTable:
 		return m.updateTable(msg)
@@ -376,8 +393,28 @@ func (m CopytradingModel) viewTable() string {
 	}
 	tradesPanel := renderPanel(t.CopyRecentTrades, tradesContent.String(), m.width, false)
 
-	helpPanel := renderHelpPanel("[↑↓] navigate   [a] add   [e] edit   [d] delete   [Space] toggle", m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, " ", tradersPanel, " ", tradesPanel, " ", helpPanel)
+	// Detail bar for the selected trader
+	detailBar := ""
+	if m.cfg != nil {
+		rows := m.tradersTable.Rows()
+		idx := m.tradersTable.Cursor()
+		if idx >= 0 && idx < len(rows) && idx < len(m.cfg.Copytrading.Traders) {
+			tr := m.cfg.Copytrading.Traders[idx]
+			addr := tr.Address
+			if len(addr) > 12 {
+				addr = addr[:6] + "..." + addr[len(addr)-4:]
+			}
+			detailBar = fmt.Sprintf("Trader: %s | Following: $%.0f | PnL: %s | Trades: %s",
+				StyleValue.Render(addr),
+				tr.MaxPositionUSD,
+				StylePositive.Render("+$0.00"),
+				StyleMuted.Render("0"),
+			)
+		}
+	}
+
+	helpPanel := renderHelpPanel("↑↓=navigate | f=follow | u=unfollow | Tab=next-tab | q=quit", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", tradersPanel, " ", tradesPanel, " ", StyleMuted.Render(detailBar), " ", helpPanel)
 }
 
 func (m CopytradingModel) viewForm(title string) string {

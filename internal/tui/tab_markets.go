@@ -66,8 +66,11 @@ type MarketsModel struct {
 	selWallets map[string]bool
 	primaryID  string
 
+	priceAlerts map[string]bool // conditionID → alert set
+
 	width  int
 	height int
+	tick   int
 }
 
 // Resize updates the model dimensions without losing data.
@@ -102,9 +105,10 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 	}
 
 	return MarketsModel{
-		mode:       modeList,
-		viewMode:   viewTrending,
-		selected:   make(map[string]bool),
+		mode:        modeList,
+		viewMode:    viewTrending,
+		selected:    make(map[string]bool),
+		priceAlerts: make(map[string]bool),
 		batchSize:  bs,
 		orderSide:  "YES",
 		orderType:  "GTC",
@@ -119,6 +123,11 @@ func NewMarketsModel(wallets []marketWallet, primaryID string) MarketsModel {
 func (m MarketsModel) Init() tea.Cmd { return nil }
 
 func (m MarketsModel) Update(msg tea.Msg) (MarketsModel, tea.Cmd) {
+	switch msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
+	}
 	switch msg := msg.(type) {
 	case MarketsLoadingMsg:
 		m.syncing = true
@@ -213,6 +222,15 @@ func (m MarketsModel) updateList(msg tea.KeyMsg) (MarketsModel, tea.Cmd) {
 	case "escape", "esc":
 		m.selected = make(map[string]bool)
 		m.batchMode = false
+	case "a":
+		if m.cursor < len(filtered) {
+			cid := filtered[m.cursor].ConditionID
+			if m.priceAlerts[cid] {
+				delete(m.priceAlerts, cid)
+			} else {
+				m.priceAlerts[cid] = true
+			}
+		}
 	}
 	return m, nil
 }
@@ -475,8 +493,13 @@ func (m MarketsModel) viewList() string {
 		if m.selected[mk.ConditionID] {
 			sel = StyleAccent.Render("✓")
 		}
-		line := fmt.Sprintf(" [%s] %-50s YES %-6s Vol $%s",
+		alertIcon := " "
+		if m.priceAlerts[mk.ConditionID] {
+			alertIcon = StyleWarning.Render("⚠")
+		}
+		line := fmt.Sprintf(" [%s] %s %-50s YES %-6s Vol $%s",
 			sel,
+			alertIcon,
 			mktTruncate(mk.Question, 50),
 			StyleSuccess.Render(fmt.Sprintf("%.0f%%", yesPrice*100)),
 			StyleMuted.Render(mktFormatVolume(float64(mk.Volume))),
@@ -496,7 +519,7 @@ func (m MarketsModel) viewList() string {
 
 	helpPanel := ""
 	if len(m.selected) == 0 {
-		helpPanel = renderHelpPanel("[Enter] detail   [Space] select   [f/F] filter   [t] mode   [↑↓/jk] navigate", m.width)
+		helpPanel = renderHelpPanel("↑↓=navigate | a=set-alert | Tab=next-tab | q=quit", m.width)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, " ", listPanel, " ", helpPanel)
