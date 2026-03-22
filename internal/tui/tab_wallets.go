@@ -53,6 +53,7 @@ type WalletsModel struct {
 	cfgPath string
 	width   int
 	height  int
+	tick    int
 
 	walletsTable table.Model
 	mode         walletMode
@@ -68,6 +69,8 @@ type WalletsModel struct {
 func (m *WalletsModel) Resize(w, h int) {
 	m.width = w
 	m.height = h
+	m.walletsTable.SetHeight(max(h-10, 3))
+	m.walletsTable.SetWidth(w - 4)
 }
 
 // NewWalletsModel creates a new WalletsModel.
@@ -86,14 +89,8 @@ func NewWalletsModel(wm WalletProvider, cfgPath string, width, height int) Walle
 		table.WithHeight(max(height/2-3, 3)),
 	)
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		Bold(true).
-		Foreground(ColorAccent).
-		Background(ColorSurface)
-	s.Selected = s.Selected.
-		Foreground(ColorBg).
-		Background(ColorAccent).
-		Bold(true)
+	s.Header = StyleTableHeader
+	s.Selected = StyleTableSelected
 	t.SetStyles(s)
 
 	m := WalletsModel{
@@ -208,6 +205,9 @@ func (m WalletsModel) Update(msg tea.Msg) (WalletsModel, tea.Cmd) {
 
 func (m WalletsModel) updateTable(msg tea.Msg) (WalletsModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
 	case WalletAddedMsg, WalletRemovedMsg, WalletChangedMsg, WalletStatsMsg:
 		m.refreshTable()
 		return m, nil
@@ -403,8 +403,31 @@ func (m WalletsModel) viewTable() string {
 		content = "\n" + m.walletsTable.View()
 	}
 	tablePanel := renderPanel("Wallets", content, m.width, true)
-	helpPanel := renderHelpPanel("[↑↓] navigate   [a] add   [e] edit   [d] delete   [Space] toggle   [Enter] details", m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, " ", helpPanel)
+
+	var detailLine string
+	if m.wm != nil {
+		id := m.selectedWalletID()
+		if id != "" {
+			bal, pnl, orders, total := m.wm.WalletStats(id)
+			label := m.wm.WalletLabel(id)
+			var enabledStr string
+			if m.wm.WalletEnabled(id) {
+				enabledStr = StyleSuccess.Render("ACTIVE")
+			} else {
+				enabledStr = StyleMuted.Render("INACTIVE")
+			}
+			detailLine = " " + StyleMuted.Render("Wallet:") + " " + StyleValue.Render(label) +
+				"  " + StyleMuted.Render("Status:") + " " + enabledStr +
+				"  " + StyleMuted.Render("Balance:") + " " + StyleValue.Render(fmt.Sprintf("$%.2f", bal)) +
+				"  " + StyleMuted.Render("P&L:") + " " + StyleValue.Render(fmt.Sprintf("%+.2f", pnl)) +
+				"  " + StyleMuted.Render("Orders:") + " " + StyleValue.Render(fmt.Sprintf("%d", orders)) +
+				"  " + StyleMuted.Render("Trades:") + " " + StyleValue.Render(fmt.Sprintf("%d", total)) +
+				"\n"
+		}
+	}
+
+	helpPanel := renderHelpPanel("↑↓=navigate | Tab=next-tab | q=quit", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, detailLine, helpPanel)
 }
 
 func (m WalletsModel) viewDetail() string {

@@ -20,6 +20,7 @@ type StrategiesModel struct {
 	rows         []StrategyRow
 	width        int
 	height       int
+	tick         int
 	provider     StrategyProvider
 	walletPicker bool
 }
@@ -28,6 +29,8 @@ type StrategiesModel struct {
 func (m *StrategiesModel) Resize(w, h int) {
 	m.width = w
 	m.height = h
+	m.table.SetHeight(max(h-10, 3))
+	m.table.SetWidth(w - 4)
 }
 
 func NewStrategiesModel(width, height int, provider StrategyProvider) StrategiesModel {
@@ -47,14 +50,8 @@ func NewStrategiesModel(width, height int, provider StrategyProvider) Strategies
 	)
 
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		Bold(true).
-		Foreground(ColorAccent).
-		Background(ColorSurface)
-	s.Selected = s.Selected.
-		Foreground(ColorBg).
-		Background(ColorAccent).
-		Bold(true)
+	s.Header = StyleTableHeader
+	s.Selected = StyleTableSelected
 	t.SetStyles(s)
 
 	return StrategiesModel{
@@ -82,6 +79,9 @@ func (m StrategiesModel) Init() tea.Cmd { return nil }
 
 func (m StrategiesModel) Update(msg tea.Msg) (StrategiesModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case animTickMsg:
+		m.tick++
+		return m, nil
 	case tea.KeyMsg:
 		if m.walletPicker {
 			// Handle wallet selection logic here or via messages
@@ -124,8 +124,18 @@ func (m StrategiesModel) View() string {
 	}
 
 	tablePanel := renderPanel("", content, m.width, true)
-	helpPanel := renderHelpPanel("[↑↓] navigate   [Space] start/stop   [w] cycle wallet", m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, " ", helpPanel)
+
+	var detailLine string
+	if idx := m.table.Cursor(); idx >= 0 && idx < len(m.rows) {
+		r := m.rows[idx]
+		detailLine = " " + StyleMuted.Render("Selected:") + " " + StyleValue.Render(r.Name) +
+			"  " + StyleMuted.Render("Status:") + " " + StyleValue.Render(r.Status) +
+			"  " + StyleMuted.Render("Wallet:") + " " + StyleValue.Render(r.WalletLabel) +
+			"\n"
+	}
+
+	helpPanel := renderHelpPanel("↑↓=navigate | Enter=enable/disable | Tab=next-tab | q=quit", m.width)
+	return lipgloss.JoinVertical(lipgloss.Left, " ", tablePanel, detailLine, helpPanel)
 }
 
 // Messages for strategy management
