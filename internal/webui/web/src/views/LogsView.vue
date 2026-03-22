@@ -1,305 +1,227 @@
 <template>
-  <div class="view">
-    <div class="view-header anim-in">
-      <div class="header-left">
-        <h2 class="view-title">{{ $t('nav.logs') }}</h2>
-        <span class="counter">{{ filteredLogs.length }}</span>
-      </div>
-      <div class="header-actions">
-        <div class="filter-tabs">
-          <button
-            v-for="lv in levels"
-            :key="lv"
-            class="filter-tab"
-            :class="[
-              { 'filter-tab--active': filterLevel === lv },
-              lv !== 'ALL' ? `lvl-${lv.toLowerCase()}` : ''
-            ]"
-            @click="filterLevel = lv"
-          >{{ lv }}</button>
-        </div>
-        <button class="ctrl-btn" :class="{ 'ctrl-btn--active': autoScroll }" @click="toggleAutoScroll" :title="$t('logs.autoScroll')">
-          ⇩
+  <div class="logs-view">
+    <!-- Toolbar -->
+    <div class="toolbar anim-in">
+      <div class="level-btns">
+        <button v-for="lvl in ['DEBUG','INFO','WARN','ERROR']" :key="lvl"
+          class="lvl-btn" :class="[`lvl-${lvl.toLowerCase()}`, { off: !store.levels[lvl] }]"
+          @click="store.levels[lvl] = !store.levels[lvl]">
+          {{ lvl }}
         </button>
-        <button class="ctrl-btn" @click="app.logs = []; newCount = 0">{{ $t('logs.clear') }}</button>
+      </div>
+      <input v-model="store.searchQuery" class="field-input srch" placeholder="Regex search..." />
+      <select v-model="store.sourceFilter" class="field-input src-sel">
+        <option value="">All sources</option>
+        <option v-for="s in sources" :key="s" :value="s">{{ s }}</option>
+      </select>
+      <button class="btn" :class="store.paused ? 'btn-success' : 'btn-ghost'" @click="store.paused = !store.paused">
+        {{ store.paused ? 'RESUME' : 'PAUSE' }}
+      </button>
+      <button class="btn btn-ghost" @click="store.exportLogs()">EXPORT</button>
+      <button class="btn btn-ghost danger-x" @click="store.clear()">CLEAR</button>
+    </div>
+
+    <!-- Main area -->
+    <div class="logs-main">
+      <!-- Log area -->
+      <div class="log-area" ref="logEl">
+        <div v-if="store.filtered.length === 0" class="empty-state">No log lines</div>
+        <div
+          v-for="(line, i) in store.filtered"
+          :key="i"
+          class="log-line"
+          :class="{ selected: selectedLine === line }"
+          @click="selectedLine = line"
+        >
+          <span class="log-ts mono">{{ fmtTs(line.ts || line.timestamp) }}</span>
+          <span class="log-lvl" :class="`ll-${(line.level||'INFO').toLowerCase()}`">{{ (line.level||'INFO').padEnd(5) }}</span>
+          <span class="log-src muted-txt">{{ line.source }}</span>
+          <span class="log-msg" v-html="highlight(line.message || line.msg || '')"></span>
+        </div>
+      </div>
+
+      <!-- Detail sidebar -->
+      <div v-if="selectedLine" class="log-sidebar">
+        <div class="sidebar-hdr">
+          <span>LOG DETAIL</span>
+          <button class="close-btn" @click="selectedLine = null">✕</button>
+        </div>
+        <div class="sidebar-body">
+          <div class="detail-row"><span class="dl">Time</span><span class="dv mono">{{ fmtTs(selectedLine.ts || selectedLine.timestamp) }}</span></div>
+          <div class="detail-row"><span class="dl">Level</span><span class="dv" :class="`ll-${(selectedLine.level||'info').toLowerCase()}`">{{ selectedLine.level }}</span></div>
+          <div class="detail-row"><span class="dl">Source</span><span class="dv mono">{{ selectedLine.source }}</span></div>
+          <div class="detail-row col">
+            <span class="dl">Message</span>
+            <pre class="detail-raw">{{ selectedLine.message || selectedLine.msg }}</pre>
+          </div>
+          <div v-if="selectedLine.raw" class="detail-row col">
+            <span class="dl">Raw</span>
+            <pre class="detail-raw">{{ selectedLine.raw }}</pre>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Terminal shell -->
-    <div class="terminal-shell anim-in">
-      <!-- Terminal chrome -->
-      <div class="term-chrome">
-        <div class="chrome-dots">
-          <span class="cdot cdot--r" />
-          <span class="cdot cdot--y" />
-          <span class="cdot cdot--g" />
-        </div>
-        <span class="term-title">POLYTRADE // SYSTEM LOG</span>
-        <span class="term-count">{{ filteredLogs.length }} entries</span>
-      </div>
-
-      <!-- Log output -->
-      <div class="log-wrap" ref="logWrap" @scroll="onScroll">
-        <div v-if="!filteredLogs.length" class="log-empty">
-          <span class="prompt-glyph">$ </span>no log entries match filter
-        </div>
-        <div
-          v-for="(entry, i) in filteredLogs"
-          :key="i"
-          class="log-row"
-          :class="`log-${entry.level?.toLowerCase()}`"
-        >
-          <span class="log-ts">{{ fmtTime(entry.time) }}</span>
-          <span class="log-level" :class="`lvl-${entry.level?.toLowerCase()}`">{{ entry.level?.toUpperCase().slice(0, 4) }}</span>
-          <span class="log-sep">│</span>
-          <span class="log-msg">{{ entry.message }}</span>
-        </div>
-        <!-- Blinking cursor at end -->
-        <div class="log-cursor" v-if="filteredLogs.length">
-          <span class="prompt-glyph">$ </span><span class="cursor-blink">█</span>
-        </div>
-      </div>
-
-      <!-- New lines badge -->
-      <div v-if="newCount > 0 && !atBottom" class="new-badge" @click="scrollToBottom">
-        ↓ {{ newCount }} new
-      </div>
+    <!-- Stats bar -->
+    <div class="stats-bar anim-in">
+      <span v-for="lvl in ['DEBUG','INFO','WARN','ERROR']" :key="lvl" class="stat-count" :class="`ll-${lvl.toLowerCase()}`">
+        {{ lvl }}: {{ lvlCount(lvl) }}
+      </span>
+      <span class="stat-total">Total: {{ store.filtered.length }}</span>
+      <label class="follow-toggle">
+        <input type="checkbox" v-model="store.follow" />
+        <span>FOLLOW</span>
+      </label>
+      <span v-if="store.paused" class="paused-badge">PAUSED</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useLogsStore } from '@/stores/logs'
 import { useAppStore } from '@/stores/app'
 import { useApi } from '@/composables/useApi'
 
+const store = useLogsStore()
 const app = useAppStore()
-const { logs } = storeToRefs(app)
 const api = useApi()
+const logEl = ref(null)
+const selectedLine = ref(null)
 
-const logWrap = ref(null)
-const autoScroll = ref(true)
-const atBottom = ref(true)
-const newCount = ref(0)
-const filterLevel = ref('ALL')
-
-const levels = ['ALL', 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR']
-
-const filteredLogs = computed(() => {
-  if (filterLevel.value === 'ALL') return logs.value
-  return logs.value.filter(e => e.level?.toUpperCase() === filterLevel.value)
-})
-
-function fmtTime(ts) {
-  if (!ts) return '--------'
-  try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '--------' }
-}
-
-function isAtBottom() {
-  const el = logWrap.value
-  if (!el) return true
-  return el.scrollHeight - el.scrollTop - el.clientHeight < 36
-}
-
-function onScroll() {
-  atBottom.value = isAtBottom()
-  if (atBottom.value) newCount.value = 0
-}
-
-function scrollToBottom() {
-  const el = logWrap.value
-  if (el) el.scrollTop = el.scrollHeight
-  newCount.value = 0
-  atBottom.value = true
-}
-
-function toggleAutoScroll() {
-  autoScroll.value = !autoScroll.value
-  if (autoScroll.value) scrollToBottom()
-}
-
-watch(logs, async () => {
-  await nextTick()
-  if (autoScroll.value) scrollToBottom()
-  else if (!isAtBottom()) newCount.value++
-})
-
+// Load initial logs from API
 onMounted(async () => {
-  try {
-    const data = await api.getLogs()
-    app.logs = data
-    await nextTick()
-    scrollToBottom()
-  } catch {}
+  if (!store.buffer.length) {
+    try {
+      const data = await api.getLogs()
+      const lines = Array.isArray(data) ? data : (data.logs || [])
+      lines.forEach(l => store.push({
+        level: l.level || 'INFO',
+        source: l.source || l.component || '',
+        message: l.message || l.msg || '',
+        ts: l.timestamp || l.ts || Date.now(),
+        raw: JSON.stringify(l),
+      }))
+    } catch {}
+  }
 })
+
+// Pipe app store log events to logsStore
+const stopWatch = watch(() => app.logs, (logs) => {
+  if (Array.isArray(logs) && logs.length) {
+    const last = logs[logs.length - 1]
+    if (last) store.push({
+      level: last.level || 'INFO',
+      source: last.source || last.component || '',
+      message: last.message || last.msg || '',
+      ts: last.timestamp || last.ts || Date.now(),
+      raw: JSON.stringify(last),
+    })
+  }
+}, { deep: false })
+onUnmounted(() => stopWatch())
+
+// Auto-scroll when following
+watch(() => store.filtered.length, async () => {
+  if (store.follow && logEl.value) {
+    await nextTick()
+    logEl.value.scrollTop = logEl.value.scrollHeight
+  }
+})
+
+const sources = computed(() => {
+  const s = new Set(store.buffer.map(l => l.source).filter(Boolean))
+  return [...s].sort()
+})
+
+function lvlCount(lvl) { return store.buffer.filter(l => l.level === lvl).length }
+function fmtTs(t) {
+  if (!t) return ''
+  try {
+    const d = typeof t === 'number' ? new Date(t) : new Date(t)
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  } catch { return String(t) }
+}
+
+function highlight(msg) {
+  if (!msg) return ''
+  return msg
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("[\w_]+"):/g, '<span class="hl-key">$1</span>:')
+    .replace(/:(\s*"[^"]*")/g, ':<span class="hl-val">$1</span>')
+    .replace(/\b(\d+\.?\d*)\b/g, '<span class="hl-num">$1</span>')
+    .replace(/\b(error|failed|fatal)\b/gi, '<span class="hl-err">$1</span>')
+}
 </script>
 
 <style scoped>
-.view {
-  display: flex; flex-direction: column; gap: 0.9rem;
-  height: calc(100vh - 100px);
+.logs-view { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - 120px); }
+
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.level-btns { display: flex; gap: 4px; }
+.lvl-btn { padding: 3px 10px; border-radius: var(--radius); border: 1px solid; background: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; transition: opacity 0.15s; }
+.lvl-btn.off { opacity: 0.3; }
+.lvl-debug { color: var(--text-secondary); border-color: var(--border); }
+.lvl-info  { color: var(--success); border-color: rgba(16,217,148,0.40); }
+.lvl-warn  { color: var(--warning); border-color: rgba(245,158,11,0.40); }
+.lvl-error { color: var(--danger); border-color: rgba(255,77,106,0.40); }
+.srch { flex: 1; min-width: 150px; max-width: 240px; }
+.src-sel { width: 130px; }
+
+.logs-main { flex: 1; display: flex; gap: 10px; overflow: hidden; }
+
+.log-area {
+  flex: 1; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); font-family: var(--font-mono); font-size: 12px;
 }
-
-/* Header */
-.view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0; }
-.header-left { display: flex; align-items: center; gap: 0.75rem; }
-.view-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright); }
-.counter { font-size: 0.92rem; color: var(--text-secondary); font-family: var(--font-mono); }
-.header-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-
-/* Filter tabs */
-.filter-tabs {
-  display: flex; gap: 1px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 2px;
+.log-line {
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 2px 10px; border-bottom: 1px solid rgba(255,255,255,0.02);
+  cursor: pointer; line-height: 1.6;
 }
-.filter-tab {
-  background: none; border: none;
-  color: var(--text-muted);
-  border-radius: calc(var(--radius) - 1px);
-  padding: 0.25rem 0.65rem;
-  font-size: 0.92rem; font-family: var(--font-mono); font-weight: 700;
-  cursor: pointer; transition: all var(--transition);
-  letter-spacing: 0.04em;
-}
-.filter-tab:hover { color: var(--text-primary); }
-.filter-tab--active { background: var(--bg-card); }
-.filter-tab.lvl-trace.filter-tab--active { color: var(--text-secondary); }
-.filter-tab.lvl-debug.filter-tab--active { color: var(--text-secondary); }
-.filter-tab.lvl-info.filter-tab--active  { color: var(--accent); }
-.filter-tab.lvl-warn.filter-tab--active  { color: var(--warning); }
-.filter-tab.lvl-error.filter-tab--active { color: var(--danger); }
+.log-line:hover { background: var(--bg-hover); }
+.log-line.selected { background: rgba(124,58,237,0.10); }
 
-/* Control buttons */
-.ctrl-btn {
-  background: none; border: 1px solid var(--border); color: var(--text-secondary);
-  border-radius: var(--radius); padding: 0.32rem 0.80rem; font-size: 0.90rem;
-  cursor: pointer; transition: all var(--transition); font-family: var(--font-mono);
-}
-.ctrl-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.ctrl-btn--active { border-color: var(--accent); color: var(--accent); }
+.log-ts { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+.log-lvl { font-size: 10px; font-weight: 700; flex-shrink: 0; width: 40px; }
+.log-src { font-size: 10px; flex-shrink: 0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-msg { font-size: 11px; flex: 1; word-break: break-word; }
 
-/* Terminal shell */
-.terminal-shell {
-  flex: 1; min-height: 0;
-  display: flex; flex-direction: column;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  border-radius: var(--radius);
-  overflow: hidden;
-  position: relative;
-}
+.ll-debug { color: var(--text-secondary); }
+.ll-info  { color: var(--success); }
+.ll-warn  { color: var(--warning); }
+.ll-error { color: var(--danger); }
 
-/* Scanline overlay */
-.terminal-shell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg, transparent, transparent 2px,
-    rgba(124,58,237,0.01) 2px, rgba(124,58,237,0.01) 4px
-  );
-  pointer-events: none;
-  z-index: 10;
-}
+:deep(.hl-key) { color: var(--accent-bright); }
+:deep(.hl-val) { color: var(--price-bright); }
+:deep(.hl-num) { color: var(--success); }
+:deep(.hl-err) { color: var(--danger); font-weight: 700; }
 
-/* Chrome bar */
-.term-chrome {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.6rem 1.2rem;
-  background: rgba(124, 58, 237, 0.04);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
+.muted-txt { color: var(--text-secondary); }
+.mono { font-family: var(--font-mono); }
 
-.chrome-dots { display: flex; gap: 0.28rem; flex-shrink: 0; }
-.cdot { width: 9px; height: 9px; border-radius: 50%; }
-.cdot--r { background: #ff5f57; }
-.cdot--y { background: #ffbd2e; }
-.cdot--g { background: #28ca41; }
+.log-sidebar { width: 320px; flex-shrink: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-hdr { padding: 8px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--accent); border-bottom: 1px solid var(--border); background: rgba(124,58,237,0.03); display: flex; align-items: center; justify-content: space-between; }
+.close-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.sidebar-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.detail-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
+.detail-row.col { flex-direction: column; gap: 4px; }
+.dl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); flex-shrink: 0; width: 60px; }
+.dv { color: var(--text-primary); font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
+.detail-raw { font-size: 11px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; white-space: pre-wrap; word-break: break-all; color: var(--text-primary); font-family: var(--font-mono); max-height: 200px; overflow-y: auto; margin: 0; }
 
-.term-title { font-size: 0.86rem; letter-spacing: 0.10em; color: var(--text-secondary); flex: 1; text-transform: uppercase; }
-.term-count  { font-size: 0.86rem; color: var(--text-muted); letter-spacing: 0.06em; }
+.stats-bar { display: flex; align-items: center; gap: 16px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); font-size: 11px; }
+.stat-count { font-weight: 700; font-family: var(--font-mono); }
+.stat-total { color: var(--text-secondary); font-family: var(--font-mono); margin-left: auto; }
+.follow-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: var(--text-secondary); }
+.follow-toggle input { accent-color: var(--accent); }
+.paused-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 3px; background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.30); }
 
-/* Log output */
-.log-wrap {
-  flex: 1; min-height: 0;
-  overflow-y: auto;
-  font-family: var(--font-mono);
-  font-size: 0.90rem;
-  padding: 0.4rem 0;
-  scroll-behavior: smooth;
-  position: relative;
-  z-index: 1;
-}
+.empty-state { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 12px; }
 
-.log-empty {
-  padding: 1.5rem 1rem;
-  color: var(--text-muted);
-  font-size: 0.90rem;
-}
-
-.prompt-glyph { color: var(--accent); }
-
-.log-row {
-  display: flex;
-  gap: 0.6rem;
-  padding: 0.18rem 1rem;
-  line-height: 1.5;
-  align-items: baseline;
-  transition: background var(--transition);
-}
-.log-row:hover { background: rgba(124, 58, 237, 0.03); }
-
-.log-ts    { width: 5rem; flex-shrink: 0; color: var(--text-muted); font-size: 0.94rem; }
-.log-level { width: 3rem; flex-shrink: 0; font-weight: 700; font-size: 0.94rem; }
-.log-sep   { color: var(--border); user-select: none; }
-.log-msg   { color: var(--text-primary); word-break: break-all; white-space: pre-wrap; flex: 1; }
-
-/* Level colors */
-.lvl-trace { color: var(--text-muted); }
-.lvl-debug { color: var(--text-secondary); }
-.lvl-info  { color: var(--accent); }
-.lvl-warn  { color: var(--warning); }
-.lvl-error { color: var(--danger); }
-
-/* Row background tints */
-.log-warn  { background: rgba(245,158,11,0.04); }
-.log-error { background: rgba(255,77,106,0.05); }
-
-/* Cursor */
-.log-cursor {
-  padding: 0.18rem 1rem;
-  font-size: 0.90rem;
-  color: var(--text-muted);
-}
-.cursor-blink {
-  color: var(--accent);
-  animation: blink 1s ease infinite;
-}
-
-/* New badge */
-.new-badge {
-  position: absolute;
-  bottom: 0.75rem; left: 50%;
-  transform: translateX(-50%);
-  background: var(--accent);
-  color: #000;
-  border-radius: 1px;
-  padding: 0.2rem 0.85rem;
-  font-size: 0.94rem;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 12px rgba(124,58,237,0.40);
-  animation: fadeSlideUp 0.15s ease both;
-  user-select: none;
-  z-index: 20;
-  letter-spacing: 0.06em;
-}
-.new-badge:hover { background: var(--accent-hover); }
+.btn { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: var(--radius); font-family: var(--font-mono); font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all var(--transition); }
+.btn-ghost   { background: none; border-color: var(--border); color: var(--text-secondary); }
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-success { background: var(--success-dim); color: var(--success); border-color: rgba(16,217,148,0.40); }
+.danger-x { color: var(--danger) !important; border-color: rgba(255,77,106,0.30) !important; }
 </style>
