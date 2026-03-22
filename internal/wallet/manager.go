@@ -16,6 +16,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/api/ws"
 	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/builder"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/copytrading"
 	"github.com/atlasdev/orbitron/internal/health"
@@ -37,9 +38,10 @@ type Manager struct {
 	dataClient *data.Client
 	notifier   notify.Notifier
 	db         storage.Store
-	dialFn     api.DialFunc
-	builderKey string
-	log        zerolog.Logger
+	dialFn      api.DialFunc
+	builderKey  string
+	orderLogger *builder.OrderExecutionLogger
+	log         zerolog.Logger
 }
 
 // NewManager creates a Manager. bus, cfg, wsClient may be nil (e.g., in tests).
@@ -98,6 +100,13 @@ func (m *Manager) SetBuilderKey(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.builderKey = key
+}
+
+// SetOrderLogger sets the order execution logger for attribution auditing.
+func (m *Manager) SetOrderLogger(l *builder.OrderExecutionLogger) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.orderLogger = l
 }
 
 // Activate initialises a wallet (derives L2 credentials, creates CLOB client, starts subsystems).
@@ -179,6 +188,9 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 	inst.Executor = copytrading.NewOrderExecutor(wClobClient, orderSigner, l2.APIKey, addr, m.log)
 	if m.builderKey != "" {
 		inst.Executor.WithBuilderKey(m.builderKey)
+	}
+	if m.orderLogger != nil {
+		inst.Executor.WithOrderLogger(m.orderLogger)
 	}
 
 	// 8. Setup Analytics
@@ -600,6 +612,12 @@ func (m *Manager) PlaceOrder(walletID, tokenID, side, orderType string, price, s
 		inst.Address,
 		zerolog.Nop(),
 	)
+	if m.builderKey != "" {
+		exec.WithBuilderKey(m.builderKey)
+	}
+	if m.orderLogger != nil {
+		exec.WithOrderLogger(m.orderLogger)
+	}
 	return exec.PlaceLimit(tokenID, side, orderType, price, sizeUSD)
 }
 

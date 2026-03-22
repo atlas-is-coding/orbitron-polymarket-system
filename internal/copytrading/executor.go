@@ -6,8 +6,11 @@ import (
 	"strconv"
 	"strings"
 
+	"time"
+
 	"github.com/atlasdev/orbitron/internal/api/clob"
 	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/builder"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 )
@@ -26,7 +29,8 @@ type OrderExecutor struct {
 	apiKey        string
 	makerAddr     string
 	logger        zerolog.Logger
-	builderAPIKey string // опциональный ключ Builder Program
+	builderAPIKey string                        // опциональный ключ Builder Program
+	orderLogger   *builder.OrderExecutionLogger // nil if not configured
 }
 
 // WithBuilderKey устанавливает Polymarket Builder API key.
@@ -34,6 +38,25 @@ type OrderExecutor struct {
 func (e *OrderExecutor) WithBuilderKey(key string) *OrderExecutor {
 	e.builderAPIKey = key
 	return e
+}
+
+// WithOrderLogger attaches an OrderExecutionLogger for attribution auditing.
+func (e *OrderExecutor) WithOrderLogger(l *builder.OrderExecutionLogger) *OrderExecutor {
+	e.orderLogger = l
+	return e
+}
+
+// logOrder records order attribution if a logger is configured.
+func (e *OrderExecutor) logOrder(orderID string, success bool) {
+	if e.orderLogger == nil {
+		return
+	}
+	e.orderLogger.LogOrder(builder.OrderLogEntry{
+		OrderID:       orderID,
+		BuilderKeySet: e.builderAPIKey != "",
+		Timestamp:     time.Now(),
+		Success:       success,
+	})
 }
 
 // NewOrderExecutor создаёт OrderExecutor.
@@ -94,9 +117,11 @@ func (e *OrderExecutor) Open(assetID string, sizeUSD float64, negRisk bool) (*Op
 		return nil, fmt.Errorf("executor: CreateOrder BUY: %w", err)
 	}
 	if !resp.Success {
+		e.logOrder(resp.OrderID, false)
 		return nil, fmt.Errorf("executor: BUY order rejected: %s", resp.ErrorMsg)
 	}
 
+	e.logOrder(resp.OrderID, true)
 	e.logger.Info().
 		Str("asset_id", assetID).
 		Str("order_id", resp.OrderID).
@@ -131,11 +156,13 @@ func (e *OrderExecutor) Close(assetID string, sizeShares, avgBuyPrice float64, n
 		return nil, fmt.Errorf("executor: CreateOrder SELL: %w", err)
 	}
 	if !resp.Success {
+		e.logOrder(resp.OrderID, false)
 		return nil, fmt.Errorf("executor: SELL order rejected: %s", resp.ErrorMsg)
 	}
 
 	pnl := (price - avgBuyPrice) * sizeShares
 
+	e.logOrder(resp.OrderID, true)
 	e.logger.Info().
 		Str("asset_id", assetID).
 		Str("order_id", resp.OrderID).
@@ -176,9 +203,11 @@ func (e *OrderExecutor) PlaceLimit(tokenID, side, orderType string, price, sizeU
 		return "", fmt.Errorf("executor: CreateOrder limit: %w", err)
 	}
 	if !resp.Success {
+		e.logOrder(resp.OrderID, false)
 		return "", fmt.Errorf("executor: limit order rejected: %s", resp.ErrorMsg)
 	}
 
+	e.logOrder(resp.OrderID, true)
 	e.logger.Info().
 		Str("token_id", tokenID).
 		Str("side", side).

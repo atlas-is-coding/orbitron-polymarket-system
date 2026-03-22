@@ -20,6 +20,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/api/gamma"
 	"github.com/atlasdev/orbitron/internal/api/ws"
+	"github.com/atlasdev/orbitron/internal/builder"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/copytrading"
 	"github.com/atlasdev/orbitron/internal/diag"
@@ -275,10 +276,10 @@ func run() error {
 	builderCreds, licenseErr := license.Load()
 	if licenseErr != nil {
 		log.Warn().Err(licenseErr).Msg("builder credentials unavailable — Builder features disabled")
-	} else if builderCreds != nil {
-		log.Info().Str("key", builderCreds.APIKey[:4]+"***").Msg("builder credentials loaded")
 	}
-	// builderCreds используются ниже при инициализации кошельков.
+	builder.NewBuilderKeyValidator(builderCreds, log).Check()
+	orderLogger := builder.NewOrderExecutionLogger(log)
+	// builderCreds and orderLogger are wired into the wallet manager below.
 
 	// --- Geoblock check ---
 	if geo, geoErr := health.CheckGeoblock(proxyDial); geoErr != nil {
@@ -343,6 +344,7 @@ func run() error {
 	if builderCreds != nil {
 		wm.SetBuilderKey(builderCreds.APIKey)
 	}
+	wm.SetOrderLogger(orderLogger)
 
 	// --- Build wallet instances ---
 	ctx, cancel := context.WithCancel(context.Background())

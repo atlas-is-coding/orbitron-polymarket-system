@@ -27,7 +27,7 @@ image.png
 THREADS.md
 
 # Build & Dev artifacts
-bot
+/bot
 *.exe
 tmp/
 dist/
