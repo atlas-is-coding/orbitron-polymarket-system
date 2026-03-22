@@ -1,547 +1,553 @@
 <template>
-  <div class="view">
-    <div class="page-header anim-in">
-      <h2 class="view-title">{{ $t('settings.title') }}</h2>
-    </div>
+  <div class="settings-layout">
+    <!-- Left nav -->
+    <nav class="settings-nav">
+      <a v-for="s in sections" :key="s.id" class="snav-item" :class="{ active: activeSection === s.id }"
+        @click.prevent="scrollTo(s.id)">{{ s.label }}</a>
+    </nav>
 
-    <!-- UI -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionUi') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.language') }}</label>
-          <select class="setting-input" v-model="form.language" @change="save('ui.language', form.language)">
+    <!-- Form area -->
+    <div class="settings-body" ref="bodyEl" @scroll="onScroll">
+      <!-- Save bar -->
+      <Transition name="savebar">
+        <div v-if="store.isDirty" class="save-bar">
+          <span class="dirty-badge">Unsaved changes</span>
+          <div class="save-actions">
+            <button class="btn-ghost" @click="store.reset()">Reset</button>
+            <button class="btn-primary" :disabled="saving" @click="doSave">
+              {{ saving ? 'Saving…' : 'Save Config' }}
+            </button>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Auth & Keys -->
+      <section id="s-auth" class="s-section">
+        <div class="s-heading">Auth &amp; Keys</div>
+        <div class="s-row">
+          <label>Private Key</label>
+          <input class="s-input" type="password" :value="store.local.auth?.private_key || ''"
+            @input="store.set('auth.private_key', $event.target.value)" placeholder="64-hex, no 0x prefix" />
+        </div>
+        <div class="s-row">
+          <label>API Key</label>
+          <input class="s-input" :value="store.local.auth?.api_key || ''"
+            @input="store.set('auth.api_key', $event.target.value)" placeholder="CLOB API key" />
+        </div>
+        <div class="s-row">
+          <label>API Secret</label>
+          <input class="s-input" type="password" :value="store.local.auth?.api_secret || ''"
+            @input="store.set('auth.api_secret', $event.target.value)" />
+        </div>
+        <div class="s-row">
+          <label>API Passphrase</label>
+          <input class="s-input" type="password" :value="store.local.auth?.passphrase || ''"
+            @input="store.set('auth.passphrase', $event.target.value)" />
+        </div>
+        <div class="s-row">
+          <label>Chain ID</label>
+          <select class="s-input" :value="store.local.auth?.chain_id || 137"
+            @change="store.set('auth.chain_id', parseInt($event.target.value))">
+            <option :value="137">137 — Polygon Mainnet</option>
+            <option :value="80002">80002 — Amoy Testnet</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Network -->
+      <section id="s-network" class="s-section">
+        <div class="s-heading">Network</div>
+        <div v-for="field in networkFields" :key="field.key" class="s-row">
+          <label>{{ field.label }}</label>
+          <div class="s-input-row">
+            <input class="s-input" :value="getNestedVal(field.key)"
+              @input="store.set(field.key, $event.target.value)" :placeholder="field.placeholder" />
+            <button class="btn-test" :class="testState[field.key]" @click="testUrl(field.key)">
+              {{ testState[field.key] === 'ok' ? '✓' : testState[field.key] === 'err' ? '✗' : 'TEST' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trading Engine -->
+      <section id="s-trading" class="s-section">
+        <div class="s-heading">Trading Engine</div>
+        <div class="s-row">
+          <label>Enabled</label>
+          <label class="toggle">
+            <input type="checkbox" :checked="store.local.trading?.enabled"
+              @change="store.set('trading.enabled', $event.target.checked)" />
+            <span class="track"></span>
+          </label>
+        </div>
+        <div class="s-row">
+          <label>Max Position USD</label>
+          <input class="s-input s-input-sm" type="number" :value="store.local.trading?.max_position_usd || 100"
+            @input="store.set('trading.max_position_usd', parseFloat($event.target.value))" />
+        </div>
+        <div class="s-row">
+          <label>Max Daily Trades</label>
+          <input class="s-input s-input-sm" type="number" :value="store.local.trading?.max_daily_trades || 50"
+            @input="store.set('trading.max_daily_trades', parseInt($event.target.value))" />
+        </div>
+        <div class="s-row">
+          <label>Order Fill Timeout (s)</label>
+          <input class="s-input s-input-sm" type="number" :value="store.local.trading?.order_fill_timeout_s || 60"
+            @input="store.set('trading.order_fill_timeout_s', parseInt($event.target.value))" />
+        </div>
+      </section>
+
+      <!-- Telegram -->
+      <section id="s-telegram" class="s-section">
+        <div class="s-heading">Telegram</div>
+        <div class="s-row">
+          <label>Bot Token</label>
+          <input class="s-input" type="password" :value="store.local.telegram?.token || ''"
+            @input="store.set('telegram.token', $event.target.value)" placeholder="123456:ABC-..." />
+        </div>
+        <div class="s-row">
+          <label>Chat ID</label>
+          <input class="s-input s-input-sm" :value="store.local.telegram?.chat_id || ''"
+            @input="store.set('telegram.chat_id', $event.target.value)" placeholder="-100..." />
+        </div>
+        <div class="s-row">
+          <label>Notifications</label>
+          <label class="toggle">
+            <input type="checkbox" :checked="store.local.telegram?.notify_fills"
+              @change="store.set('telegram.notify_fills', $event.target.checked)" />
+            <span class="track"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Logging -->
+      <section id="s-logging" class="s-section">
+        <div class="s-heading">Logging</div>
+        <div class="s-row">
+          <label>Log Level</label>
+          <select class="s-input" :value="store.local.log?.level || 'info'"
+            @change="store.set('log.level', $event.target.value)">
+            <option value="debug">debug</option>
+            <option value="info">info</option>
+            <option value="warn">warn</option>
+            <option value="error">error</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <label>Format</label>
+          <select class="s-input" :value="store.local.log?.format || 'pretty'"
+            @change="store.set('log.format', $event.target.value)">
+            <option value="pretty">pretty</option>
+            <option value="json">json</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <label>Log to File</label>
+          <label class="toggle">
+            <input type="checkbox" :checked="store.local.log?.file_enabled"
+              @change="store.set('log.file_enabled', $event.target.checked)" />
+            <span class="track"></span>
+          </label>
+        </div>
+        <div class="s-row" v-if="store.local.log?.file_enabled">
+          <label>Log File Path</label>
+          <input class="s-input" :value="store.local.log?.file_path || 'bot.log'"
+            @input="store.set('log.file_path', $event.target.value)" />
+        </div>
+      </section>
+
+      <!-- Interface -->
+      <section id="s-interface" class="s-section">
+        <div class="s-heading">Interface</div>
+        <div class="s-row">
+          <label>Language</label>
+          <select class="s-input" :value="currentLang" @change="changeLang($event.target.value)">
             <option v-for="l in LANGS" :key="l" :value="l">{{ l.toUpperCase() }}</option>
           </select>
         </div>
-      </div>
-    </section>
+        <div class="s-row">
+          <label>Poll Interval (ms)</label>
+          <input class="s-input s-input-sm" type="number" :value="store.local.webui?.poll_interval_ms || 5000"
+            @input="store.set('webui.poll_interval_ms', parseInt($event.target.value))" />
+        </div>
+      </section>
 
-    <!-- Auth -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionAuth') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.chainId') }}</label>
-          <div class="input-row">
-            <select class="setting-input" v-model.number="form.chainId" @change="save('auth.chain_id', form.chainId)">
-              <option :value="137">137 (Polygon Mainnet)</option>
-              <option :value="80002">80002 (Amoy Testnet)</option>
-            </select>
+      <!-- Danger Zone -->
+      <section id="s-danger" class="s-section s-danger">
+        <div class="s-heading danger-heading">Danger Zone</div>
+        <div class="danger-actions">
+          <div class="danger-row">
+            <div>
+              <div class="danger-title">Cancel All Orders</div>
+              <div class="danger-desc">Immediately cancel every open order across all wallets.</div>
+            </div>
+            <button class="btn-danger" @click="confirmAction('cancelAllOrders')">Cancel All</button>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="danger-title">Stop All Strategies</div>
+              <div class="danger-desc">Halt all running strategies. Does not cancel open orders.</div>
+            </div>
+            <button class="btn-danger" @click="confirmAction('stopAllStrategies')">Stop All</button>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="danger-title">Reset Config</div>
+              <div class="danger-desc">Restore default configuration. This cannot be undone.</div>
+            </div>
+            <button class="btn-danger" @click="confirmAction('resetConfig')">Reset</button>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- API -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionApi') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.apiTimeout') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.apiTimeout" min="1" step="1" />
-            <button class="btn-save" @click="save('api.timeout_sec', form.apiTimeout)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.apiMaxRetries') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.apiMaxRetries" min="0" step="1" />
-            <button class="btn-save" @click="save('api.max_retries', form.apiMaxRetries)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Logging -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionLog') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.logLevel') }}</label>
-          <select class="setting-input" v-model="form.logLevel" @change="save('log.level', form.logLevel)">
-            <option v-for="l in logLevels" :key="l" :value="l">{{ l }}</option>
-          </select>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.logFormat') }}</label>
-          <select class="setting-input" v-model="form.logFormat" @change="save('log.format', form.logFormat)">
-            <option v-for="f in logFormats" :key="f" :value="f">{{ f }}</option>
-          </select>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.logFile') }}</label>
-          <input class="setting-input" type="text" v-model="form.logFile" placeholder="./polytrade.log"
-            @change="save('log.file', form.logFile)" />
+    <!-- Confirm dialog -->
+    <div v-if="confirmTarget" class="modal-backdrop" @click.self="confirmTarget = null">
+      <div class="modal">
+        <div class="modal-title">Are you sure?</div>
+        <div class="modal-body">{{ confirmMessages[confirmTarget] }}</div>
+        <div class="modal-actions">
+          <button class="btn-ghost" @click="confirmTarget = null">Cancel</button>
+          <button class="btn-danger" @click="runConfirmed">Confirm</button>
         </div>
       </div>
-    </section>
-
-    <!-- Monitor -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionMonitor') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.monitorEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.monitorEnabled" @change="save('monitor.enabled', form.monitorEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.monitorInterval') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.monitorInterval" min="100" step="100" />
-            <button class="btn-save" @click="save('monitor.poll_interval_ms', form.monitorInterval)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Trades Monitor -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionTradesMonitor') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.tradesEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.tradesEnabled" @change="save('monitor.trades.enabled', form.tradesEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.tradesInterval') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.tradesInterval" min="1000" step="1000" />
-            <button class="btn-save" @click="save('monitor.trades.poll_interval_ms', form.tradesInterval)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.alertOnFill') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.alertOnFill" @change="save('monitor.trades.alert_on_fill', form.alertOnFill)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.alertOnCancel') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.alertOnCancel" @change="save('monitor.trades.alert_on_cancel', form.alertOnCancel)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.trackPositions') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.trackPositions" @change="save('monitor.trades.track_positions', form.trackPositions)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.tradesLimit') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.tradesLimit" min="1" step="1" />
-            <button class="btn-save" @click="save('monitor.trades.trades_limit', form.tradesLimit)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Trading -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionTrading') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.tradingEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.tradingEnabled" @change="save('trading.enabled', form.tradingEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.maxPositionUsd') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.maxPositionUsd" min="0" step="10" />
-            <button class="btn-save" @click="save('trading.max_position_usd', form.maxPositionUsd)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.slippagePct') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.slippagePct" min="0" step="0.1" />
-            <button class="btn-save" @click="save('trading.slippage_pct', form.slippagePct)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.defaultOrderType') }}</label>
-          <select class="setting-input" v-model="form.defaultOrderType" @change="save('trading.default_order_type', form.defaultOrderType)">
-            <option v-for="t in orderTypes" :key="t" :value="t">{{ t }}</option>
-          </select>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.negRisk') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.negRisk" @change="save('trading.neg_risk', form.negRisk)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-      </div>
-    </section>
-
-    <!-- Copytrading -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionCopytrading') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.copytradingEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.copytradingEnabled" @change="save('copytrading.enabled', form.copytradingEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.copytradingInterval') }}</label>
-          <div class="input-row">
-            <input type="number" class="setting-input" v-model.number="form.copytradingInterval" min="1000" step="1000" />
-            <button class="btn-save" @click="save('copytrading.poll_interval_ms', form.copytradingInterval)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.sizeMode') }}</label>
-          <select class="setting-input" v-model="form.sizeMode" @change="save('copytrading.size_mode', form.sizeMode)">
-            <option v-for="m in sizeModes" :key="m" :value="m">{{ m }}</option>
-          </select>
-        </div>
-      </div>
-    </section>
-
-    <!-- Telegram -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionTelegram') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.telegramEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.telegramEnabled" @change="save('telegram.enabled', form.telegramEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.telegramToken') }}</label>
-          <div class="input-row">
-            <input type="password" class="setting-input" v-model="form.telegramToken" placeholder="***" />
-            <button class="btn-save" @click="save('telegram.bot_token', form.telegramToken)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.telegramAdminChatId') }}</label>
-          <div class="input-row">
-            <input type="text" class="setting-input" v-model="form.telegramAdminChatId" />
-            <button class="btn-save" @click="save('telegram.admin_chat_id', form.telegramAdminChatId)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Database -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionDatabase') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.databaseEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.databaseEnabled" @change="save('database.enabled', form.databaseEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.databasePath') }}</label>
-          <div class="input-row">
-            <input type="text" class="setting-input" v-model="form.databasePath" placeholder="bot.db" />
-            <button class="btn-save" @click="save('database.path', form.databasePath)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Web UI -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionWebUi') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.webUiEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.webUiEnabled" @change="save('webui.enabled', form.webUiEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.webUiListen') }}</label>
-          <div class="input-row">
-            <input type="text" class="setting-input" v-model="form.webUiListen" placeholder="127.0.0.1:8080" />
-            <button class="btn-save" @click="save('webui.listen', form.webUiListen)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.webUiJwtSecret') }}</label>
-          <div class="input-row">
-            <input type="password" class="setting-input" v-model="form.webUiJwtSecret" />
-            <button class="btn-save" @click="save('webui.jwt_secret', form.webUiJwtSecret)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Proxy -->
-    <section class="settings-section anim-in">
-      <div class="section-header"><span>{{ $t('settings.sectionProxy') }}</span></div>
-      <div class="settings-grid">
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.proxyEnabled') }}</label>
-          <label class="toggle">
-            <input type="checkbox" v-model="form.proxyEnabled" @change="save('proxy.enabled', form.proxyEnabled)" />
-            <span class="toggle-track"><span class="toggle-thumb" /></span>
-          </label>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.proxyType') }}</label>
-          <select class="setting-input" v-model="form.proxyType" @change="save('proxy.type', form.proxyType)">
-            <option v-for="t in proxyTypes" :key="t" :value="t">{{ t }}</option>
-          </select>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.proxyAddr') }}</label>
-          <div class="input-row">
-            <input type="text" class="setting-input" v-model="form.proxyAddr" placeholder="host:port" />
-            <button class="btn-save" @click="save('proxy.addr', form.proxyAddr)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.proxyUsername') }}</label>
-          <div class="input-row">
-            <input type="text" class="setting-input" v-model="form.proxyUsername" />
-            <button class="btn-save" @click="save('proxy.username', form.proxyUsername)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-        <div class="setting-card">
-          <label class="setting-label">{{ $t('settings.proxyPassword') }}</label>
-          <div class="input-row">
-            <input type="password" class="setting-input" v-model="form.proxyPassword" />
-            <button class="btn-save" @click="save('proxy.password', form.proxyPassword)">{{ $t('settings.save') }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Saved toast -->
-    <Transition name="fade">
-      <div v-if="savedMsg" class="saved-toast">{{ $t('settings.saved') }} ✓</div>
-    </Transition>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useAppStore } from '@/stores/app'
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '@/stores/settings'
 import { useApi } from '@/composables/useApi'
 import { LANGS } from '@/i18n'
 
-const app = useAppStore()
+const { locale } = useI18n()
+const store = useSettingsStore()
 const api = useApi()
-const savedMsg = ref(false)
-const { settingsStale } = storeToRefs(app)
 
-watch(settingsStale, async (stale) => {
-  if (!stale) return
-  try { const s = await api.getSettings(); applySettings(s) } catch {}
-  app.settingsStale = false
-})
+const saving = ref(false)
+const bodyEl = ref(null)
+const activeSection = ref('s-auth')
+const testState = ref({})
+const confirmTarget = ref(null)
+const currentLang = ref(locale.value)
 
-const logLevels = ['trace', 'debug', 'info', 'warn', 'error']
-const logFormats = ['pretty', 'json']
-const orderTypes = ['GTC', 'GTD', 'FOK', 'FAK']
-const sizeModes = ['proportional', 'fixed_pct']
-const proxyTypes = ['socks5', 'http']
+const sections = [
+  { id: 's-auth',      label: 'Auth & Keys' },
+  { id: 's-network',   label: 'Network' },
+  { id: 's-trading',   label: 'Trading Engine' },
+  { id: 's-telegram',  label: 'Telegram' },
+  { id: 's-logging',   label: 'Logging' },
+  { id: 's-interface', label: 'Interface' },
+  { id: 's-danger',    label: 'Danger Zone' },
+]
 
-const form = reactive({
-  language: 'en', logLevel: 'info', logFormat: 'pretty', logFile: '',
-  chainId: 137, apiTimeout: 10, apiMaxRetries: 3,
-  monitorEnabled: true, monitorInterval: 1000,
-  tradesEnabled: false, tradesInterval: 5000,
-  alertOnFill: true, alertOnCancel: true, trackPositions: true, tradesLimit: 50,
-  tradingEnabled: false, maxPositionUsd: 100.0, slippagePct: 0.5, defaultOrderType: 'GTC', negRisk: false,
-  copytradingEnabled: false, copytradingInterval: 10000, sizeMode: 'proportional',
-  telegramEnabled: false, telegramToken: '', telegramAdminChatId: '',
-  databaseEnabled: false, databasePath: 'bot.db',
-  webUiEnabled: true, webUiListen: '127.0.0.1:8080', webUiJwtSecret: '',
-  proxyEnabled: false, proxyType: 'socks5', proxyAddr: '', proxyUsername: '', proxyPassword: '',
-})
+const networkFields = [
+  { key: 'network.clob_url',  label: 'CLOB URL',  placeholder: 'https://clob.polymarket.com' },
+  { key: 'network.gamma_url', label: 'Gamma URL', placeholder: 'https://gamma-api.polymarket.com' },
+  { key: 'network.data_url',  label: 'Data URL',  placeholder: 'https://data-api.polymarket.com' },
+  { key: 'network.ws_url',    label: 'WS URL',    placeholder: 'wss://ws-subscriptions-clob.polymarket.com/ws/' },
+]
 
-onMounted(async () => {
-  try { const s = await api.getSettings(); app.settings = s; applySettings(s) } catch {}
-})
-
-function applySettings(s) {
-  if (s.ui?.language)                           form.language = s.ui.language
-  if (s.auth?.chain_id)                         form.chainId = s.auth.chain_id
-  if (s.api?.timeout_sec)                       form.apiTimeout = s.api.timeout_sec
-  if (s.api?.max_retries)                       form.apiMaxRetries = s.api.max_retries
-  if (s.log?.level)                             form.logLevel = s.log.level
-  if (s.log?.format)                            form.logFormat = s.log.format
-  if (s.log?.file !== undefined)                form.logFile = s.log.file ?? ''
-  form.monitorEnabled = !!s.monitor?.enabled
-  if (s.monitor?.poll_interval_ms)              form.monitorInterval = s.monitor.poll_interval_ms
-  form.tradesEnabled = !!s.monitor?.trades?.enabled
-  if (s.monitor?.trades?.poll_interval_ms)      form.tradesInterval = s.monitor.trades.poll_interval_ms
-  form.alertOnFill = !!s.monitor?.trades?.alert_on_fill
-  form.alertOnCancel = !!s.monitor?.trades?.alert_on_cancel
-  form.trackPositions = !!s.monitor?.trades?.track_positions
-  if (s.monitor?.trades?.trades_limit)          form.tradesLimit = s.monitor.trades.trades_limit
-  form.tradingEnabled = !!s.trading?.enabled
-  if (s.trading?.max_position_usd)              form.maxPositionUsd = s.trading.max_position_usd
-  if (s.trading?.slippage_pct)                  form.slippagePct = s.trading.slippage_pct
-  if (s.trading?.default_order_type)            form.defaultOrderType = s.trading.default_order_type
-  form.negRisk = !!s.trading?.neg_risk
-  form.copytradingEnabled = !!s.copytrading?.enabled
-  if (s.copytrading?.poll_interval_ms)          form.copytradingInterval = s.copytrading.poll_interval_ms
-  if (s.copytrading?.size_mode)                 form.sizeMode = s.copytrading.size_mode
-  form.telegramEnabled = !!s.telegram?.enabled
-  if (s.telegram?.bot_token && s.telegram.bot_token !== '***') form.telegramToken = s.telegram.bot_token
-  if (s.telegram?.admin_chat_id)                form.telegramAdminChatId = s.telegram.admin_chat_id
-  form.databaseEnabled = !!s.database?.enabled
-  if (s.database?.path)                         form.databasePath = s.database.path
-  form.webUiEnabled = !!s.webui?.enabled
-  if (s.webui?.listen)                          form.webUiListen = s.webui.listen
-  // Don't populate password fields with masked "***" value — leave blank so user must re-enter to change
-  if (s.webui?.jwt_secret && s.webui.jwt_secret !== '***') form.webUiJwtSecret = s.webui.jwt_secret
-  form.proxyEnabled = !!s.proxy?.enabled
-  if (s.proxy?.type)     form.proxyType = s.proxy.type
-  if (s.proxy?.addr)     form.proxyAddr = s.proxy.addr
-  if (s.proxy?.username) form.proxyUsername = s.proxy.username
-  if (s.proxy?.password && s.proxy.password !== '***') form.proxyPassword = s.proxy.password
+const confirmMessages = {
+  cancelAllOrders:   'This will cancel all open orders across all wallets immediately.',
+  stopAllStrategies: 'This will stop all running strategies immediately.',
+  resetConfig:       'This will reset your configuration to defaults. All custom settings will be lost.',
 }
 
-async function save(key, value) {
-  // Never send back a masked sentinel value — user must explicitly type a new value to change secrets
-  if (String(value) === '***') return
+function getNestedVal(dotKey) {
+  const parts = dotKey.split('.')
+  let cur = store.local
+  for (const p of parts) cur = cur?.[p]
+  return cur || ''
+}
+
+function changeLang(lang) {
+  currentLang.value = lang
+  locale.value = lang
+  localStorage.setItem('lang', lang)
+}
+
+function scrollTo(id) {
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function onScroll() {
+  for (const s of [...sections].reverse()) {
+    const el = document.getElementById(s.id)
+    if (el && el.getBoundingClientRect().top <= 120) {
+      activeSection.value = s.id
+      return
+    }
+  }
+}
+
+async function doSave() {
+  saving.value = true
+  try { await store.save() } finally { saving.value = false }
+}
+
+async function testUrl(key) {
+  const url = getNestedVal(key)
+  if (!url) return
+  testState.value = { ...testState.value, [key]: 'loading' }
   try {
-    await api.postSettings(key, String(value))
-    savedMsg.value = true
-    setTimeout(() => { savedMsg.value = false }, 2000)
-  } catch {}
+    await api.testEndpoint(url)
+    testState.value = { ...testState.value, [key]: 'ok' }
+  } catch {
+    testState.value = { ...testState.value, [key]: 'err' }
+  }
+  setTimeout(() => {
+    testState.value = { ...testState.value, [key]: null }
+  }, 3000)
 }
+
+function confirmAction(action) {
+  confirmTarget.value = action
+}
+
+async function runConfirmed() {
+  const action = confirmTarget.value
+  confirmTarget.value = null
+  if (action === 'cancelAllOrders') {
+    await api.cancelAll()
+  } else if (action === 'stopAllStrategies') {
+    const strats = await api.getStrategies().catch(() => ({ strategies: [] }))
+    const list = strats.strategies || []
+    await Promise.allSettled(list.filter(s => s.running).map(s => api.stopStrategy(s.key)))
+  } else if (action === 'resetConfig') {
+    store.reset()
+  }
+}
+
+onMounted(() => store.load())
 </script>
 
 <style scoped>
-.view { display: flex; flex-direction: column; gap: 1.75rem; position: relative; }
+.settings-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
 
-.page-header { }
-.view-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright); }
+/* Left nav */
+.settings-nav {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.snav-item {
+  padding: 8px 20px;
+  font-size: var(--font-size-sm, 12px);
+  color: var(--fg-muted);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all var(--transition);
+  white-space: nowrap;
+  user-select: none;
+}
+.snav-item:hover { color: var(--fg); background: rgba(255,255,255,0.03); }
+.snav-item.active { color: var(--accent-bright); border-left-color: var(--accent-bright); background: rgba(124,58,237,0.06); }
 
-/* Section */
-.settings-section { display: flex; flex-direction: column; gap: 0.75rem; }
+/* Body */
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 60px;
+  position: relative;
+}
 
-/* Section header */
-.section-header {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 1.00rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--accent); font-weight: 700;
-  padding-bottom: 0.5rem;
+/* Save bar */
+.save-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  margin: 0 -32px 0;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+.dirty-badge {
+  font-size: var(--font-size-sm, 12px);
+  color: var(--warning);
+  font-weight: 600;
+}
+.save-actions { display: flex; gap: 8px; }
+
+.savebar-enter-active, .savebar-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.savebar-enter-from, .savebar-leave-to { opacity: 0; transform: translateY(-8px); }
+
+/* Sections */
+.s-section {
+  padding: 28px 0 16px;
   border-bottom: 1px solid var(--border);
 }
-
-/* Grid */
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 0.65rem;
+.s-section:last-child { border-bottom: none; }
+.s-heading {
+  font-size: var(--font-size-xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-bottom: 16px;
 }
 
-/* Card */
-.setting-card {
-  background: var(--bg-card);
+/* Rows */
+.s-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.s-row:last-child { border-bottom: none; }
+.s-row > label:first-child {
+  font-size: var(--font-size-sm, 12px);
+  color: var(--fg-muted);
+  min-width: 180px;
+}
+
+.s-input {
+  background: var(--bg-input, rgba(255,255,255,0.05));
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.85rem 1rem;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  transition: border-color var(--transition);
-}
-.setting-card:hover { border-color: rgba(124, 58, 237, 0.30); }
-
-/* Label */
-.setting-label {
-  font-size: 0.90rem; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-secondary);
-}
-
-/* Input */
-.setting-input {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  padding: 0.4rem 0.65rem;
-  font-size: 0.96rem; font-family: var(--font-mono);
-  outline: none; width: 100%;
-  transition: border-color var(--transition);
-}
-.setting-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,58,237,0.12); }
-
-select.setting-input { cursor: pointer; }
-
-.input-row { display: flex; gap: 0.4rem; }
-.input-row .setting-input { flex: 1; }
-
-/* Save button */
-.btn-save {
-  background: transparent;
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.7rem;
-  font-size: 0.86rem; font-weight: 600;
-  cursor: pointer; white-space: nowrap;
+  color: var(--fg);
+  font-size: var(--font-size-sm, 12px);
   font-family: var(--font-mono);
-  transition: all var(--transition);
+  padding: 5px 10px;
+  width: 280px;
+  outline: none;
+  transition: border-color var(--transition);
 }
-.btn-save:hover { background: var(--accent); color: #fff; box-shadow: var(--accent-glow); }
+.s-input:focus { border-color: var(--accent); }
+.s-input-sm { width: 120px; }
+
+.s-input-row { display: flex; gap: 8px; align-items: center; }
+
+/* Test button */
+.btn-test {
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  width: 50px;
+  text-align: center;
+}
+.btn-test:hover { border-color: var(--accent); color: var(--accent-bright); }
+.btn-test.ok { color: var(--success); border-color: var(--success); }
+.btn-test.err { color: var(--danger); border-color: var(--danger); }
 
 /* Toggle */
-.toggle { display: flex; align-items: center; cursor: pointer; }
+.toggle { position: relative; display: inline-block; width: 36px; height: 20px; cursor: pointer; }
 .toggle input { display: none; }
-.toggle-track {
-  width: 36px; height: 18px;
-  background: var(--border);
-  border-radius: 1px; position: relative;
-  transition: background var(--transition);
+.track {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
   border: 1px solid var(--border);
+  transition: background var(--transition);
 }
-.toggle input:checked ~ .toggle-track { background: var(--accent); border-color: var(--accent); }
-.toggle-thumb {
+.track::after {
+  content: '';
   position: absolute;
-  width: 12px; height: 12px;
-  background: var(--text-muted);
-  border-radius: 1px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--fg-dim);
   top: 2px; left: 2px;
-  transition: left var(--transition), background var(--transition);
+  transition: transform var(--transition), background var(--transition);
 }
-.toggle input:checked ~ .toggle-track .toggle-thumb { left: 20px; background: #000; }
+.toggle input:checked + .track { background: rgba(124,58,237,0.3); border-color: var(--accent); }
+.toggle input:checked + .track::after { transform: translateX(16px); background: var(--accent-bright); }
 
-/* Saved toast */
-.saved-toast {
-  position: fixed;
-  bottom: 1.5rem; right: 1.5rem;
-  background: var(--success);
-  color: #000;
-  padding: 0.5rem 1.1rem;
-  border-radius: var(--radius);
-  font-size: 0.92rem; font-weight: 700;
-  box-shadow: 0 2px 16px rgba(16, 217, 148, 0.35);
-  font-family: var(--font-mono); letter-spacing: 0.04em;
+/* Danger zone */
+.s-danger { }
+.danger-heading { color: var(--danger) !important; }
+.danger-actions { display: flex; flex-direction: column; gap: 0; }
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
-.fade-enter-active { animation: fadeSlideUp 0.18s ease both; }
-.fade-leave-active { animation: fadeSlideUp 0.15s ease reverse both; }
+.danger-row:last-child { border-bottom: none; }
+.danger-title { font-size: var(--font-size-base, 14px); color: var(--fg); margin-bottom: 3px; }
+.danger-desc { font-size: var(--font-size-sm, 12px); color: var(--fg-dim); }
+
+.btn-danger {
+  padding: 7px 16px;
+  background: var(--danger-dim, rgba(239,68,68,0.12));
+  border: 1px solid rgba(239,68,68,0.4);
+  color: var(--danger);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn-danger:hover { background: var(--danger); color: #fff; }
+
+/* Buttons */
+.btn-ghost {
+  padding: 7px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm, 12px);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-ghost:hover { color: var(--fg); border-color: var(--fg-muted); }
+.btn-primary {
+  padding: 7px 18px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:not(:disabled):hover { background: var(--accent-bright); }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  padding: 28px;
+  width: 400px;
+  max-width: 90vw;
+}
+.modal-title { font-size: var(--font-size-md, 15px); font-weight: 700; color: var(--fg); margin-bottom: 10px; }
+.modal-body { font-size: var(--font-size-sm, 12px); color: var(--fg-muted); margin-bottom: 24px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 </style>
