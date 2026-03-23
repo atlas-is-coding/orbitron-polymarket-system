@@ -5,6 +5,8 @@ CLAUDE.md
 CLAUDE copy.md
 PRODUCTION_CHECKLIST.md
 GEMINI.md
+MARKETING_PLAN.md
+marketing/
 .claude/
 .gemini/
 ,gemini/
@@ -20,6 +22,9 @@ GEMINI.md
 !internal/builder/validator_test.go
 !internal/builder/logger_test.go
 !internal/builder/integration_test.go
+# Exception for analytics tests
+!internal/analytics/hub_test.go
+!internal/analytics/client_test.go
 
 # AI / Workflow artifacts
 .superpowers/
