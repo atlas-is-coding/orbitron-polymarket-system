@@ -197,7 +197,8 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 	var analyticsHub *analytics.AnalyticsHub
 	if m.cfg.Analytics.Enabled && l1 != nil {
 		analyticsHub = analytics.NewAnalyticsHub(m.cfg.Analytics.BatchSize)
-		analyticsClient := analytics.NewClient(l1, wCfg.Label, m.cfg.Analytics.Endpoint, m.log)
+		inst.AnalyticsHub = analyticsHub
+		analyticsClient := analytics.NewClient(l1, wCfg.Label, m.cfg.Analytics.Endpoint, wCfg.ChainID, m.log)
 		go func(hub *analytics.AnalyticsHub, client *analytics.Client) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -220,11 +221,11 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 					return
 				case <-hub.Trigger():
 				case <-ticker.C:
-					trades := hub.Flush()
-					if len(trades) > 0 {
-						if err := client.Report(instCtx, trades); err != nil {
-							m.log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("failed to report analytics")
-						}
+				}
+				trades := hub.Flush()
+				if len(trades) > 0 {
+					if err := client.Report(instCtx, trades); err != nil {
+						m.log.Warn().Err(err).Str("wallet", wCfg.Label).Msg("failed to report analytics")
 					}
 				}
 			}
