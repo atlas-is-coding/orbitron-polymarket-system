@@ -7,7 +7,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"runtime/debug"
 	"syscall"
 	"time"
@@ -177,6 +179,20 @@ func (a *engineAdapter) CancelAllOrders() error {
 		}
 	}
 	return fmt.Errorf("no active trades monitor")
+}
+
+// openBrowser opens the given URL in the default system browser.
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default: // linux and others
+		cmd = exec.Command("xdg-open", url)
+	}
+	_ = cmd.Start()
 }
 
 func main() {
@@ -390,14 +406,14 @@ func run() error {
 	riskMgr := risk.NewManager(cfg.Trading.Risk)
 
 	// --- Trading Strategies ---
-	// Helper to find executor by wallet ID or primary (returns the first available).
-	getExecutor := func(wids []string) strategies.Executor {
+	// findWalletInst returns the first active wallet instance matching wids
+	// (or the primary wallet when wids is empty).
+	findWalletInst := func(wids []string) *wallet.WalletInstance {
 		if len(wids) == 0 {
-			// Fallback to primary
 			for _, id := range wm.WalletIDs() {
 				inst, ok := wm.Get(id)
 				if ok && inst.Cfg.Primary && inst.Cfg.Enabled && inst.Executor != nil {
-					return &executorAdapter{inst.Executor}
+					return inst
 				}
 			}
 			return nil
@@ -408,30 +424,40 @@ func run() error {
 			}
 			inst, ok := wm.Get(wid)
 			if ok && inst.Cfg.Enabled && inst.Executor != nil {
-				return &executorAdapter{inst.Executor}
+				return inst
 			}
 		}
 		return nil
 	}
 
+	// getExecutor returns a TaggingExecutor that records which strategy placed
+	// each order, enabling accurate strategy attribution in analytics reports.
+	getExecutor := func(wids []string, strategyName string) strategies.Executor {
+		inst := findWalletInst(wids)
+		if inst == nil {
+			return nil
+		}
+		return strategies.NewTaggingExecutor(&executorAdapter{inst.Executor}, inst.AnalyticsHub, strategyName)
+	}
+
 	sc := cfg.Trading.Strategies
 	engine.Register(strategies.NewArbitrageStrategy(
-		gammaClient, getExecutor(sc.Arbitrage.WalletIDs), notifier, bus, riskMgr, sc.Arbitrage, log,
+		gammaClient, getExecutor(sc.Arbitrage.WalletIDs, "arbitrage"), notifier, bus, riskMgr, sc.Arbitrage, log,
 	))
 	engine.Register(strategies.NewMarketMakingStrategy(
-		gammaClient, pubClobClient, getExecutor(sc.MarketMaking.WalletIDs), notifier, bus, riskMgr, sc.MarketMaking, log,
+		gammaClient, pubClobClient, getExecutor(sc.MarketMaking.WalletIDs, "market_making"), notifier, bus, riskMgr, sc.MarketMaking, log,
 	))
 	engine.Register(strategies.NewPositiveEVStrategy(
-		gammaClient, getExecutor(sc.PositiveEV.WalletIDs), notifier, bus, riskMgr, sc.PositiveEV, log,
+		gammaClient, getExecutor(sc.PositiveEV.WalletIDs, "positive_ev"), notifier, bus, riskMgr, sc.PositiveEV, log,
 	))
 	engine.Register(strategies.NewRisklessRateStrategy(
-		gammaClient, getExecutor(sc.RisklessRate.WalletIDs), notifier, bus, riskMgr, sc.RisklessRate, log,
+		gammaClient, getExecutor(sc.RisklessRate.WalletIDs, "riskless_rate"), notifier, bus, riskMgr, sc.RisklessRate, log,
 	))
 	engine.Register(strategies.NewFadeTheChaosStrategy(
-		gammaClient, getExecutor(sc.FadeChaos.WalletIDs), notifier, bus, riskMgr, sc.FadeChaos, log,
+		gammaClient, getExecutor(sc.FadeChaos.WalletIDs, "fade_chaos"), notifier, bus, riskMgr, sc.FadeChaos, log,
 	))
 	engine.Register(strategies.NewCrossMarketStrategy(
-		gammaClient, getExecutor(sc.CrossMarket.WalletIDs), notifier, bus, riskMgr, sc.CrossMarket, log,
+		gammaClient, getExecutor(sc.CrossMarket.WalletIDs, "cross_market"), notifier, bus, riskMgr, sc.CrossMarket, log,
 	))
 
 	// --- Market Monitor ---
@@ -577,6 +603,10 @@ func run() error {
 		}
 		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			openBrowser("http://" + cfg.WebUI.Listen)
+		}()
 
 		// Emit initial state to Nexus/WebUI after server is ready
 		bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
