@@ -187,7 +187,13 @@ type Locale struct {
 	WizardStep1Label string `json:"wizard_step1_label"`
 
 	// Wizard step hints
-	WizardStep1Hint string `json:"wizard_step1_hint"`
+	WizardStep1Hint  string `json:"wizard_step1_hint"`
+	WizardStep2Label string `json:"wizard_step2_label"`
+	WizardStep2Hint  string `json:"wizard_step2_hint"`
+	WizardStep3Label string `json:"wizard_step3_label"`
+	WizardStep3Hint  string `json:"wizard_step3_hint"`
+	WizardStep4Label string `json:"wizard_step4_label"`
+	WizardStep4Hint  string `json:"wizard_step4_hint"`
 
 	// Log messages (zerolog)
 	LogBotStarting          string `json:"log_bot_starting"`
