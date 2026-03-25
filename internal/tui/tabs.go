@@ -86,6 +86,56 @@ func RenderTopBar(active TabID, width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, tabs, line)
 }
 
+// renderCard renders a card with a colored top accent line and titled body.
+// focused=true uses ColorPrimary accent; false uses ColorPrimary2.
+// Replaces the old renderPanel() for all tab content blocks.
+func renderCard(title, body string, width int, focused bool) string {
+	accentColor := ColorPrimary2
+	titleColor := ColorFgDim
+	if focused {
+		accentColor = ColorPrimary
+		titleColor = ColorBright
+	}
+	innerW := width - 2
+	if innerW < 1 {
+		innerW = 1
+	}
+	topBar := lipgloss.NewStyle().Foreground(accentColor).Render(strings.Repeat("─", width))
+	heading := lipgloss.NewStyle().Foreground(titleColor).Bold(true).
+		Render("▸ " + strings.ToUpper(title))
+	sep := lipgloss.NewStyle().Foreground(ColorMuted).Render(strings.Repeat("─", innerW))
+	content := lipgloss.NewStyle().
+		Background(ColorBgMid).
+		Width(innerW).
+		Padding(0, 1).
+		Render(heading + "\n" + sep + "\n" + body)
+	return lipgloss.JoinVertical(lipgloss.Left, topBar, content)
+}
+
+// renderHeroCard renders a centered KPI card with large bold value.
+// topColor sets the accent top bar color (use ColorPrimary, ColorSuccess, ColorPrimary2).
+// Width formula for 4-card row: heroW := (m.width - 6) / 4
+// Width formula for 2-card row: heroW := (m.width - 3) / 2
+func renderHeroCard(label, value, sub string, width int, topColor lipgloss.Color) string {
+	innerW := width - 2
+	if innerW < 1 {
+		innerW = 1
+	}
+	topBar := lipgloss.NewStyle().Foreground(topColor).Render(strings.Repeat("─", width))
+	lbl := lipgloss.NewStyle().Foreground(ColorMuted).
+		Width(innerW).Align(lipgloss.Center).Render(strings.ToUpper(label))
+	val := lipgloss.NewStyle().Foreground(ColorBright).Bold(true).
+		Width(innerW).Align(lipgloss.Center).Render(value)
+	subStr := lipgloss.NewStyle().Foreground(ColorMuted).
+		Width(innerW).Align(lipgloss.Center).Render(sub)
+	body := lipgloss.NewStyle().
+		Background(ColorBgMid).
+		Width(innerW).
+		Padding(1, 1).
+		Render(lbl + "\n" + val + "\n" + subStr)
+	return lipgloss.JoinVertical(lipgloss.Left, topBar, body)
+}
+
 // renderPanel renders a spec-compliant content panel.
 // active=true uses ColorPrimary border; false uses ColorPrimaryDim.
 func renderPanel(title, content string, width int, active bool) string {

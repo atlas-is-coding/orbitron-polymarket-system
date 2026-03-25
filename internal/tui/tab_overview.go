@@ -267,7 +267,7 @@ func (m OverviewModel) View() string {
 		fmt.Fprintf(&statsContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewPnLToday)), formatPnL(m.pnlToday))
 		fmt.Fprintf(&statsContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
 		fmt.Fprintf(&statsContent, " %s  %s\n", label("Status"), statusDot)
-		statsPanel := renderPanel(t.OverviewStats, statsContent.String(), m.width, true)
+		statsPanel := renderCard(t.OverviewStats, statsContent.String(), m.width, true)
 		return lipgloss.JoinVertical(lipgloss.Left, " ", statsPanel, " ", helpPanel)
 
 	case "standard":
@@ -282,7 +282,7 @@ func (m OverviewModel) View() string {
 		fmt.Fprintf(&leftContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewBalance)), val(fmt.Sprintf("$%.2f", m.balance)))
 		fmt.Fprintf(&leftContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewPnLToday)), formatPnL(m.pnlToday))
 		fmt.Fprintf(&leftContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
-		leftPanel := renderPanel(t.OverviewStats, leftContent.String(), half, true)
+		leftPanel := renderCard(t.OverviewStats, leftContent.String(), half, true)
 
 		var rightContent strings.Builder
 		fmt.Fprintf(&rightContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewOpenOrders)), StyleBold.Render(fmt.Sprintf("%d", m.openOrders)))
@@ -298,7 +298,7 @@ func (m OverviewModel) View() string {
 			}
 			fmt.Fprintf(&rightContent, " %s %-14s %s\n", dot, StyleFgDim.Render(s.Name), status)
 		}
-		rightPanel := renderPanel(t.OverviewHealth, rightContent.String(), half, false)
+		rightPanel := renderCard(t.OverviewHealth, rightContent.String(), half, false)
 
 		topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, " ", rightPanel)
 		return lipgloss.JoinVertical(lipgloss.Left, " ", topRow, " ", helpPanel)
@@ -323,7 +323,7 @@ func (m OverviewModel) View() string {
 			}
 			fmt.Fprintf(&logoSubsystems, " %s %-16s %s\n", dot, StyleFgDim.Render(s.Name), status)
 		}
-		leftPanel := renderPanel("", logoSubsystems.String(), third, false)
+		leftPanel := renderCard("", logoSubsystems.String(), third, false)
 
 		// ── Middle: Quick Stats ───────────────────────────────────────────────
 		var statsContent strings.Builder
@@ -332,10 +332,10 @@ func (m OverviewModel) View() string {
 		fmt.Fprintf(&statsContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewPositions)), StyleBold.Render(fmt.Sprintf("%d", m.positions)))
 		fmt.Fprintf(&statsContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewPnLToday)), formatPnL(m.pnlToday))
 		fmt.Fprintf(&statsContent, " %s  %s\n", label(fmt.Sprintf("%-20s", t.OverviewCopyTraders)), StyleBold.Render(fmt.Sprintf("%d", m.traders)))
-		middlePanel := renderPanel(t.OverviewStats, statsContent.String(), third, true)
+		middlePanel := renderCard(t.OverviewStats, statsContent.String(), third, true)
 
 		// ── Right: Health ─────────────────────────────────────────────────────
-		rightPanel := renderPanel(t.OverviewHealth, m.renderHealthBlock(), third, false)
+		rightPanel := renderCard(t.OverviewHealth, m.renderHealthBlock(), third, false)
 
 		topRow := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, " ", middlePanel, " ", rightPanel)
 
@@ -379,7 +379,7 @@ func (m OverviewModel) View() string {
 				}
 				fmt.Fprintf(&walletsContent, " %-*s  %-14s  %-14s  %s\n", colW, lbl, balStr, formatPnL(w.pnl), statusStr)
 			}
-			walletsPanel = renderPanel(t.OverviewWallets, walletsContent.String(), m.width, false)
+			walletsPanel = renderCard(t.OverviewWallets, walletsContent.String(), m.width, false)
 		}
 
 		if walletsPanel != "" {
