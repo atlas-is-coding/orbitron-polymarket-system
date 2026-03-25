@@ -30,6 +30,7 @@ marketing/
 !internal/updater/updater_test.go
 # Exception for nexus tests
 !internal/nexus/types_test.go
+!internal/nexus/event_test.go
 
 # AI / Workflow artifacts
 .superpowers/
