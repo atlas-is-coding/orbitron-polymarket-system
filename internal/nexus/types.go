@@ -1,6 +1,10 @@
 package nexus
 
-import "time"
+import (
+	"time"
+
+	"github.com/atlasdev/orbitron/internal/config"
+)
 
 // EventType represents the type of an event
 type EventType string
@@ -39,9 +43,10 @@ const (
 	EventPriceAlert     EventType = "price.alert"
 )
 
-// Event type constants - System (2)
+// Event type constants - System (3)
 const (
 	EventConfigReloaded  EventType = "config.reloaded"
+	EventConfigChanged   EventType = "config.changed"
 	EventHealthSnapshot  EventType = "health.snapshot"
 )
 
@@ -215,6 +220,12 @@ type PriceAlertPayload struct {
 // ConfigReloadedPayload - config.reloaded event
 type ConfigReloadedPayload struct {
 	Timestamp time.Time `json:"timestamp"`
+}
+
+// ConfigChangedPayload - config.changed event (for live config updates)
+type ConfigChangedPayload struct {
+	Copytrading config.CopytradingConfig `json:"copytrading,omitempty"`
+	Wallets     []config.WalletConfig    `json:"wallets,omitempty"`
 }
 
 // HealthSnapshotPayload - health.snapshot event

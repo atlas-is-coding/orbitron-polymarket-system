@@ -296,9 +296,7 @@ func (s *Server) handlePostSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	// Side effect: language change
 	if req.Key == "ui.language" {
 		i18n.SetLanguage(req.Value)
@@ -502,6 +500,24 @@ func (s *Server) handleWalletStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, stats[0])
 }
 
+// publishConfigChange publishes a config change event to both EventBus and Nexus.
+func (s *Server) publishConfigChange() {
+	if s.bus != nil {
+		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
+	}
+	if s.nexus != nil {
+		// Publish config change to centralized Nexus system
+		s.nexus.PublishEvent(nexus.Event{
+			Type: nexus.EventConfigChanged,
+			Timestamp: time.Now(),
+			Payload: nexus.ConfigChangedPayload{
+				Copytrading: s.cfg.Copytrading,
+				Wallets: s.cfg.Wallets,
+			},
+		})
+	}
+}
+
 func (s *Server) handleAddTrader(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Address  string  `json:"address"`
@@ -542,9 +558,7 @@ func (s *Server) handleAddTrader(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "added"})
 }
 
@@ -575,9 +589,7 @@ func (s *Server) handleRemoveTrader(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
 
@@ -610,9 +622,7 @@ func (s *Server) handleToggleTrader(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
 }
 
@@ -659,9 +669,7 @@ func (s *Server) handleEditTrader(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -1161,9 +1169,7 @@ func (s *Server) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 

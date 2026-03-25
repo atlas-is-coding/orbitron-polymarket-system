@@ -151,8 +151,46 @@ func (b *Bot) Run(ctx context.Context) error {
 	// EventBus consumer goroutine
 	go b.consumeEvents(ctx, tap)
 
+	// Subscribe to Nexus config changes
+	if b.nexus != nil {
+		nexusTap := b.nexus.Subscribe("config.*")
+		go b.consumeNexusEvents(ctx, nexusTap)
+		defer func() {
+			b.nexus.Unsubscribe("config.*", nexusTap)
+		}()
+	}
+
 	// Telegram long-polling loop (blocks)
 	return b.pollTelegram(ctx)
+}
+
+// consumeNexusEvents reads from the Nexus config event channel and updates BotState.
+func (b *Bot) consumeNexusEvents(ctx context.Context, nexusCh <-chan nexus.Event) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case evt, ok := <-nexusCh:
+			if !ok {
+				return
+			}
+			// Handle config change events
+			if evt.Type == nexus.EventConfigChanged {
+				if payload, ok := evt.Payload.(nexus.ConfigChangedPayload); ok {
+					b.cfgMu.Lock()
+					// Update copytrading config
+					if len(payload.Copytrading.Traders) > 0 {
+						b.cfg.Copytrading = payload.Copytrading
+					}
+					// Update wallets config
+					if len(payload.Wallets) > 0 {
+						b.cfg.Wallets = payload.Wallets
+					}
+					b.cfgMu.Unlock()
+				}
+			}
+		}
+	}
 }
 
 // consumeEvents reads from the EventBus tap and updates BotState.
