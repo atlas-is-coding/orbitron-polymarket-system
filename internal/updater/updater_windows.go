@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build windows
 
 package updater
 
@@ -10,14 +10,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-// RunUpdate applies the update. It prefers git pull when a .git directory is
-// present, otherwise downloads the binary directly. On success it restarts
-// the process in-place. n is used to send error notifications on failure.
+const helperName = "updater-helper.exe"
+
+// RunUpdate applies the update on Windows.
 func RunUpdate(ctx context.Context, version, binaryURL, dir string, p *Pending, n *Notifier) {
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 		runGitUpdate(dir, version, p, n)
@@ -32,18 +33,16 @@ func runGitUpdate(dir, version string, p *Pending, n *Notifier) {
 	pull := exec.Command("git", "pull")
 	pull.Dir = dir
 	if out, err := pull.CombinedOutput(); err != nil {
-		msg := fmt.Sprintf("git pull failed: %v — %s", err, out)
-		n.NotifyError(msg)
+		n.NotifyError(fmt.Sprintf("git pull failed: %v — %s", err, out))
 		return
 	}
 
-	setup := filepath.Join(dir, "setup.sh")
+	setup := filepath.Join(dir, "setup.ps1")
 	if _, err := os.Stat(setup); err == nil {
-		cmd := exec.Command("bash", setup)
+		cmd := exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup)
 		cmd.Dir = dir
 		if out, err := cmd.CombinedOutput(); err != nil {
-			msg := fmt.Sprintf("setup.sh failed: %v — %s", err, out)
-			n.NotifyError(msg)
+			n.NotifyError(fmt.Sprintf("setup.ps1 failed: %v — %s", err, out))
 			return
 		}
 	}
@@ -55,7 +54,7 @@ func runGitUpdate(dir, version string, p *Pending, n *Notifier) {
 
 func runBinaryUpdate(ctx context.Context, binaryURL, version, dir string, p *Pending, n *Notifier) {
 	if binaryURL == "" {
-		log.Warn().Msg("updater: no binary URL for this platform")
+		log.Warn().Msg("updater: no binary URL for windows_amd64")
 		return
 	}
 
@@ -64,31 +63,35 @@ func runBinaryUpdate(ctx context.Context, binaryURL, version, dir string, p *Pen
 		n.NotifyError("cannot determine executable path: " + err.Error())
 		return
 	}
-	_ = dir // dir is used for .git detection only; binary lives at exe
 
-	tmp := exe + ".new"
-	if err := downloadFile(ctx, binaryURL, tmp); err != nil {
+	newExe := exe + ".new"
+	if err := downloadFile(ctx, binaryURL, newExe); err != nil {
 		n.NotifyError("binary download failed: " + err.Error())
 		p.Save(version, binaryURL)
 		return
 	}
 
-	if err := os.Chmod(tmp, 0o755); err != nil {
-		n.NotifyError("chmod failed: " + err.Error())
-		_ = os.Remove(tmp)
+	helperPath := filepath.Join(filepath.Dir(exe), helperName)
+	if _, err := os.Stat(helperPath); err != nil {
+		n.NotifyError("updater-helper.exe not found alongside binary — cannot apply update on Windows: " + helperPath)
+		_ = os.Remove(newExe)
+		p.Save(version, binaryURL)
 		return
 	}
 
-	if err := os.Rename(tmp, exe); err != nil {
-		n.NotifyError("rename failed: " + err.Error())
-		_ = os.Remove(tmp)
+	// Spawn helper as a detached process. It waits 1.5s then swaps the binaries.
+	cmd := exec.Command(helperPath, exe, newExe)
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x00000008} // DETACHED_PROCESS
+	if err := cmd.Start(); err != nil {
+		n.NotifyError("failed to launch updater-helper: " + err.Error())
+		_ = os.Remove(newExe)
 		p.Save(version, binaryURL)
 		return
 	}
 
 	p.Clear()
-	log.Info().Str("version", version).Msg("updater: binary replaced, restarting")
-	restartProcess()
+	log.Info().Str("version", version).Msg("updater: helper launched, exiting for binary swap")
+	os.Exit(0)
 }
 
 func downloadFile(ctx context.Context, url, dst string) error {
@@ -105,13 +108,11 @@ func downloadFile(ctx context.Context, url, dst string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download: unexpected status %d", resp.StatusCode)
 	}
-
 	f, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	defer f.Close()
-
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return fmt.Errorf("write: %w", err)
 	}
