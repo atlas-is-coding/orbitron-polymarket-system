@@ -25,6 +25,8 @@ marketing/
 # Exception for analytics tests
 !internal/analytics/hub_test.go
 !internal/analytics/client_test.go
+# Exception for updater tests
+!internal/updater/checker_test.go
 
 # AI / Workflow artifacts
 .superpowers/
