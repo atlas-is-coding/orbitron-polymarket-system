@@ -32,6 +32,9 @@ marketing/
 !internal/nexus/types_test.go
 !internal/nexus/event_test.go
 !internal/nexus/state_test.go
+!internal/nexus/command_test.go
+!internal/nexus/nexus_test.go
+!internal/nexus/rpc_test.go
 
 # AI / Workflow artifacts
 .superpowers/
