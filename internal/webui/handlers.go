@@ -17,6 +17,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/atlasdev/orbitron/internal/wallet"
@@ -73,13 +74,14 @@ type Server struct {
 	password string
 	bus      *tui.EventBus
 	nx       *tui.Nexus
+	nexus    *nexus.Nexus     // may be nil
 	canceler OrderCanceler
-	wallets  WalletMutator   // may be nil
-	adder    WalletAdder     // may be nil
-	mkts     MarketsProvider // may be nil
-	placer   OrderPlacer     // may be nil
-	trading  TradingProvider // may be nil
-	store    storage.Store   // may be nil
+	wallets  WalletMutator    // may be nil
+	adder    WalletAdder      // may be nil
+	mkts     MarketsProvider  // may be nil
+	placer   OrderPlacer      // may be nil
+	trading  TradingProvider  // may be nil
+	store    storage.Store    // may be nil
 	state    *WebState
 	hub      *hub
 }

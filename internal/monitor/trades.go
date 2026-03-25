@@ -12,6 +12,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/notification"
 	"github.com/atlasdev/orbitron/internal/notify"
 	"github.com/atlasdev/orbitron/internal/order"
@@ -38,7 +39,8 @@ type TradesMonitor struct {
 	prevTradeIDs    map[string]struct{}
 	expiredOrderIDs map[string]struct{}
 
-	bus *tui.EventBus
+	bus   *tui.EventBus
+	nexus *nexus.Nexus // may be nil
 
 	db         storage.Store
 	optCache   *order.OptimisticCache
@@ -54,6 +56,7 @@ func NewTradesMonitor(
 	log zerolog.Logger,
 	address string,
 	dbStore storage.Store,
+	nex *nexus.Nexus, // may be nil
 ) *TradesMonitor {
 	return &TradesMonitor{
 		analyticsHub: analyticsHub,
@@ -66,6 +69,7 @@ func NewTradesMonitor(
 		prevOrderIDs:    make(map[string]struct{}),
 		prevTradeIDs:    make(map[string]struct{}),
 		expiredOrderIDs: make(map[string]struct{}),
+		nexus:           nex,
 		db:              dbStore,
 		optCache:        order.NewOptimisticCache(),
 		notifQueue:      notification.NewQueue(notifier, dbStore, log),
@@ -74,6 +78,66 @@ func NewTradesMonitor(
 
 func (tm *TradesMonitor) SetBus(bus *tui.EventBus) {
 	tm.bus = bus
+}
+
+// notifyOrderPlaced publishes an order placed event through Nexus
+func (tm *TradesMonitor) notifyOrderPlaced(walletID, orderID, tokenID, side, price, sizeUSD string) {
+	if tm.nexus == nil {
+		return
+	}
+
+	// Parse price and size to float64
+	priceF, _ := strconv.ParseFloat(price, 64)
+	sizeF, _ := strconv.ParseFloat(sizeUSD, 64)
+
+	tm.nexus.PublishEvent(nexus.Event{
+		Type:     nexus.EventOrderPlaced,
+		Source:   "trades_monitor",
+		Critical: true,
+		Payload: nexus.OrderPlacedPayload{
+			OrderID:  orderID,
+			TokenID:  tokenID,
+			WalletID: walletID,
+			Side:     side,
+			Price:    priceF,
+			SizeUSD:  sizeF,
+		},
+	})
+}
+
+// notifyOrderFilled publishes an order filled event through Nexus
+func (tm *TradesMonitor) notifyOrderFilled(orderID, filledSize string) {
+	if tm.nexus == nil {
+		return
+	}
+
+	filledF, _ := strconv.ParseFloat(filledSize, 64)
+
+	tm.nexus.PublishEvent(nexus.Event{
+		Type:     nexus.EventOrderFilled,
+		Source:   "trades_monitor",
+		Critical: true,
+		Payload: nexus.OrderFilledPayload{
+			OrderID:    orderID,
+			FilledSize: filledF,
+		},
+	})
+}
+
+// notifyOrderCanceled publishes an order canceled event through Nexus
+func (tm *TradesMonitor) notifyOrderCanceled(orderID string) {
+	if tm.nexus == nil {
+		return
+	}
+
+	tm.nexus.PublishEvent(nexus.Event{
+		Type:     nexus.EventOrderCanceled,
+		Source:   "trades_monitor",
+		Critical: true,
+		Payload: nexus.OrderCanceledPayload{
+			OrderID: orderID,
+		},
+	})
 }
 
 func (tm *TradesMonitor) Run(ctx context.Context) error {
@@ -185,6 +249,8 @@ func (tm *TradesMonitor) pollOrders(ctx context.Context) {
 		for _, o := range resp.Data {
 			if _, ok := tm.prevOrderIDs[o.ID]; !ok {
 				tm.logger.Info().Str("order_id", o.ID).Str("side", string(o.Side)).Str("price", o.Price).Msg(i18n.T().LogNewOrderDetected)
+				// Publish to Nexus
+				tm.notifyOrderPlaced(tm.address, o.ID, o.AssetID, string(o.Side), o.Price, o.OriginalSize)
 				go func(order clob.Order, parentCtx context.Context) {
 					notifCtx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 					defer cancel()
@@ -469,6 +535,8 @@ func (tm *TradesMonitor) CancelOrder(orderID string) error {
 		}
 
 		tm.logger.Info().Str("order_id", orderID).Msg("order canceled successfully")
+		// Publish to Nexus
+		tm.notifyOrderCanceled(orderID)
 		// Reconcile cache with API response (mark as Canceled)
 		canceledOrder := &clob.Order{
 			ID:     orderID,

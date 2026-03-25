@@ -41,6 +41,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/trading/risk"
 	"github.com/atlasdev/orbitron/internal/trading/strategies"
 	"github.com/atlasdev/orbitron/internal/license"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/atlasdev/orbitron/internal/updater"
 	"github.com/atlasdev/orbitron/internal/wallet"
@@ -193,6 +194,156 @@ func openBrowser(url string) {
 		cmd = exec.Command("xdg-open", url)
 	}
 	_ = cmd.Start()
+}
+
+// NoopAuditLog is a no-op implementation of nexus.AuditLog
+type NoopAuditLog struct{}
+
+func (n *NoopAuditLog) SaveCommand(ctx context.Context, cmd *nexus.Command) error {
+	return nil
+}
+
+func (n *NoopAuditLog) SaveEvent(ctx context.Context, event *nexus.Event) error {
+	return nil
+}
+
+func (n *NoopAuditLog) GetCommandHistory(ctx context.Context, limit int) ([]*nexus.Command, error) {
+	return []*nexus.Command{}, nil
+}
+
+func (n *NoopAuditLog) GetEventHistory(ctx context.Context, limit int) ([]*nexus.Event, error) {
+	return []*nexus.Event{}, nil
+}
+
+// registerCommandHandlers registers all command handlers with the Nexus coordinator
+func registerCommandHandlers(nex *nexus.Nexus, cfg *config.Config, adapter *engineAdapter, wm *wallet.Manager) {
+	// Orders
+	nex.RegisterCommandHandler(nexus.CommandPlaceOrder, handlePlaceOrder(adapter, wm))
+	nex.RegisterCommandHandler(nexus.CommandCancelOrder, handleCancelOrder(wm))
+	nex.RegisterCommandHandler(nexus.CommandCancelAllOrders, handleCancelAllOrders(wm))
+
+	// Wallets
+	nex.RegisterCommandHandler(nexus.CommandAddWallet, handleAddWallet(wm))
+	nex.RegisterCommandHandler(nexus.CommandRemoveWallet, handleRemoveWallet(wm))
+	nex.RegisterCommandHandler(nexus.CommandToggleWallet, handleToggleWallet(wm))
+
+	// Strategies
+	nex.RegisterCommandHandler(nexus.CommandStartStrategy, handleStartStrategy(adapter))
+	nex.RegisterCommandHandler(nexus.CommandStopStrategy, handleStopStrategy(adapter))
+
+	// Config
+	nex.RegisterCommandHandler(nexus.CommandReloadConfig, handleReloadConfig())
+
+	// Set custom timeouts
+	nex.SetCommandTimeout(nexus.CommandPlaceOrder, 30*time.Second)
+	nex.SetCommandTimeout(nexus.CommandCancelOrder, 10*time.Second)
+}
+
+// Command handler implementations
+func handlePlaceOrder(adapter *engineAdapter, wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(nexus.PlaceOrderPayload)
+		orderID, err := adapter.PlaceOrder(
+			payload.WalletID,
+			payload.ConditionID,
+			payload.Side,
+			payload.OrderType,
+			payload.Price,
+			payload.SizeUSD,
+			false,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"order_id": orderID}, nil
+	}
+}
+
+func handleCancelOrder(wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(nexus.CancelOrderPayload)
+		for _, inst := range wm.Wallets() {
+			if inst.TradesMon != nil && inst.Cfg.Enabled {
+				err := inst.TradesMon.CancelOrder(payload.OrderID)
+				if err == nil {
+					return map[string]bool{"canceled": true}, nil
+				}
+			}
+		}
+		return nil, fmt.Errorf("no active trades monitor to cancel order")
+	}
+}
+
+func handleCancelAllOrders(wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		for _, inst := range wm.Wallets() {
+			if inst.TradesMon != nil && inst.Cfg.Enabled {
+				err := inst.TradesMon.CancelAllOrders()
+				if err == nil {
+					return map[string]bool{"canceled": true}, nil
+				}
+			}
+		}
+		return nil, fmt.Errorf("no active trades monitor to cancel orders")
+	}
+}
+
+func handleAddWallet(wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		// For now, return success - actual wallet addition happens through UI
+		return map[string]string{"status": "wallet_add_request_sent"}, nil
+	}
+}
+
+func handleRemoveWallet(wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(nexus.RemoveWalletPayload)
+		err := wm.Remove(payload.WalletID)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"removed": true}, nil
+	}
+}
+
+func handleToggleWallet(wm *wallet.Manager) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(nexus.ToggleWalletPayload)
+		err := wm.Toggle(payload.WalletID, payload.Enabled)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"toggled": true}, nil
+	}
+}
+
+func handleStartStrategy(adapter *engineAdapter) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(*nexus.StartStrategyPayload)
+		err := adapter.StartStrategy(payload.StrategyName)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"status": "started"}, nil
+	}
+}
+
+func handleStopStrategy(adapter *engineAdapter) nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		payload := cmd.Payload.(*nexus.StopStrategyPayload)
+		err := adapter.StopStrategy(payload.StrategyName)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"status": "stopped"}, nil
+	}
+}
+
+func handleReloadConfig() nexus.CommandHandler {
+	return func(ctx context.Context, cmd *nexus.Command) (interface{}, error) {
+		// Config reload is handled by ConfigWatcher separately
+		return map[string]string{"status": "reload_requested"}, nil
+	}
 }
 
 func main() {
@@ -348,6 +499,14 @@ func run() error {
 		defer db.Close()
 		log.Info().Str("path", cfg.Database.Path).Msg(i18n.T().LogDatabaseOpened)
 	}
+
+	// --- Nexus State Manager ---
+	auditLog := &NoopAuditLog{}
+	nex, err := nexus.NewNexus(auditLog, 9000, log)
+	if err != nil {
+		return fmt.Errorf("create nexus: %w", err)
+	}
+	log.Info().Msg("Nexus coordinator initialized")
 
 	// --- Wallet Manager ---
 	wm := wallet.NewManager(bus, cfg, wsClient)
@@ -575,7 +734,7 @@ func run() error {
 				break
 			}
 		}
-		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, wm, marketsService, wm, &log)
+		tgBot, err = telegrambot.New(cfg, *cfgPath, bus, cancelerForBot, wm, wm, marketsService, wm, nil, &log)
 		if err != nil {
 			log.Warn().Err(err).Msg("telegram bot init failed, continuing without it")
 			tgBot = nil
@@ -601,7 +760,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, nil, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 		go func() {
 			time.Sleep(500 * time.Millisecond)
@@ -622,7 +781,7 @@ func run() error {
 		go watcher.Run(ctx)
 
 		// Start TUI
-		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, nx, 0, 0, nil, adapter)
+		rootModel := tui.NewRootModel(cfg, *cfgPath, bus, nx, nil, 0, 0, nil, adapter)
 
 		// Show first active wallet address
 		for _, inst := range wm.Wallets() {

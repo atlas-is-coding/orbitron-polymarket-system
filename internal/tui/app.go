@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/nexus"
 )
 
 const toastDuration = 3 * time.Second
@@ -45,6 +46,8 @@ type AppModel struct {
 
 	bus     *EventBus
 	nx      *Nexus
+	nexus   *nexus.Nexus           // may be nil
+	eventSub <-chan nexus.Event     // subscription to Nexus events
 	cfg     *config.Config
 	cfgPath string
 	onSave  func(string)
@@ -80,6 +83,7 @@ func NewAppModel(
 	cfgPath string,
 	bus *EventBus,
 	nx *Nexus,
+	nex *nexus.Nexus, // may be nil
 	width, height int,
 	onSave func(string),
 	tp TradingProvider,
@@ -93,12 +97,13 @@ func NewAppModel(
 	cw := max(width, 20)
 	ch := max(height-topBarHeight-1, 10)
 
-	return AppModel{
+	app := AppModel{
 		cfg:        cfg,
 		cfgPath:    cfgPath,
 		onSave:     onSave,
 		bus:        bus,
 		nx:         nx,
+		nexus:      nex,
 		width:      width,
 		height:     height,
 		now:        time.Now(),
@@ -111,6 +116,8 @@ func NewAppModel(
 		logs:       NewLogsModel(cw, ch),
 		settings:   NewSettingsModel(cfg, cfgPath, cw, ch, onSave),
 	}
+
+	return app
 }
 
 // SetWallet is kept for API compatibility but no longer displays in the UI.
@@ -122,6 +129,21 @@ func clockTick() tea.Cmd {
 
 func animTick() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return animTickMsg{} })
+}
+
+func (m *AppModel) subscribeToNexusEvents() tea.Cmd {
+	if m.nexus == nil {
+		return nil
+	}
+	// Subscribe to all events from Nexus
+	m.eventSub = m.nexus.Subscribe("*")
+	// Return a command that waits for the first event
+	return func() tea.Msg {
+		select {
+		case event := <-m.eventSub:
+			return event
+		}
+	}
 }
 
 func (m AppModel) Init() tea.Cmd {
@@ -140,7 +162,29 @@ func (m AppModel) Init() tea.Cmd {
 			m.trading.SetPositionRows(positions)
 		}
 	}
-	return tea.Batch(m.bus.WaitForEvent(), clockTick(), animTick())
+
+	// Subscribe to Nexus events if available
+	var nexusCmd tea.Cmd
+	if m.nexus != nil {
+		m.eventSub = m.nexus.Subscribe("*")
+		nexusCmd = m.waitForNexusEvent()
+	}
+
+	return tea.Batch(m.bus.WaitForEvent(), clockTick(), animTick(), nexusCmd)
+}
+
+// waitForNexusEvent returns a command that waits for the next Nexus event
+func (m AppModel) waitForNexusEvent() tea.Cmd {
+	if m.eventSub == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		event, ok := <-m.eventSub
+		if !ok {
+			return nil
+		}
+		return event
+	}
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -402,6 +446,68 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.Version, msg.ReleaseNotes, msg.PublishedAt,
 		)
 		return m, m.bus.WaitForEvent()
+
+	case nexus.Event:
+		// Handle Nexus coordinator events
+		switch msg.Type {
+		case nexus.EventOrderPlaced:
+			// Update orders display from state store
+			if orders, ok := m.nexus.GetState("orders").([]*nexus.OrderState); ok && orders != nil {
+				// Convert OrderState to OrderRow for display
+				rows := make([]OrderRow, len(orders))
+				for i, o := range orders {
+					rows[i] = OrderRow{
+						Market: o.TokenID,
+						Side:   o.Side,
+						Price:  fmt.Sprintf("%.4f", o.Price),
+						Size:   fmt.Sprintf("%.2f", o.SizeUSD),
+						Filled: "0",
+						Status: "LIVE",
+						ID:     o.ID,
+					}
+				}
+				m.trading.SetOrderRows(rows)
+			}
+			return m, tea.Batch(
+				func() tea.Msg { return ToastMsg{Text: "Order placed", Kind: "success"} },
+				m.waitForNexusEvent(),
+			)
+
+		case nexus.EventOrderFilled:
+			if payload, ok := msg.Payload.(nexus.OrderFilledPayload); ok {
+				return m, tea.Batch(
+					func() tea.Msg { return ToastMsg{Text: fmt.Sprintf("Order %s filled: %.2f", payload.OrderID[:8], payload.FilledSize), Kind: "success"} },
+					m.waitForNexusEvent(),
+				)
+			}
+			return m, m.waitForNexusEvent()
+
+		case nexus.EventOrderCanceled:
+			return m, tea.Batch(
+				func() tea.Msg { return ToastMsg{Text: "Order canceled", Kind: "success"} },
+				m.waitForNexusEvent(),
+			)
+
+		case nexus.EventBalanceUpdated:
+			if wallets, ok := m.nexus.GetState("wallets").([]*nexus.WalletState); ok && wallets != nil {
+				// Update wallet stats - this will be reflected in the Nexus state
+			}
+			return m, m.waitForNexusEvent()
+
+		case nexus.EventStrategyAlert:
+			if payload, ok := msg.Payload.(nexus.StrategyAlertPayload); ok {
+				message := fmt.Sprintf("%s: %s", payload.Strategy, payload.Signal)
+				return m, tea.Batch(
+					func() tea.Msg { return ToastMsg{Text: message, Kind: "warning"} },
+					m.waitForNexusEvent(),
+				)
+			}
+			return m, m.waitForNexusEvent()
+
+		default:
+			// For other Nexus events, continue listening
+			return m, m.waitForNexusEvent()
+		}
 	}
 
 	// Route key events to active tab

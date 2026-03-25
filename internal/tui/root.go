@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/nexus"
 )
 
 // RootModel is the top-level BubbleTea model.
@@ -12,6 +13,7 @@ type RootModel struct {
 	splash     SplashModel
 	app        AppModel
 	nx         *Nexus
+	nex        *nexus.Nexus // may be nil
 	showSplash bool
 }
 
@@ -21,14 +23,16 @@ func NewRootModel(
 	cfgPath string,
 	bus *EventBus,
 	nx *Nexus,
+	nex *nexus.Nexus, // may be nil
 	width, height int,
 	onSave func(string),
 	tp TradingProvider,
 ) RootModel {
 	return RootModel{
 		splash:     NewSplashModel(width, height),
-		app:        NewAppModel(cfg, cfgPath, bus, nx, width, height, onSave, tp),
+		app:        NewAppModel(cfg, cfgPath, bus, nx, nex, width, height, onSave, tp),
 		nx:         nx,
+		nex:        nex,
 		showSplash: true,
 	}
 }

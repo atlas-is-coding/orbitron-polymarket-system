@@ -13,6 +13,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/auth"
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/atlasdev/orbitron/internal/wallet"
 )
@@ -1610,10 +1611,73 @@ func (b *Bot) doPlaceOrder(ctx context.Context, chatID int64, orderData string) 
 	price, _ := strconv.ParseFloat(priceStr, 64)
 	sizeUSD, _ := strconv.ParseFloat(sizeStr, 64)
 
+	// Use Nexus for async command execution if available
+	if b.nexus != nil {
+		cmdID, err := b.nexus.ExecuteCommandAsync(ctx, &nexus.Command{
+			Type:      nexus.CommandPlaceOrder,
+			SourceUI:  "telegram",
+			Timestamp: time.Now(),
+			Payload: nexus.PlaceOrderPayload{
+				ConditionID: tokenID,  // Use tokenID as ConditionID
+				WalletID:    walletID,
+				Side:        side,
+				Price:       price,
+				SizeUSD:     sizeUSD,
+				OrderType:   orderType,
+			},
+		})
+		if err != nil {
+			b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrOrderPlace, err.Error())))
+			return
+		}
+
+		b.sendText(chatID, "Order processing...")
+		// Poll for result in background
+		go b.pollOrderResult(chatID, cmdID)
+		return
+	}
+
+	// Fallback to direct placement (if Nexus not available)
 	orderID, err := b.placer.PlaceOrder(walletID, tokenID, side, orderType, price, sizeUSD, false)
 	if err != nil {
 		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrOrderPlace, err.Error())))
 		return
 	}
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessOrderPlaced, orderID, side, price, sizeUSD)))
+}
+
+// pollOrderResult polls for command completion and sends result to chat
+func (b *Bot) pollOrderResult(chatID int64, cmdID string) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	timeout := time.After(30 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			b.sendText(chatID, RenderError("Order timeout (no response in 30s)"))
+			return
+		case <-ticker.C:
+			cmd, err := b.nexus.GetCommandStatus(cmdID)
+			if err != nil {
+				continue
+			}
+
+			if cmd.Status == nexus.StatusCompleted {
+				// Extract order ID from result
+				if resultMap, ok := cmd.Result.(map[string]interface{}); ok {
+					if orderID, ok := resultMap["order_id"].(string); ok {
+						b.sendText(chatID, RenderSuccess(fmt.Sprintf("✅ Order placed: %s", orderID)))
+						return
+					}
+				}
+				b.sendText(chatID, RenderSuccess("✅ Order placed successfully"))
+				return
+			}
+			if cmd.Status == nexus.StatusFailed {
+				b.sendText(chatID, RenderError(fmt.Sprintf("❌ Error: %s", cmd.Error)))
+				return
+			}
+		}
+	}
 }

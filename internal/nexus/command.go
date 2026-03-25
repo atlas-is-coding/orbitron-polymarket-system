@@ -45,6 +45,7 @@ type CommandProcessor struct {
 // asyncWorkers specifies the number of concurrent async command handlers.
 // If asyncWorkers <= 0, defaults to 4.
 func NewCommandProcessor(ctx context.Context, auditLog AuditLog, asyncWorkers int, log zerolog.Logger) *CommandProcessor {
+	
 	if asyncWorkers <= 0 {
 		asyncWorkers = 4
 	}

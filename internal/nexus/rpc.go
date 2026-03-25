@@ -304,6 +304,7 @@ func (rs *HTTPRPCServer) handleEventStream(w http.ResponseWriter, r *http.Reques
 		rs.log.Warn().Err(err).Msg("WebSocket upgrade failed")
 		return
 	}
+	
 	defer ws.Close()
 
 	// Generate client ID

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/storage"
 	"github.com/atlasdev/orbitron/internal/tui"
 	"github.com/rs/zerolog"
@@ -19,7 +20,7 @@ import (
 //go:embed web/dist
 var staticFiles embed.FS
 
-// New creates a Server. canceler, wallets, mkts, trading, and store may be nil.
+// New creates a Server. canceler, wallets, mkts, trading, store, and nexus may be nil.
 func New(
 	cfg *config.Config,
 	cfgPath string,
@@ -31,6 +32,7 @@ func New(
 	placer OrderPlacer,
 	trading TradingProvider,
 	store storage.Store, // may be nil
+	nex *nexus.Nexus,    // may be nil
 	log *zerolog.Logger,
 ) *Server {
 	s := &Server{
@@ -39,6 +41,7 @@ func New(
 		password: cfg.WebUI.JWTSecret,
 		bus:      bus,
 		nx:       nx,
+		nexus:    nex,
 		canceler: canceler,
 		wallets:  wallets,
 		mkts:     mkts,
@@ -262,6 +265,13 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/api/v1/trades", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, []any{})
 	}))
+
+	// Register Nexus RPC routes if available
+	if s.nexus != nil && s.nexus.GetRPCServer() != nil {
+		if rpcServer, ok := s.nexus.GetRPCServer().(*nexus.HTTPRPCServer); ok {
+			rpcServer.RegisterRoutes(mux)
+		}
+	}
 
 	// WebSocket
 	mux.HandleFunc("/ws", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {

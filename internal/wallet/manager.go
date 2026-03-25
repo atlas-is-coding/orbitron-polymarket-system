@@ -234,7 +234,7 @@ func (m *Manager) Activate(ctx context.Context, wCfg config.WalletConfig) (*Wall
 
 	// 9. Setup Trades Monitor
 	if m.cfg.Monitor.Trades.Enabled {
-		tm := monitor.NewTradesMonitor(analyticsHub, wClobClient, m.dataClient, m.notifier, &m.cfg.Monitor.Trades, m.log, addr, m.db)
+		tm := monitor.NewTradesMonitor(analyticsHub, wClobClient, m.dataClient, m.notifier, &m.cfg.Monitor.Trades, m.log, addr, m.db, nil)
 		if m.bus != nil {
 			tm.SetBus(m.bus)
 		}

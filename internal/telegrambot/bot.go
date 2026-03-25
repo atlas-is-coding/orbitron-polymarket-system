@@ -17,6 +17,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/markets"
+	"github.com/atlasdev/orbitron/internal/nexus"
 	"github.com/atlasdev/orbitron/internal/tui"
 )
 
@@ -58,12 +59,13 @@ type OrderPlacer interface {
 type Bot struct {
 	api      *tgbotapi.BotAPI
 	bus      *tui.EventBus
+	nexus    *nexus.Nexus       // may be nil
 	state    *BotState
-	canceler OrderCanceler   // optional; nil if TradesMonitor not running
-	wallets  WalletMutator   // optional; nil if wallet manager unavailable
-	adder    WalletAdder     // optional; nil if wallet manager unavailable
-	mkts     MarketsProvider // optional; nil if Markets service not running
-	placer   OrderPlacer     // optional; nil if no active wallet with private key
+	canceler OrderCanceler      // optional; nil if TradesMonitor not running
+	wallets  WalletMutator      // optional; nil if wallet manager unavailable
+	adder    WalletAdder        // optional; nil if wallet manager unavailable
+	mkts     MarketsProvider    // optional; nil if Markets service not running
+	placer   OrderPlacer        // optional; nil if no active wallet with private key
 	log      zerolog.Logger
 
 	cfgMu   sync.RWMutex
@@ -74,10 +76,10 @@ type Bot struct {
 }
 
 // New creates a new Bot.
-// canceler, wallets, and mkts may be nil.
+// canceler, wallets, mkts, nexus may be nil.
 // log may be nil (uses nop logger).
 // Returns (nil, nil) if bot_token is empty — caller must check.
-func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, adder WalletAdder, mkts MarketsProvider, placer OrderPlacer, log *zerolog.Logger) (*Bot, error) {
+func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCanceler, wallets WalletMutator, adder WalletAdder, mkts MarketsProvider, placer OrderPlacer, nex *nexus.Nexus, log *zerolog.Logger) (*Bot, error) {
 	var adminID int64
 	if cfg.Telegram.AdminChatID != "" {
 		if id, err := strconv.ParseInt(cfg.Telegram.AdminChatID, 10, 64); err == nil {
@@ -92,6 +94,7 @@ func New(cfg *config.Config, cfgPath string, bus *tui.EventBus, canceler OrderCa
 
 	b := &Bot{
 		bus:      bus,
+		nexus:    nex,
 		state:    NewBotState(),
 		canceler: canceler,
 		wallets:  wallets,
