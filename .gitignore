@@ -40,6 +40,7 @@ marketing/
 .superpowers/
 image.png
 THREADS.md
+push.sh
 
 # Build & Dev artifacts
 /bot
@@ -75,4 +76,4 @@ DATA_SYNC_ANALYSIS.md
 DATA_SYNC_EXAMPLES.md
 DATA_SYNC_FIXES_PHASE1.md
 DATA_SYNC_QUICK_REF.md
-DATA_SYNC_SUMMARY.md
+DATA_SYNC_SUMMARY.md!internal/nexus/integration_test.go
