@@ -10,12 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// Адреса CTF Exchange контрактов на Polygon (chainId=137)
-const (
-	CTFExchangeMain    = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"
-	CTFExchangeNegRisk = "0xC5d563A36AE78145C45a50134d48A1215220f80a"
-)
-
 // OrderSide — сторона ордера в EIP-712 (0=BUY, 1=SELL)
 type OrderSide int
 
@@ -65,11 +59,12 @@ type OrderSigner struct {
 // NewOrderSigner создаёт OrderSigner для указанного exchange контракта.
 // negRisk=true использует NegRisk Exchange адрес.
 func NewOrderSigner(l1 *L1Signer, chainID int64, negRisk bool) *OrderSigner {
-	addr := CTFExchangeMain
-	if negRisk {
-		addr = CTFExchangeNegRisk
+	cfg, err := GetContractConfig(chainID, negRisk)
+	if err != nil {
+		// Fallback to mainnet if unsupported (safest default for existing logic)
+		cfg, _ = GetContractConfig(137, negRisk)
 	}
-	exchangeAddr := common.HexToAddress(addr)
+	exchangeAddr := common.HexToAddress(cfg.Exchange)
 
 	// EIP-712 domain separator
 	domainTypeHash := crypto.Keccak256Hash([]byte(

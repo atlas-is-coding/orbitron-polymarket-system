@@ -116,6 +116,9 @@ func buildEventsQuery(p EventsParams) string {
 	if p.Active != nil {
 		q += "active=" + strconv.FormatBool(*p.Active) + "&"
 	}
+	if p.Closed != nil {
+		q += "closed=" + strconv.FormatBool(*p.Closed) + "&"
+	}
 	if p.Category != "" {
 		q += "category=" + p.Category + "&"
 	}

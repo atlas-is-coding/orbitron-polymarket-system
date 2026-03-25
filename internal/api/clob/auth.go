@@ -18,14 +18,14 @@ type APIKeyCreds struct {
 // DeriveAPIKey retrieves or creates L2 credentials via L1 signature.
 // First attempts GET /auth/derive-api-key (nonce=0); if the key doesn't exist
 // (HTTP 400), falls back to POST /auth/api-key to create a new one.
-func (c *Client) DeriveAPIKey(l1 *auth.L1Signer) (*auth.L2Credentials, error) {
+func (c *Client) DeriveAPIKey(l1 *auth.L1Signer, chainID int64) (*auth.L2Credentials, error) {
 	ts, err := c.GetServerTime()
 	if err != nil {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: get server time: %w", err)
 	}
 
 	nonce := "0"
-	headers, err := l1.L1Headers(strconv.FormatInt(ts, 10), nonce)
+	headers, err := l1.L1Headers(strconv.FormatInt(ts, 10), nonce, chainID)
 	if err != nil {
 		return nil, fmt.Errorf("clob: DeriveAPIKey: sign: %w", err)
 	}

@@ -11,7 +11,9 @@ import (
 	"github.com/atlasdev/orbitron/internal/api/data"
 	"github.com/atlasdev/orbitron/internal/api/gamma"
 	"github.com/atlasdev/orbitron/internal/auth"
+	"github.com/atlasdev/orbitron/internal/builder"
 	"github.com/atlasdev/orbitron/internal/config"
+	"github.com/atlasdev/orbitron/internal/license"
 	"github.com/atlasdev/orbitron/internal/wallet"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
@@ -20,6 +22,20 @@ import (
 // Run выполняет диагностику системы: проверку связи, авторизации и возможность торговли.
 func Run(ctx context.Context, cfg *config.Config, log zerolog.Logger) error {
 	log.Info().Msg("🚀 Starting diagnostics...")
+
+	// 0. Builder credentials
+	log.Info().Msg("--- Checking Builder Credentials ---")
+	builderCreds, licErr := license.Load()
+	
+	builder.NewBuilderKeyValidator(builderCreds, log).Check()
+	var builderAPIKey string
+	if licErr != nil {
+		log.Warn().Err(licErr).Msg("⚠️  Builder credentials unavailable — order will be placed WITHOUT builderApiKey")
+	} else if builderCreds != nil {
+		builderAPIKey = builderCreds.APIKey
+	} else {
+		log.Warn().Msg("⚠️  No builder token configured — order will be placed WITHOUT builderApiKey")
+	}
 
 	// 1. Клиенты
 	clobHTTP := api.NewClient(cfg.API.ClobURL, cfg.API.TimeoutSec, cfg.API.MaxRetries)
@@ -131,7 +147,7 @@ func Run(ctx context.Context, cfg *config.Config, log zerolog.Logger) error {
 		priceLevel := 0.50
 
 		// Строим ордер на $1.00
-		orderID, err := testPlaceOrder(clobClient, l1, creds, tokenID, priceLevel, 1.0, w.ChainID, targetMarket.NegRisk, log)
+		orderID, err := testPlaceOrder(clobClient, l1, creds, tokenID, priceLevel, 1.0, w.ChainID, targetMarket.NegRisk, builderAPIKey, log)
 		if err != nil {
 		log.Error().Err(err).Msg("❌ Failed to place test order")
 		} else {
@@ -169,6 +185,7 @@ func testPlaceOrder(
 	sizeUSD float64,
 	chainID int64,
 	negRisk bool,
+	builderAPIKey string,
 	log zerolog.Logger,
 ) (string, error) {
 	signer := auth.NewOrderSigner(l1, chainID, negRisk)
@@ -214,6 +231,13 @@ func testPlaceOrder(
 		return "", err
 	}
 
+	if builderAPIKey != "" {
+		log.Info().Str("builder_key_prefix", builderAPIKey[:min(4, len(builderAPIKey))]+"***").
+			Msg("builder: attaching builderApiKey to order request")
+	} else {
+		log.Warn().Msg("builder: no builderApiKey — order will be placed WITHOUT attribution")
+	}
+
 	req := &clob.CreateOrderRequest{
 		Order: clob.SignedOrder{
 			Salt:          salt.String(),
@@ -230,8 +254,9 @@ func testPlaceOrder(
 			SignatureType: 0, // EOA
 			Signature:     sig,
 		},
-		Owner:     creds.APIKey,
-		OrderType: clob.OrderTypeGTC,
+		Owner:         creds.APIKey,
+		OrderType:     clob.OrderTypeGTC,
+		BuilderApiKey: builderAPIKey,
 	}
 
 	resp, err := clobClient.CreateOrder(req)
@@ -241,7 +266,12 @@ func testPlaceOrder(
 	if !resp.Success {
 		return "", fmt.Errorf("order rejected: %s", resp.ErrorMsg)
 	}
+	log.Info().
+		Str("order_id", resp.OrderID).
+		Bool("builder_key_set", builderAPIKey != "").
+		Msg("✅ Order accepted by Polymarket")
 	return resp.OrderID, nil
 }
+
 
 func ptr[T any](v T) *T { return &v }

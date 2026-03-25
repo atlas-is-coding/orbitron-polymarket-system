@@ -19,14 +19,14 @@ type Client struct {
 func NewClientWithDialer(baseURL string, timeoutSec, maxRetries int, dial DialFunc) *Client {
 	timeout := time.Duration(timeoutSec) * time.Second
 	hc := &fasthttp.Client{
-		ReadTimeout:                   timeout,
-		WriteTimeout:                  timeout,
-		MaxIdleConnDuration:           30 * time.Second,
-		MaxConnDuration:               60 * time.Second,
-		MaxConnsPerHost:               256,
-		DisablePathNormalizing:        true,
-		DisableHeaderNamesNormalizing: false,
-		Name:                          "polytrade-bot/1.0",
+	        ReadTimeout:                   timeout,
+	        WriteTimeout:                  timeout,
+	        MaxIdleConnDuration:           30 * time.Second,
+	        MaxConnDuration:               60 * time.Second,
+	        MaxConnsPerHost:               256,
+	        DisablePathNormalizing:        true,
+	        DisableHeaderNamesNormalizing: true,
+	        Name:                          "polytrade-bot/1.0",
 	}
 	if dial != nil {
 		hc.Dial = fasthttp.DialFunc(dial)

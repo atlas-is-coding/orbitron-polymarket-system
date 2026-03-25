@@ -1,9 +1,9 @@
   [monitor.trades]
     enabled = true
-    poll_interval_ms = 2000       # интервал опроса ордеров (миллисекунды)
-    positions_poll_ms = 5000      # интервал опроса позиций (раздельно)
-    max_backoff_ms = 30000        # макс exponential backoff на ошибках
-    trades_limit = 100            # макс сделок за один poll
+    poll_interval_ms = 2000       # fetching markets each ... milliseconds
+    positions_poll_ms = 5000      # fetching user positions each ... milliseconds
+    max_backoff_ms = 30000        # max exponential backoff for errors
+    trades_limit = 100            # max orders for one poll
     track_positions = true
     alert_on_fill = true
     alert_on_cancel = true

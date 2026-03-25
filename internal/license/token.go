@@ -7,7 +7,7 @@ import "encoding/hex"
 //	go build -ldflags="-X 'github.com/atlasdev/orbitron/internal/license.rawToken=ENCODED'"
 //
 // where ENCODED = hex(realToken XOR xorKey). Generate with: go run ./cmd/tokenenc encode REAL_TOKEN
-var rawToken = ""
+var rawToken = "0f904537fb4d05ed28c4708e4237de035c96516da71d52f567c77fda417bd9040c964837"
 
 // xorKey is a fixed key embedded in the binary as a byte array (not a string literal).
 // Change this value before your first production build and never change it again.

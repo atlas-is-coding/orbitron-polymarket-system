@@ -29,7 +29,7 @@ type GammaClient interface {
 type Service struct {
 	gamma  GammaClient
 	bus    *tui.EventBus
-	cache  storage.MarketCacheStore // nil = no persistence
+	store  storage.Store // nil = no persistence
 	log    *zerolog.Logger
 
 	mu      sync.RWMutex
@@ -42,11 +42,11 @@ type Service struct {
 }
 
 // NewService creates a Service. Any argument may be nil (for tests or optional features).
-func NewService(gammaClient GammaClient, bus *tui.EventBus, cache storage.MarketCacheStore) *Service {
+func NewService(gammaClient GammaClient, bus *tui.EventBus, store storage.Store) *Service {
 	return &Service{
 		gamma:  gammaClient,
 		bus:    bus,
-		cache:  cache,
+		store:  store,
 		alerts: make(map[string]*AlertRule),
 	}
 }
@@ -60,7 +60,7 @@ func (s *Service) WithLogger(log *zerolog.Logger) *Service {
 // Run starts the markets service. Blocks until ctx is cancelled.
 func (s *Service) Run(ctx context.Context) error {
 	// 1. Load from cache immediately (may be empty on first run)
-	if s.cache != nil {
+	if s.store != nil {
 		if err := s.loadFromCache(ctx); err != nil && s.log != nil {
 			s.log.Warn().Err(err).Msg("markets: cache load failed, continuing without cache")
 		}
@@ -92,9 +92,10 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 }
 
-// loadFromCache populates in-memory markets from SQLite.
+// loadFromCache populates in-memory markets and alerts from SQLite.
 func (s *Service) loadFromCache(ctx context.Context) error {
-	records, err := s.cache.GetCachedMarkets(ctx)
+	// 1. Load markets
+	records, err := s.store.GetCachedMarkets(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,10 +115,29 @@ func (s *Service) loadFromCache(ctx context.Context) error {
 	for _, tg := range tagSet {
 		tags = append(tags, tg)
 	}
+
+	// 2. Load alerts
+	alertRecords, err := s.store.GetAlerts(ctx)
+	alerts := make(map[string]*AlertRule)
+	if err == nil {
+		for _, r := range alertRecords {
+			alerts[r.ID] = &AlertRule{
+				ID:          r.ID,
+				ConditionID: r.ConditionID,
+				TokenID:     r.TokenID,
+				Direction:   r.Direction,
+				Threshold:   r.Threshold,
+				CreatedAt:   r.CreatedAt,
+				Triggered:   r.Triggered,
+			}
+		}
+	}
+
 	s.mu.Lock()
 	s.markets = markets
 	s.tags = tags
 	s.total = len(markets)
+	s.alerts = alerts
 	s.mu.Unlock()
 	s.notifyBus()
 	return nil
@@ -237,8 +257,8 @@ func (s *Service) runFullSync(ctx context.Context, startOffset int, detectNew bo
 		}
 	}
 
-	if detectNew && s.cache != nil && s.log != nil {
-		newMkts, err := s.cache.GetNewMarkets(ctx, syncStart)
+	if detectNew && s.store != nil && s.log != nil {
+		newMkts, err := s.store.GetNewMarkets(ctx, syncStart)
 		if err == nil && len(newMkts) > 0 {
 			s.log.Info().Int("count", len(newMkts)).Msg("markets: new markets detected")
 		}
@@ -295,7 +315,7 @@ func (s *Service) mergePage(ctx context.Context, mks []gamma.Market) {
 
 	s.notifyBus()
 
-	if s.cache != nil {
+	if s.store != nil {
 		now := time.Now()
 		records := make([]storage.MarketCacheRecord, 0, len(mks))
 		for _, m := range mks {
@@ -310,7 +330,7 @@ func (s *Service) mergePage(ctx context.Context, mks []gamma.Market) {
 				FirstSeen:   now,
 			})
 		}
-		if err := s.cache.UpsertMarkets(ctx, records); err != nil && s.log != nil {
+		if err := s.store.UpsertMarkets(ctx, records); err != nil && s.log != nil {
 			s.log.Warn().Err(err).Msg("markets: cache upsert failed")
 		}
 	}
@@ -373,11 +393,26 @@ func (s *Service) checkAlerts(markets []gamma.Market) {
 			(a.Direction == "below" && price <= a.Threshold)
 		if f {
 			a.Triggered = true
+			// Update in DB
+			if s.store != nil {
+				_ = s.store.MarkAlertTriggered(context.Background(), a.ID)
+			}
+
+			// Find market question for better notification
+			question := ""
+			for _, m := range markets {
+				if m.ConditionID == a.ConditionID {
+					question = m.Question
+					break
+				}
+			}
+
 			fired = append(fired, tui.MarketAlertMsg{
 				ConditionID:  a.ConditionID,
 				Threshold:    a.Threshold,
 				Direction:    a.Direction,
 				CurrentPrice: price,
+				Question:     question,
 			})
 		}
 	}
@@ -452,13 +487,25 @@ func (s *Service) TotalCount() int {
 	return s.total
 }
 
-// AddAlert adds an alert rule and returns its generated ID.
+// AddAlert adds an alert rule and saves it to DB.
 func (s *Service) AddAlert(rule AlertRule) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rule.ID = fmt.Sprintf("alert-%d", time.Now().UnixNano())
 	rule.CreatedAt = time.Now()
 	s.alerts[rule.ID] = &rule
+
+	if s.store != nil {
+		_ = s.store.SaveAlert(context.Background(), &storage.MarketAlertRecord{
+			ID:          rule.ID,
+			ConditionID: rule.ConditionID,
+			TokenID:     rule.TokenID,
+			Direction:   rule.Direction,
+			Threshold:   rule.Threshold,
+			CreatedAt:   rule.CreatedAt,
+			Triggered:   rule.Triggered,
+		})
+	}
 	return rule.ID
 }
 
@@ -467,6 +514,10 @@ func (s *Service) RemoveAlert(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.alerts, id)
+
+	if s.store != nil {
+		_ = s.store.DeleteAlert(context.Background(), id)
+	}
 }
 
 // Alerts returns a snapshot of all alert rules.

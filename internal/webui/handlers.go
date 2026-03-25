@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -1018,6 +1019,367 @@ func (s *Server) handleMarketDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, m)
+}
+
+// handleApproveAllowance handles POST /api/v1/wallets/:id/approve
+// Body: {"contract": "ctf" | "negrisk" | "all"}
+func (s *Server) handleApproveAllowance(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/wallets/")
+	id := strings.TrimSuffix(path, "/approve")
+
+	var req struct {
+		Contract string `json:"contract"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	s.cfgMu.RLock()
+	var privKey, walletAddr, rpcURL string
+	for _, wc := range s.cfg.Wallets {
+		if wc.ID == id {
+			privKey = wc.PrivateKey
+			break
+		}
+	}
+	rpcURL = s.cfg.API.PolygonRPC
+	s.cfgMu.RUnlock()
+
+	if privKey == "" {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("wallet %q not found", id))
+		return
+	}
+	l1, err := auth.NewL1Signer(privKey)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "invalid private key in config")
+		return
+	}
+	walletAddr = l1.Address()
+
+	statuses, err := wallet.CheckAllowances(r.Context(), rpcURL, walletAddr)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "check allowances: "+err.Error())
+		return
+	}
+
+	// Filter by contract type
+	if req.Contract != "" && req.Contract != "all" {
+		var filtered []config.AllowanceStatus
+		for _, st := range statuses {
+			if st.Approved {
+				continue
+			}
+			switch req.Contract {
+			case "ctf":
+				if strings.Contains(strings.ToLower(st.SpenderName), "exchange") {
+					filtered = append(filtered, st)
+				}
+			case "negrisk":
+				if strings.Contains(strings.ToLower(st.SpenderName), "neg risk") {
+					filtered = append(filtered, st)
+				}
+			}
+		}
+		statuses = filtered
+	}
+
+	if err := wallet.GrantMissingAllowances(r.Context(), rpcURL, privKey, statuses); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "approved"})
+}
+
+// handleTestEndpoint handles POST /api/v1/health/test
+// Body: {"url": "https://..."} — pings the URL and returns latency.
+func (s *Server) handleTestEndpoint(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		writeError(w, http.StatusBadRequest, "url required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, req.URL, nil)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid url")
+		return
+	}
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	resp.Body.Close()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"status":     resp.StatusCode,
+		"latency_ms": time.Since(start).Milliseconds(),
+	})
+}
+
+// handleSaveConfig handles PUT /api/v1/settings.
+// Accepts a partial config object; only non-"***" values are applied.
+// Delegates to applyConfigKey for each dot-notation key.
+func (s *Server) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
+	var raw map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		writeError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	// Flatten nested map to dot-notation keys
+	flat := make(map[string]string)
+	flattenMap(raw, "", flat)
+
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+	changed := false
+	for k, v := range flat {
+		if v == "***" || v == "" {
+			continue // skip masked or empty
+		}
+		if err := applyConfigKey(&cfgCopy, k, v); err != nil {
+			continue // skip unknown keys silently
+		}
+		changed = true
+	}
+	if !changed {
+		s.cfgMu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]string{"status": "no changes"})
+		return
+	}
+	if err := config.Save(s.cfgPath, &cfgCopy); err != nil {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	if s.bus != nil {
+		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+// flattenMap recursively flattens a nested map into dot-notation string keys.
+func flattenMap(m map[string]any, prefix string, out map[string]string) {
+	for k, v := range m {
+		key := k
+		if prefix != "" {
+			key = prefix + "." + k
+		}
+		switch val := v.(type) {
+		case map[string]any:
+			flattenMap(val, key, out)
+		case nil:
+			// skip
+		default:
+			out[key] = fmt.Sprintf("%v", val)
+		}
+	}
+}
+
+// handleStrategyConfig handles POST /api/v1/strategies/:name/config.
+// Persists strategy-specific config fields to the TOML file and notifies the bus.
+func (s *Server) handleStrategyConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/api/v1/strategies/")
+	name = strings.TrimSuffix(name, "/config")
+
+	s.cfgMu.Lock()
+	cfgCopy := *s.cfg
+
+	var decodeErr error
+	switch name {
+	case "arbitrage":
+		var sc config.ArbitrageConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.Arbitrage = sc
+		}
+	case "market_making":
+		var sc config.MarketMakingConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.MarketMaking = sc
+		}
+	case "positive_ev":
+		var sc config.PositiveEVConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.PositiveEV = sc
+		}
+	case "riskless_rate":
+		var sc config.RisklessRateConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.RisklessRate = sc
+		}
+	case "fade_chaos":
+		var sc config.FadeChaosConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.FadeChaos = sc
+		}
+	case "cross_market":
+		var sc config.CrossMarketConfig
+		decodeErr = json.NewDecoder(r.Body).Decode(&sc)
+		if decodeErr == nil {
+			cfgCopy.Trading.Strategies.CrossMarket = sc
+		}
+	default:
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusNotFound, "unknown strategy: "+name)
+		return
+	}
+
+	if decodeErr != nil {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusBadRequest, decodeErr.Error())
+		return
+	}
+	if err := config.Save(s.cfgPath, &cfgCopy); err != nil {
+		s.cfgMu.Unlock()
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	*s.cfg = cfgCopy
+	s.cfgMu.Unlock()
+	if s.bus != nil {
+		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleOrderbook proxies GET /api/v1/orderbook/{tokenID} to the CLOB public orderbook endpoint.
+func (s *Server) handleOrderbook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+	tokenID := strings.TrimPrefix(r.URL.Path, "/api/v1/orderbook/")
+	if tokenID == "" {
+		writeError(w, http.StatusBadRequest, "missing token_id in path")
+		return
+	}
+
+	clobURL := s.cfg.API.ClobURL
+	if clobURL == "" {
+		clobURL = "https://clob.polymarket.com"
+	}
+
+	resp, err := http.Get(clobURL + "/book?token_id=" + tokenID) //nolint:noctx
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "orderbook fetch failed: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body) //nolint:errcheck
+}
+
+// handleBatchOrders handles POST /api/v1/orders/batch.
+// Accepts a JSON array of order requests and places each in sequence.
+func (s *Server) handleBatchOrders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	if s.placer == nil {
+		writeError(w, http.StatusServiceUnavailable, "order placement unavailable")
+		return
+	}
+
+	var reqs []struct {
+		TokenID   string  `json:"token_id"`
+		Side      string  `json:"side"`
+		OrderType string  `json:"order_type"`
+		Price     float64 `json:"price"`
+		SizeUSD   float64 `json:"size_usd"`
+		WalletID  string  `json:"wallet_id"`
+		NegRisk   bool    `json:"neg_risk"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqs); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(reqs) == 0 {
+		writeError(w, http.StatusBadRequest, "orders array is empty")
+		return
+	}
+
+	type result struct {
+		OrderID string `json:"order_id,omitempty"`
+		Error   string `json:"error,omitempty"`
+	}
+	results := make([]result, len(reqs))
+	for i, req := range reqs {
+		orderID, err := s.placer.PlaceOrder(req.WalletID, req.TokenID, req.Side, req.OrderType, req.Price, req.SizeUSD, req.NegRisk)
+		if err != nil {
+			results[i] = result{Error: err.Error()}
+		} else {
+			results[i] = result{OrderID: orderID}
+		}
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// handleClosePosition handles POST /api/v1/positions/close.
+// Closes an open position by placing a sell order at the specified price.
+func (s *Server) handleClosePosition(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+	if s.placer == nil {
+		writeError(w, http.StatusServiceUnavailable, "order placement unavailable")
+		return
+	}
+
+	var req struct {
+		TokenID   string  `json:"token_id"`
+		Side      string  `json:"side"`      // "YES" or "NO" — which side tokens to sell
+		Price     float64 `json:"price"`     // sell price (0 < price < 1)
+		SizeUSD   float64 `json:"size_usd"`  // USD value to close
+		WalletID  string  `json:"wallet_id"`
+		NegRisk   bool    `json:"neg_risk"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.TokenID == "" {
+		writeError(w, http.StatusBadRequest, "token_id required")
+		return
+	}
+	if req.Side != "YES" && req.Side != "NO" {
+		writeError(w, http.StatusBadRequest, "side must be YES or NO")
+		return
+	}
+	if req.Price <= 0 || req.Price >= 1 {
+		writeError(w, http.StatusBadRequest, "price must be between 0.001 and 0.999")
+		return
+	}
+	if req.SizeUSD <= 0 {
+		writeError(w, http.StatusBadRequest, "size_usd must be positive")
+		return
+	}
+
+	orderID, err := s.placer.PlaceOrder(req.WalletID, req.TokenID, req.Side, "GTC", req.Price, req.SizeUSD, req.NegRisk)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"order_id": orderID, "status": "closing"})
 }
 
 // handleCreateAlert handles POST /api/v1/alerts

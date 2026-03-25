@@ -25,11 +25,14 @@ export const useSettingsStore = defineStore('settings', () => {
   async function save() {
     saving.value = true
     try {
-      // Use saveConfig if available, otherwise fall back to postSettings
-      if (api.saveConfig) {
-        await api.saveConfig(local.value)
-      } else {
-        await api.postSettings(local.value)
+      // Flatten both objects and POST only changed non-secret keys
+      const flat = _flatten(local.value)
+      const serverFlat = _flatten(server.value)
+      for (const [k, v] of Object.entries(flat)) {
+        const strVal = String(v ?? '')
+        if (strVal === '***') continue          // masked secret — skip
+        if (String(serverFlat[k] ?? '') === strVal) continue // unchanged — skip
+        await api.postSettings(k, strVal)
       }
       server.value = JSON.parse(JSON.stringify(local.value))
     } finally {
@@ -37,12 +40,33 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function _flatten(obj, prefix = '', out = {}) {
+    for (const [k, v] of Object.entries(obj || {})) {
+      const key = prefix ? `${prefix}.${k}` : k
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+        _flatten(v, key, out)
+      } else {
+        out[key] = v
+      }
+    }
+    return out
+  }
+
   function reset() {
     local.value = JSON.parse(JSON.stringify(server.value))
   }
 
-  function set(key, value) {
-    local.value[key] = value
+  // set navigates dot-notation path to update nested value in local config
+  function set(dotKey, value) {
+    const parts = dotKey.split('.')
+    let cur = local.value
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (cur[parts[i]] === undefined || cur[parts[i]] === null || typeof cur[parts[i]] !== 'object') {
+        cur[parts[i]] = {}
+      }
+      cur = cur[parts[i]]
+    }
+    cur[parts[parts.length - 1]] = value
   }
 
   return { server, local, loading, saving, isDirty, load, save, reset, set }

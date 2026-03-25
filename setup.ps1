@@ -121,10 +121,7 @@ try {
     $BIN_NAME = "orbitron-polytrade-bot.exe"
     Write-Info "Compiling $BIN_NAME ..."
 
-    go build `
-        -ldflags "-s -w" `
-        -o $BIN_NAME `
-        .\cmd\bot\
+    go build -o $BIN_NAME -ldflags="-X 'github.com/atlas-is-coding/orbitron-polymarket-system/internal/license.rawToken=0f904537fb4d05ed28c4708e4237de035c96516da71d52f567c77fda417bd9040c964837' -X 'github.com/atlas-is-coding/orbitron-polymarket-system/internal/license.LicenseServerURL=https://getorbitron.net/api/v1/license'" ./cmd/bot/
 
     if (Test-Path $BIN_NAME) {
         Write-Info "Backend built: $BIN_NAME"

@@ -14,6 +14,7 @@ import (
 	"github.com/atlasdev/orbitron/internal/config"
 	"github.com/atlasdev/orbitron/internal/i18n"
 	"github.com/atlasdev/orbitron/internal/tui"
+	"github.com/atlasdev/orbitron/internal/wallet"
 )
 
 // settingEntry describes one editable config field accessible via /set.
@@ -1100,7 +1101,7 @@ func (b *Bot) sendWallets(chatID int64) {
 	b.sendOrEdit(chatID, text, walletsKeyboard(wallets))
 }
 
-func (b *Bot) doToggleWallet(_ context.Context, chatID int64, id string) {
+func (b *Bot) doToggleWallet(ctx context.Context, chatID int64, id string) {
 	l := i18n.T()
 	if b.wallets == nil {
 		b.sendText(chatID, RenderError(l.TgErrWalletManagerNA))
@@ -1223,7 +1224,7 @@ func (b *Bot) sendSettingsSection(chatID int64, sectionName string) {
 
 // --- Action helpers ---
 
-func (b *Bot) doCancelOrder(_ context.Context, chatID int64, orderID string) {
+func (b *Bot) doCancelOrder(ctx context.Context, chatID int64, orderID string) {
 	l := i18n.T()
 	if b.canceler == nil {
 		b.sendText(chatID, RenderError(l.TgErrCancelUnavail))
@@ -1236,7 +1237,7 @@ func (b *Bot) doCancelOrder(_ context.Context, chatID int64, orderID string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessOrderCancelled, orderID)))
 }
 
-func (b *Bot) doCancelAll(_ context.Context, chatID int64) {
+func (b *Bot) doCancelAll(ctx context.Context, chatID int64) {
 	l := i18n.T()
 	if b.canceler == nil {
 		b.sendText(chatID, RenderError(l.TgErrCancelUnavail))
@@ -1249,7 +1250,7 @@ func (b *Bot) doCancelAll(_ context.Context, chatID int64) {
 	b.sendText(chatID, RenderSuccess(l.TgSuccessAllCancelled))
 }
 
-func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
+func (b *Bot) doSetSetting(ctx context.Context, chatID int64, key, value string) {
 	l := i18n.T()
 	if IsSecretKey(key) && !b.isAdmin(chatID) {
 		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyAdmin, key)))
@@ -1283,7 +1284,7 @@ func (b *Bot) doSetSetting(_ context.Context, chatID int64, key, value string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessConfigSaved, key, value)))
 }
 
-func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
+func (b *Bot) doToggleSetting(ctx context.Context, chatID int64, key string) {
 	l := i18n.T()
 	if IsSecretKey(key) && !b.isAdmin(chatID) {
 		b.sendText(chatID, RenderError(fmt.Sprintf(l.TgErrKeyAdmin, key)))
@@ -1321,7 +1322,7 @@ func (b *Bot) doToggleSetting(_ context.Context, chatID int64, key string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessConfigSaved, key, newVal)))
 }
 
-func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
+func (b *Bot) doAddTrader(ctx context.Context, chatID int64, args []string) {
 	addr := args[0]
 	label := ""
 	if len(args) > 1 {
@@ -1369,7 +1370,7 @@ func (b *Bot) doAddTrader(_ context.Context, chatID int64, args []string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderAdded, addr, label, allocPct)))
 }
 
-func (b *Bot) doRemoveTrader(_ context.Context, chatID int64, addr string) {
+func (b *Bot) doRemoveTrader(ctx context.Context, chatID int64, addr string) {
 	b.cfgMu.Lock()
 	cfgCopy := *b.cfg
 	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
@@ -1402,7 +1403,7 @@ func (b *Bot) doRemoveTrader(_ context.Context, chatID int64, addr string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderRemoved, addr)))
 }
 
-func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
+func (b *Bot) doToggleTrader(ctx context.Context, chatID int64, addr string) {
 	l := i18n.T()
 	b.cfgMu.Lock()
 	cfgCopy := *b.cfg
@@ -1442,7 +1443,7 @@ func (b *Bot) doToggleTrader(_ context.Context, chatID int64, addr string) {
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessTraderToggled, addr, state)))
 }
 
-func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, allocPct, maxPos float64) {
+func (b *Bot) doEditTrader(ctx context.Context, chatID int64, addr, label string, allocPct, maxPos float64) {
 	b.cfgMu.Lock()
 	cfgCopy := *b.cfg
 	traders := make([]config.TraderConfig, len(cfgCopy.Copytrading.Traders))
@@ -1475,7 +1476,7 @@ func (b *Bot) doEditTrader(_ context.Context, chatID int64, addr, label string, 
 	b.sendText(chatID, RenderSuccess(fmt.Sprintf(i18n.T().TgSuccessTraderUpdated, addr, label, allocPct, maxPos)))
 }
 
-func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
+func (b *Bot) doAddWallet(ctx context.Context, chatID int64, privateKey string) {
 	l := i18n.T()
 	l1, err := auth.NewL1Signer(strings.TrimPrefix(privateKey, "0x"))
 	if err != nil {
@@ -1516,14 +1517,44 @@ func (b *Bot) doAddWallet(_ context.Context, chatID int64, privateKey string) {
 	}
 	*b.cfg = cfgCopy
 	b.cfgMu.Unlock()
+
+	// Check allowances
+	allowances, _ := wallet.CheckAllowances(ctx, b.cfg.API.PolygonRPC, addr)
+
+	// Automatically grant missing allowances
+	if err := wallet.GrantMissingAllowances(ctx, b.cfg.API.PolygonRPC, privateKey, allowances); err == nil {
+		// Re-check after granting to update status in response
+		if updated, err2 := wallet.CheckAllowances(ctx, b.cfg.API.PolygonRPC, addr); err2 == nil {
+			allowances = updated
+		}
+	}
+
 	if b.adder != nil {
 		b.adder.AddInactive(wCfg)
 	}
-	b.bus.Send(tui.WalletAddedMsg{ID: id, Label: wCfg.Label, Enabled: true})
-	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessWalletAdded, addr, id)))
+	b.bus.Send(tui.WalletAddedMsg{
+		ID:         id,
+		Label:      wCfg.Label,
+		Enabled:    true,
+		Allowances: allowances,
+	})
+
+	allowanceText := ""
+	if len(allowances) > 0 {
+		allowanceText = "\n\n<b>Token Allowances:</b>"
+		for _, a := range allowances {
+			icon := "❌"
+			if a.Approved {
+				icon = "✅"
+			}
+			allowanceText += fmt.Sprintf("\n%s %s → %s", icon, a.TokenSymbol, a.SpenderName)
+		}
+	}
+
+	b.sendText(chatID, RenderSuccess(fmt.Sprintf(l.TgSuccessWalletAdded, addr, id))+allowanceText)
 }
 
-func (b *Bot) doRemoveWallet(_ context.Context, chatID int64, id string) {
+func (b *Bot) doRemoveWallet(ctx context.Context, chatID int64, id string) {
 	l := i18n.T()
 	type remover interface{ Remove(id string) error }
 	if r, ok := b.wallets.(remover); ok {
@@ -1564,7 +1595,7 @@ func (b *Bot) sendOrderConfirm(chatID int64) {
 	b.sendOrEdit(chatID, text, orderConfirmKeyboard())
 }
 
-func (b *Bot) doPlaceOrder(_ context.Context, chatID int64, orderData string) {
+func (b *Bot) doPlaceOrder(ctx context.Context, chatID int64, orderData string) {
 	l := i18n.T()
 	if b.placer == nil {
 		b.sendText(chatID, RenderError(l.TgErrOrderUnavail))

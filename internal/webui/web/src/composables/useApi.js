@@ -71,11 +71,6 @@ export function useApi() {
     return (await axios.post(`/api/v1/strategies/${key}/stop`)).data
   }
 
-  // Config — full object save
-  async function saveConfig(config) {
-    return (await axios.post('/api/v1/settings', config)).data
-  }
-
   // Orderbook for markets detail panel
   async function getOrderbook(conditionId) {
     return (await axios.get(`/api/v1/orderbook/${conditionId}`)).data
@@ -114,13 +109,19 @@ export function useApi() {
     return (await axios.post('/api/v1/health/test', { url })).data
   }
 
-  // Trades
-  async function getTrades() {
-    return (await axios.get('/api/v1/trades')).data
+  // Trades — returns empty list if no storage, backend handles gracefully
+  async function getTrades(walletAddress) {
+    const params = walletAddress ? { wallet_address: walletAddress } : {}
+    return (await axios.get('/api/v1/wallets/history/trades', { params })).data
+  }
+
+  // Config — full object save via PUT
+  async function saveConfig(config) {
+    return (await axios.put('/api/v1/settings', config)).data
   }
 
   return {
-    getOverview, getOrders, getPositions, getLogs,
+    getOverview, getOrders, getPositions, getLogs, getStrategies,
     getCopytrading, getSettings, cancelOrder, cancelAll,
     postSettings, saveConfig, addTrader, removeTrader, toggleTrader,
     getWallets, toggleWallet, renameWallet, removeWallet, addWallet,

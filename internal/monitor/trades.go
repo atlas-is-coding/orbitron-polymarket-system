@@ -323,6 +323,12 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 				if tm.analyticsHub != nil {
 					p, _ := strconv.ParseFloat(t.Price, 64)
 					s, _ := strconv.ParseFloat(t.Size, 64)
+					// Resolve strategy by the order that generated this trade.
+					// MakerOrderID is checked first; fall back to TakerOrderID.
+					strategy := tm.analyticsHub.StrategyForOrder(t.MakerOrderID)
+					if strategy == "unknown" && t.TakerOrderID != "" {
+						strategy = tm.analyticsHub.StrategyForOrder(t.TakerOrderID)
+					}
 					tm.analyticsHub.RecordTrade(analytics.TradeReport{
 						ID:        t.ID,
 						MarketID:  t.AssetID,
@@ -331,7 +337,7 @@ func (tm *TradesMonitor) pollTrades(ctx context.Context) {
 						Price:     p,
 						Size:      s,
 						Volume:    p * s,
-						Strategy:  "unknown",
+						Strategy:  strategy,
 						Timestamp: t.Timestamp,
 					})
 				}

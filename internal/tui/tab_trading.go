@@ -23,25 +23,25 @@ const (
 
 // OrderRow represents a single row in the orders table.
 type OrderRow struct {
-	Market string
-	Side   string
-	Price  string
-	Size   string
-	Filled string
-	Status string
-	Age    string
-	ID     string
+	Market string `json:"market"`
+	Side   string `json:"side"`
+	Price  string `json:"price"`
+	Size   string `json:"size"`
+	Filled string `json:"filled"`
+	Status string `json:"status"`
+	Age    string `json:"age"`
+	ID     string `json:"id"`
 }
 
 // PositionRow represents a single row in the positions table.
 type PositionRow struct {
-	Market  string
-	Side    string
-	Size    string
-	Entry   string
-	Current string
-	PnL     string
-	PnLPct  string
+	Market  string `json:"market"`
+	Side    string `json:"side"`
+	Size    string `json:"size"`
+	Entry   string `json:"entry"`
+	Current string `json:"current"`
+	PnL     string `json:"pnl"`
+	PnLPct  string `json:"pnl_pct"`
 }
 
 // CancelOrderMsg is emitted when user presses D on a selected order.

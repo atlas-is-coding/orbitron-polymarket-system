@@ -120,6 +120,8 @@ type Event struct {
 	Description string   `json:"description"`
 	Slug        string   `json:"slug"`
 	Category    string   `json:"category"`
+	// Теги события
+	Tags        []Tag    `json:"tags"`
 	// Рынки в этом событии
 	Markets     []Market `json:"markets"`
 	// Статус события
@@ -143,7 +145,7 @@ type MarketsParams struct {
 	SortBy      string
 	// Порядок: ASC, DESC
 	SortOrder   string
-	Order     string // "volume_24hr", "volume", "liquidity", "end_date"
+	Order     string // "volume", "liquidity", "end_date"
 	Ascending bool   // sort direction; false = descending (default)
 	Closed    *bool  // explicit closed filter
 	// Пагинация
@@ -154,6 +156,7 @@ type MarketsParams struct {
 // EventsParams — параметры для GET /events
 type EventsParams struct {
 	Active    *bool
+	Closed    *bool
 	Category  string
 	Offset    int
 	Limit     int

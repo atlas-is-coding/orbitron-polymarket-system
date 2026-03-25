@@ -59,16 +59,15 @@ func LoadL1Signer(t *testing.T) *auth.L1Signer {
 
 // LoadL2Creds выводит L2 credentials через DeriveAPIKey. Вызывает t.Skip если нет ключа.
 func LoadL2Creds(t *testing.T) (*auth.L1Signer, *auth.L2Credentials) {
-	t.Helper()
-	l1 := LoadL1Signer(t)
-	pubClient := NewCLOBClient()
-	creds, err := pubClient.DeriveAPIKey(l1)
-	if err != nil {
-		t.Fatalf("testutil: DeriveAPIKey: %v", err)
-	}
-	return l1, creds
+        t.Helper()
+        l1 := LoadL1Signer(t)
+        pubClient := NewCLOBClient()
+        creds, err := pubClient.DeriveAPIKey(l1, 137) // Default to mainnet for testutil
+        if err != nil {
+                t.Fatalf("testutil: DeriveAPIKey: %v", err)
+        }
+        return l1, creds
 }
-
 // NewAuthCLOBClient возвращает CLOB клиент с L2 credentials.
 func NewAuthCLOBClient(creds *auth.L2Credentials) *clob.Client {
 	h := api.NewClient(ClobURL, 10, 2)

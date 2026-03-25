@@ -4,8 +4,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -60,10 +62,9 @@ func (s *L1Signer) Sign(data []byte) (string, error) {
 }
 
 // L1Headers возвращает заголовки для L1-аутентификации (для /auth/api-key endpoint).
-func (s *L1Signer) L1Headers(timestamp, nonce string) (map[string]string, error) {
-	// Polymarket L1 подписывает: timestamp + ":" + nonce
-	msg := []byte(timestamp + ":" + nonce)
-	sig, err := s.Sign(msg)
+// Polymarket ожидает EIP-712 подпись структуры ClobAuth.
+func (s *L1Signer) L1Headers(timestamp, nonce string, chainID int64) (map[string]string, error) {
+	sig, err := s.SignAuth(timestamp, nonce, chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,4 +75,58 @@ func (s *L1Signer) L1Headers(timestamp, nonce string) (map[string]string, error)
 		"POLY_NONCE":     nonce,
 		"POLY_SIGNATURE": sig,
 	}, nil
+}
+
+// SignAuth вычисляет EIP-712 подпись для аутентификации на CLOB API.
+func (s *L1Signer) SignAuth(timestamp, nonce string, chainID int64) (string, error) {
+	// 1. Domain Separator
+	domainTypeHash := crypto.Keccak256Hash([]byte(
+		"EIP712Domain(string name,string version,uint256 chainId)",
+	))
+	nameHash := crypto.Keccak256Hash([]byte("ClobAuthDomain"))
+	versionHash := crypto.Keccak256Hash([]byte("1"))
+
+	domainSep := crypto.Keccak256(
+		domainTypeHash.Bytes(),
+		nameHash.Bytes(),
+		versionHash.Bytes(),
+		padBigInt(big.NewInt(chainID)),
+	)
+
+	// 2. Struct Hash (ClobAuth)
+	clobAuthTypeHash := crypto.Keccak256Hash([]byte(
+		"ClobAuth(address address,string timestamp,uint256 nonce,string message)",
+	))
+	
+	msg := "This message attests that I control the given wallet"
+	msgHash := crypto.Keccak256Hash([]byte(msg))
+	tsHash := crypto.Keccak256Hash([]byte(timestamp))
+	
+	nonceInt := new(big.Int)
+	if _, ok := nonceInt.SetString(nonce, 10); !ok {
+		return "", fmt.Errorf("invalid nonce %q", nonce)
+	}
+
+	encoded := make([]byte, 0, 32*5)
+	encoded = append(encoded, clobAuthTypeHash.Bytes()...)
+	encoded = append(encoded, padAddress(common.HexToAddress(s.address))...)
+	encoded = append(encoded, tsHash.Bytes()...)
+	encoded = append(encoded, padBigInt(nonceInt)...)
+	encoded = append(encoded, msgHash.Bytes()...)
+	structHash := crypto.Keccak256(encoded)
+
+	// 3. Final Hash
+	finalHash := crypto.Keccak256(
+		[]byte("\x19\x01"),
+		domainSep,
+		structHash,
+	)
+
+	sig, err := crypto.Sign(finalHash, s.privateKey)
+	if err != nil {
+		return "", fmt.Errorf("l1: sign auth: %w", err)
+	}
+
+	sig[64] += 27
+	return "0x" + hex.EncodeToString(sig), nil
 }

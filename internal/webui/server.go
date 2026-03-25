@@ -114,15 +114,17 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/api/v1/positions", s.jwtMiddleware(s.handlePositions))
 	mux.HandleFunc("/api/v1/strategies", s.jwtMiddleware(s.handleStrategies))
 	mux.HandleFunc("/api/v1/strategies/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
-	        path := r.URL.Path
-	        switch {
-	        case strings.HasSuffix(path, "/start"):
-	                s.handleStartStrategy(w, r)
-	        case strings.HasSuffix(path, "/stop"):
-	                s.handleStopStrategy(w, r)
-	        default:
-	                writeError(w, http.StatusNotFound, "not found")
-	        }
+		path := r.URL.Path
+		switch {
+		case strings.HasSuffix(path, "/start"):
+			s.handleStartStrategy(w, r)
+		case strings.HasSuffix(path, "/stop"):
+			s.handleStopStrategy(w, r)
+		case strings.HasSuffix(path, "/config"):
+			s.handleStrategyConfig(w, r)
+		default:
+			writeError(w, http.StatusNotFound, "not found")
+		}
 	}))
 	mux.HandleFunc("/api/v1/logs", s.jwtMiddleware(s.handleLogs))
 	// Initial subsystem status for Web UI itself
@@ -159,6 +161,18 @@ func (s *Server) Run(ctx context.Context) error {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	}))
+	// GET /api/v1/copytrading/traders — returns traders list directly
+	mux.HandleFunc("/api/v1/copytrading/traders", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		s.cfgMu.RLock()
+		traders := make([]config.TraderConfig, len(s.cfg.Copytrading.Traders))
+		copy(traders, s.cfg.Copytrading.Traders)
+		s.cfgMu.RUnlock()
+		writeJSON(w, http.StatusOK, traders)
+	}))
 	mux.HandleFunc("/api/v1/copytrading/traders/", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
@@ -180,6 +194,8 @@ func (s *Server) Run(ctx context.Context) error {
 			s.handleGetSettings(w, r)
 		case http.MethodPost:
 			s.handlePostSettings(w, r)
+		case http.MethodPut:
+			s.handleSaveConfig(w, r)
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
@@ -202,6 +218,8 @@ func (s *Server) Run(ctx context.Context) error {
 			s.handleUpdateWallet(w, r)
 		case r.Method == http.MethodDelete:
 			s.handleDeleteWallet(w, r)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/approve"):
+			s.handleApproveAllowance(w, r)
 		case r.Method == http.MethodPost:
 			s.handleToggleWallet(w, r)
 		default:
@@ -221,6 +239,29 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/api/v1/markets/", s.jwtMiddleware(s.handleMarketDetail))
 	mux.HandleFunc("/api/v1/markets", s.jwtMiddleware(s.handleMarketsList))
 	mux.HandleFunc("/api/v1/alerts", s.jwtMiddleware(s.handleCreateAlert))
+
+	// Health test endpoint
+	mux.HandleFunc("/api/v1/health/test", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "POST required")
+			return
+		}
+		s.handleTestEndpoint(w, r)
+	}))
+
+	// Orderbook proxy
+	mux.HandleFunc("/api/v1/orderbook/", s.jwtMiddleware(s.handleOrderbook))
+
+	// Batch orders
+	mux.HandleFunc("/api/v1/orders/batch", s.jwtMiddleware(s.handleBatchOrders))
+
+	// Close position
+	mux.HandleFunc("/api/v1/positions/close", s.jwtMiddleware(s.handleClosePosition))
+
+	// Trades — returns empty list (history requires storage)
+	mux.HandleFunc("/api/v1/trades", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, []any{})
+	}))
 
 	// WebSocket
 	mux.HandleFunc("/ws", s.jwtMiddleware(func(w http.ResponseWriter, r *http.Request) {
