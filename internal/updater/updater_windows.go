@@ -91,6 +91,7 @@ func runBinaryUpdate(ctx context.Context, binaryURL, version, dir string, p *Pen
 
 	p.Clear()
 	log.Info().Str("version", version).Msg("updater: helper launched, exiting for binary swap")
+	time.Sleep(200 * time.Millisecond) // allow zerolog to flush before exit
 	os.Exit(0)
 }
 
