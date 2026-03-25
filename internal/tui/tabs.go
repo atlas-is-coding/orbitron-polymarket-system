@@ -136,6 +136,7 @@ func renderHeroCard(label, value, sub string, width int, topColor lipgloss.Color
 	return lipgloss.JoinVertical(lipgloss.Left, topBar, body)
 }
 
+// Deprecated: use renderCard instead. Remaining callers migrated in Tasks 3–9.
 // renderPanel renders a spec-compliant content panel.
 // active=true uses ColorPrimary border; false uses ColorPrimaryDim.
 func renderPanel(title, content string, width int, active bool) string {
