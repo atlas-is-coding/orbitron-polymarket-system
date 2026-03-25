@@ -89,7 +89,7 @@ func TestScheduleUpdateWith_NotIdleSavesPending(t *testing.T) {
 
 func TestCheckVersion_NoUpdateWhenCurrent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(versionResponse{Version: "1.0.0"}) // same as license.Version
+		json.NewEncoder(w).Encode(versionResponse{Version: "0.0.1"}) // older than any real version
 	}))
 	defer srv.Close()
 

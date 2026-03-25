@@ -2,14 +2,15 @@
 
 // updater-helper is a tiny Windows-only binary.
 // It is spawned by the updater before the main process exits.
-// Args: <old-path> <new-path>
-//   old-path — current executable (to be replaced)
-//   new-path — downloaded .new file (replacement)
+// Args: <old-path> <new-path> [original-args...]
+//   old-path        — current executable (to be replaced)
+//   new-path        — downloaded .new file (replacement)
+//   original-args   — forwarded to the relaunched binary (e.g. --config foo.toml)
 //
 // Sequence:
 //  1. Sleep 1.5s so the parent process can exit and release the file lock.
 //  2. MoveFileEx(new-path → old-path, MOVEFILE_REPLACE_EXISTING).
-//  3. exec.Command(old-path).Start() — re-launch with original args.
+//  3. exec.Command(old-path, os.Args[3:]...).Start() — re-launch with original args.
 package main
 
 import (
@@ -50,7 +51,7 @@ func moveFileEx(from, to string) error {
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "usage: updater-helper <old-exe> <new-exe>")
+		fmt.Fprintln(os.Stderr, "usage: updater-helper <old-exe> <new-exe> [args...]")
 		os.Exit(1)
 	}
 	oldExe := os.Args[1]
@@ -65,7 +66,7 @@ func main() {
 	}
 
 	// Re-launch the updated binary.
-	cmd := exec.Command(oldExe)
+	cmd := exec.Command(oldExe, os.Args[3:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
