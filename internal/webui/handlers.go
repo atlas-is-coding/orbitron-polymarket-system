@@ -756,6 +756,7 @@ func (s *Server) handleAddWallet(w http.ResponseWriter, r *http.Request) {
 			Allowances: allowances,
 		})
 	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":          id,
 		"address":     addr,
@@ -820,6 +821,7 @@ func (s *Server) handleUpdateWallet(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
@@ -868,6 +870,7 @@ func (s *Server) handleToggleWallet(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
 }
 
@@ -898,6 +901,7 @@ func (s *Server) handleDeleteWallet(w http.ResponseWriter, r *http.Request) {
 	s.cfgMu.Unlock()
 	// Sync WebState synchronously (manager.Remove already sends EventBus, but state update is async)
 	s.state.RemoveWallet(id)
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
 
@@ -1260,9 +1264,7 @@ func (s *Server) handleStrategyConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	*s.cfg = cfgCopy
 	s.cfgMu.Unlock()
-	if s.bus != nil {
-		s.bus.Send(tui.ConfigReloadedMsg{Config: s.cfg})
-	}
+	s.publishConfigChange()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

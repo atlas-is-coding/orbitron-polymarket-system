@@ -178,14 +178,10 @@ func (b *Bot) consumeNexusEvents(ctx context.Context, nexusCh <-chan nexus.Event
 			if evt.Type == nexus.EventConfigChanged {
 				if payload, ok := evt.Payload.(nexus.ConfigChangedPayload); ok {
 					b.cfgMu.Lock()
-					// Update copytrading config
-					if len(payload.Copytrading.Traders) > 0 {
-						b.cfg.Copytrading = payload.Copytrading
-					}
-					// Update wallets config
-					if len(payload.Wallets) > 0 {
-						b.cfg.Wallets = payload.Wallets
-					}
+					// Update copytrading config (even if empty - user may have deleted all traders)
+					b.cfg.Copytrading = payload.Copytrading
+					// Update wallets config (even if empty - user may have deleted all wallets)
+					b.cfg.Wallets = payload.Wallets
 					b.cfgMu.Unlock()
 				}
 			}

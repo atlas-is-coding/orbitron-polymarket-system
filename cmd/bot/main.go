@@ -786,6 +786,17 @@ func run() error {
 		watcher, _ := config.NewWatcher(*cfgPath, func(newCfg *config.Config) {
 			bus.Send(tui.ConfigReloadedMsg{Config: newCfg})
 			bus.Send(tui.StrategiesUpdateMsg{Rows: trading.GetStrategyRows(engine, wm)})
+			// Also publish to Nexus for non-TUI systems (e.g., TelegramUI)
+			if nex != nil {
+				nex.PublishEvent(nexus.Event{
+					Type:      nexus.EventConfigChanged,
+					Timestamp: time.Now(),
+					Payload: nexus.ConfigChangedPayload{
+						Copytrading: newCfg.Copytrading,
+						Wallets:     newCfg.Wallets,
+					},
+				})
+			}
 		})
 		go watcher.Run(ctx)
 
