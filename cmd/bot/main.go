@@ -436,9 +436,6 @@ func run() error {
 		log.Info().Str("type", cfg.Proxy.Type).Str("addr", cfg.Proxy.Addr).Msg("proxy enabled")
 	}
 
-	// --- Nexus State Manager ---
-	nx := tui.NewNexus()
-
 	// Load Builder Program credentials (non-fatal: bot runs without them).
 	builderCreds, licenseErr := license.Load()
 	if licenseErr != nil {
@@ -507,6 +504,15 @@ func run() error {
 		return fmt.Errorf("create nexus: %w", err)
 	}
 	log.Info().Msg("Nexus coordinator initialized")
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := nex.Shutdown(ctx); err != nil {
+			log.Error().Err(err).Msg("Nexus shutdown error")
+		}
+	}()
+	// --- Old TUI state keeper (for TUI/WebUI state display) ---
+	nx := tui.NewNexus()
 
 	// --- Wallet Manager ---
 	wm := wallet.NewManager(bus, cfg, wsClient)
@@ -722,6 +728,9 @@ func run() error {
 
 	adapter := &engineAdapter{engine: engine, wm: wm, bus: bus, ctx: ctx, cfgPath: *cfgPath}
 
+	// --- Register Nexus Command Handlers ---
+	registerCommandHandlers(nex, cfg, adapter, wm)
+
 	// --- Telegram Bot (interactive) ---
 	// Initialised before subsystems so it can be started alongside them.
 	// tgBot may be nil if bot_token is empty or init fails.
@@ -760,7 +769,7 @@ func run() error {
 				break
 			}
 		}
-		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, nil, &log)
+		webServer := webui.New(cfg, *cfgPath, bus, nx, cancelerForWeb, wm, marketsService, adapter, adapter, store, nex, &log)
 		startSubsystem("Web UI", func() error { return webServer.Run(ctx) })
 		go func() {
 			time.Sleep(500 * time.Millisecond)
