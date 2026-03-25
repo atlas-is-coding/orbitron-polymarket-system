@@ -33,9 +33,35 @@ jobs:
           path: internal/webui/web/dist/
           retention-days: 1
 
+  build-helper:
+    name: Build Updater Helper (Windows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build updater-helper.exe
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          go build -ldflags="-s -w" -o dist/updater-helper.exe ./internal/updater/helper/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-helper-windows
+          path: dist/updater-helper.exe
+          retention-days: 1
+
   build:
     name: Build / ${{ matrix.goos }}-${{ matrix.goarch }}
-    needs: build-frontend
+    needs: [build-frontend, build-helper]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -63,6 +89,13 @@ jobs:
         with:
           name: frontend-dist
           path: internal/webui/web/dist/
+
+      - name: Download updater helper (Windows only)
+        if: matrix.goos == 'windows'
+        uses: actions/download-artifact@v4
+        with:
+          name: updater-helper-windows
+          path: dist/
 
       - uses: actions/setup-go@v5
         with:
@@ -120,8 +153,10 @@ jobs:
         with:
           files: |
             dist/orbitron-*
+            dist/updater-helper.exe
             dist/checksums.txt
             setup.sh
+            setup.ps1
           generate_release_notes: true
           draft: false
           fail_on_unmatched_files: true
